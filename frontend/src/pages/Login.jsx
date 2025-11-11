@@ -19,7 +19,12 @@ export default function Login() {
       toast.success('Logged in successfully');
       navigate('/');
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Login failed');
+      const errorMessage = error.response?.data?.message 
+        || error.response?.data?.error 
+        || error.message 
+        || 'Login failed';
+      toast.error(errorMessage);
+      console.error('Login error:', error);
     } finally {
       setLoading(false);
     }

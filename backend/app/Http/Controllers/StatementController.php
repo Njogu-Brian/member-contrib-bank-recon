@@ -19,13 +19,11 @@ class StatementController extends Controller
         $filename = $file->getClientOriginalName();
         $fileHash = hash_file('sha256', $file->getRealPath());
 
-        // Check for duplicates
+        // Check for duplicates (informational only - allow re-upload)
         $existing = BankStatement::where('file_hash', $fileHash)->first();
         if ($existing) {
-            return response()->json([
-                'message' => 'This file has already been uploaded',
-                'statement' => $existing,
-            ], 409);
+            // Return existing statement info but allow upload to proceed
+            // User can delete the old one if needed
         }
 
         $path = $file->store('statements', 'local');
@@ -60,6 +58,34 @@ class StatementController extends Controller
         $statement->load('transactions.member');
 
         return response()->json($statement);
+    }
+
+    public function destroy(BankStatement $statement)
+    {
+        // Delete ALL associated transactions (assigned or not)
+        // This includes transactions, transaction splits, and match logs
+        $transactionIds = $statement->transactions()->pluck('id');
+        
+        if ($transactionIds->isNotEmpty()) {
+            // Delete transaction splits
+            \App\Models\TransactionSplit::whereIn('transaction_id', $transactionIds)->delete();
+            
+            // Delete transaction match logs
+            \App\Models\TransactionMatchLog::whereIn('transaction_id', $transactionIds)->delete();
+            
+            // Delete transactions
+            $statement->transactions()->delete();
+        }
+
+        // Delete the file from storage
+        if ($statement->file_path && Storage::exists($statement->file_path)) {
+            Storage::delete($statement->file_path);
+        }
+
+        // Delete the statement record
+        $statement->delete();
+
+        return response()->json(['message' => 'Statement and all associated transactions deleted successfully']);
     }
 }
 

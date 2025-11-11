@@ -4,19 +4,26 @@ Python service for parsing bank statement PDFs with OCR fallback.
 
 ## Installation
 
-1. Install Tesseract OCR:
-   - **Windows**: Download from https://github.com/UB-Mannheim/tesseract/wiki
-   - **macOS**: `brew install tesseract`
-   - **Linux**: `sudo apt-get install tesseract-ocr`
+### Windows
+See [SETUP_WINDOWS.md](SETUP_WINDOWS.md) for detailed Windows setup instructions.
 
-2. Install Python dependencies:
-```bash
-pip install -r requirements.txt
-```
+Quick setup:
+1. Install Python 3.9+ from https://www.python.org/downloads/ (check "Add to PATH")
+2. Install Tesseract from https://github.com/UB-Mannheim/tesseract/wiki
+3. Install dependencies: `python -m pip install -r requirements.txt`
 
-3. Configure Tesseract path (if not in PATH):
-   - Set `TESSERACT_CMD` environment variable
-   - Or modify `pytesseract.pytesseract.tesseract_cmd` in the script
+### macOS
+1. Install Tesseract: `brew install tesseract`
+2. Install dependencies: `pip install -r requirements.txt`
+
+### Linux
+1. Install Tesseract: `sudo apt-get install tesseract-ocr`
+2. Install dependencies: `pip install -r requirements.txt`
+
+### Configure Tesseract Path (if needed)
+If Tesseract is not in your PATH:
+- Set `TESSERACT_CMD` environment variable
+- Or modify `pytesseract.pytesseract.tesseract_cmd` in the script
 
 ## Usage
 

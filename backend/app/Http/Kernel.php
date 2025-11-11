@@ -27,7 +27,7 @@ class Kernel extends HttpKernel
         ],
 
         'api' => [
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+            // Stateless API - no stateful middleware needed for token auth
             'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],

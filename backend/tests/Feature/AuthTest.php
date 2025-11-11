@@ -19,6 +19,10 @@ class AuthTest extends TestCase
             'password_confirmation' => 'password123',
         ]);
 
+        if ($response->status() !== 201) {
+            dump($response->json());
+        }
+
         $response->assertStatus(201)
             ->assertJsonStructure(['user', 'token']);
     }

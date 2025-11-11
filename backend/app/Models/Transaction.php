@@ -16,15 +16,18 @@ class Transaction extends Model
         'tran_date',
         'value_date',
         'particulars',
+        'transaction_type',
         'credit',
         'debit',
         'balance',
         'transaction_code',
+        'extracted_member_number',
         'phones',
         'row_hash',
         'member_id',
         'assignment_status',
         'match_confidence',
+        'draft_member_ids',
         'raw_text',
         'raw_json',
     ];
@@ -36,6 +39,7 @@ class Transaction extends Model
         'debit' => 'decimal:2',
         'balance' => 'decimal:2',
         'phones' => 'array',
+        'draft_member_ids' => 'array',
         'match_confidence' => 'decimal:2',
         'raw_json' => 'array',
     ];
@@ -53,6 +57,11 @@ class Transaction extends Model
     public function matchLogs(): HasMany
     {
         return $this->hasMany(TransactionMatchLog::class);
+    }
+
+    public function splits(): HasMany
+    {
+        return $this->hasMany(TransactionSplit::class);
     }
 }
 

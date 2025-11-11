@@ -15,6 +15,7 @@ class Member extends Model
         'phone',
         'email',
         'member_code',
+        'member_number',
         'notes',
         'is_active',
     ];

@@ -28,7 +28,6 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['transaction_code', 'tran_date']);
-            $table->index('row_hash');
         });
     }
 

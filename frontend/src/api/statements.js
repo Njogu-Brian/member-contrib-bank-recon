@@ -10,5 +10,6 @@ export const statementsApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then((res) => res.data);
   },
+  delete: (id) => api.delete(`/statements/${id}`).then((res) => res.data),
 };
 

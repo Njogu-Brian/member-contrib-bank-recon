@@ -6,6 +6,12 @@ import Upload from './pages/Upload';
 import Transactions from './pages/Transactions';
 import Members from './pages/Members';
 import Contributions from './pages/Contributions';
+import ManualContributions from './pages/ManualContributions';
+import Expenses from './pages/Expenses';
+import DraftAssignments from './pages/DraftAssignments';
+import MemberProfile from './pages/MemberProfile';
+import Settings from './pages/Settings';
+import Statements from './pages/Statements';
 import Layout from './components/Layout';
 
 function PrivateRoute({ children }) {
@@ -36,6 +42,12 @@ function App() {
           <Route path="transactions" element={<Transactions />} />
           <Route path="members" element={<Members />} />
           <Route path="contributions" element={<Contributions />} />
+          <Route path="manual-contributions" element={<ManualContributions />} />
+          <Route path="expenses" element={<Expenses />} />
+          <Route path="draft-assignments" element={<DraftAssignments />} />
+          <Route path="members/:id" element={<MemberProfile />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="statements" element={<Statements />} />
         </Route>
       </Routes>
     </BrowserRouter>

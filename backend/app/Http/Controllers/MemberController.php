@@ -58,7 +58,8 @@ class MemberController extends Controller
             'name' => 'sometimes|required|string|max:255',
             'phone' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:255',
-            'member_code' => 'nullable|string|max:50|unique:members,member_code,'.$member->id,
+            'member_code' => 'nullable|string|max:50|unique:members,member_code,' . $member->id,
+            'member_number' => 'nullable|string|max:50',
             'notes' => 'nullable|string',
             'is_active' => 'boolean',
         ]);
@@ -109,12 +110,44 @@ class MemberController extends Controller
                     continue;
                 }
 
+                // Normalize empty strings to null
+                $memberCode = !empty(trim($rowData['member_code'] ?? '')) ? trim($rowData['member_code']) : null;
+                $phoneRaw = !empty(trim($rowData['phone'] ?? '')) ? trim($rowData['phone']) : null;
+                $email = !empty(trim($rowData['email'] ?? '')) ? trim($rowData['email']) : null;
+                $name = trim($rowData['name']);
+
+                // Normalize phone number (remove spaces, dashes, parentheses)
+                $phone = $phoneRaw ? preg_replace('/[\s\-\(\)]/', '', $phoneRaw) : null;
+
+                // Determine search criteria: prefer member_code, then name+phone combo
+                $searchCriteria = null;
+                if ($memberCode) {
+                    // Use member_code as primary identifier
+                    $searchCriteria = ['member_code' => $memberCode];
+                } elseif ($name && $phone) {
+                    // Use name+phone as composite key when member_code is missing
+                    // This ensures each unique person gets their own record
+                    $searchCriteria = [
+                        'name' => $name,
+                        'phone' => $phone,
+                    ];
+                } elseif ($name) {
+                    // Only name available - use name alone (less ideal but better than nothing)
+                    $searchCriteria = ['name' => $name];
+                } else {
+                    // No usable identifier - skip this row
+                    $errors[] = ['row' => $row, 'errors' => ['name' => ['Name is required']]];
+                    continue;
+                }
+
+                // Update or create using the determined criteria
                 $member = Member::updateOrCreate(
-                    ['member_code' => $rowData['member_code'] ?? null],
+                    $searchCriteria,
                     [
-                        'name' => $rowData['name'],
-                        'phone' => $rowData['phone'] ?? null,
-                        'email' => $rowData['email'] ?? null,
+                        'name' => $name,
+                        'phone' => $phone,
+                        'email' => $email,
+                        'member_code' => $memberCode, // Preserve member_code if it exists
                         'is_active' => true,
                     ]
                 );

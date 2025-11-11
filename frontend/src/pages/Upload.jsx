@@ -16,7 +16,8 @@ export default function Upload() {
       setFile(null);
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || 'Upload failed');
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || 'Upload failed';
+      toast.error(errorMessage, { duration: 5000 });
     },
   });
 

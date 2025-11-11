@@ -45,29 +45,66 @@ class ProcessBankStatement implements ShouldQueue
             $threshold = (float) config('app.ai_matching_threshold', 0.85);
 
             foreach ($rows as $row) {
-                // Extract transaction code and phones
-                $transactionCode = $this->extractTransactionCode($row['particulars'] ?? '');
-                $phones = $this->extractPhones($row['particulars'] ?? '');
+                // Use the parser service for better extraction
+                $parser = app(\App\Services\TransactionParserService::class);
+                $parsed = $parser->parseParticulars($row['particulars'] ?? '');
+                
+                // For Paybill, transaction_code comes from Receipt No. column (first column in table)
+                // Check if this is a Paybill transaction by presence of transaction_code from table extraction
+                $isPaybillTransaction = isset($row['transaction_code']) && !empty($row['transaction_code']);
+                
+                if ($isPaybillTransaction) {
+                    // This is from Paybill table extraction (Receipt No. column)
+                    // ALL Paybill transactions have a code and type
+                    $transactionType = 'M-Pesa Paybill';
+                    $transactionCode = $row['transaction_code']; // Always use Receipt No. from table
+                } else {
+                    // Regular bank statement transaction
+                    $transactionCode = $parsed['transaction_code'] ?? null;
+                    $transactionType = $parsed['transaction_type'] ?? null;
+                }
+                
+                $phones = $parsed['phone_numbers'] ?? [];
 
-                // Create row hash for duplicate detection
+                // Skip debit/withdrawn transactions (we only need credits/paid in)
+                // Skip if debit > 0 AND credit = 0 (pure debit transaction)
+                if (($row['debit'] ?? 0) > 0 && ($row['credit'] ?? 0) == 0) {
+                    continue; // Skip pure debit transactions
+                }
+                
+                // Also skip if credit is 0 or empty (no credit transaction)
+                // This ensures we only process transactions with Paid In amounts
+                if (($row['credit'] ?? 0) == 0) {
+                    continue;
+                }
+
+                // Create row hash for duplicate detection using date, particulars, and amount
+                // This ensures duplicates are detected across all files, not just same file
                 $rowHash = sha1(
                     ($row['particulars'] ?? '') .
                     ($row['tran_date'] ?? '') .
                     ($row['credit'] ?? 0)
                 );
 
-                // Check for duplicates
+                // Check for duplicates across ALL transactions (not just same statement)
                 $existing = Transaction::where('row_hash', $rowHash)
                     ->orWhere(function ($q) use ($transactionCode, $row) {
                         if ($transactionCode) {
                             $q->where('transaction_code', $transactionCode)
-                                ->where('tran_date', $row['tran_date'] ?? null);
+                                ->where('tran_date', $row['tran_date'] ?? null)
+                                ->where('credit', $row['credit'] ?? 0);
                         }
+                    })
+                    ->orWhere(function ($q) use ($row) {
+                        // Also check by date, particulars, and amount (exact match)
+                        $q->where('tran_date', $row['tran_date'] ?? null)
+                            ->where('particulars', $row['particulars'] ?? '')
+                            ->where('credit', $row['credit'] ?? 0);
                     })
                     ->first();
 
                 if ($existing) {
-                    continue; // Skip duplicate
+                    continue; // Skip duplicate - already exists in database
                 }
 
                 $transactions[] = [
@@ -75,10 +112,12 @@ class ProcessBankStatement implements ShouldQueue
                     'tran_date' => $row['tran_date'] ?? now(),
                     'value_date' => $row['value_date'] ?? null,
                     'particulars' => $row['particulars'] ?? '',
+                    'transaction_type' => $transactionType,
                     'credit' => (float) ($row['credit'] ?? 0),
                     'debit' => (float) ($row['debit'] ?? 0),
                     'balance' => isset($row['balance']) ? (float) $row['balance'] : null,
                     'transaction_code' => $transactionCode,
+                    'extracted_member_number' => $parsed['member_number'] ?? null,
                     'phones' => $phones,
                     'row_hash' => $rowHash,
                     'raw_text' => $row['particulars'] ?? '',

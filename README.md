@@ -58,10 +58,15 @@ npm run dev
 
 #### 3. Setup OCR Parser
 
+**Prerequisites:**
+- Install Python 3.9+ from https://www.python.org/downloads/ (check "Add to PATH")
+- Install Tesseract OCR from https://github.com/UB-Mannheim/tesseract/wiki
+- See `ocr-parser/SETUP_WINDOWS.md` for detailed Windows setup
+
 ```bash
 cd ocr-parser
-pip install -r requirements.txt
-# Install Tesseract: https://github.com/tesseract-ocr/tesseract/wiki
+python -m pip install -r requirements.txt
+# Test the parser
 python parse_pdf.py fixtures/sample_statement.pdf --output output.json
 ```
 
@@ -144,9 +149,13 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions:
 
 ## Testing
 
-- Backend: `php artisan test`
-- Frontend: `npm test` (in frontend/)
+See [TESTING_GUIDE.md](TESTING_GUIDE.md) for complete testing instructions.
+
+**Quick test commands:**
+- Backend: `cd backend && php artisan test`
+- Frontend: `cd frontend && npm test`
 - E2E: `node scripts/e2e-smoke-test.js`
+- API: Start backend with `php artisan serve` and test endpoints
 
 ## Developer Checklist
 
