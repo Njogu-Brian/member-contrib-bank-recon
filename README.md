@@ -143,9 +143,21 @@ node scripts/e2e-smoke-test.js
 
 ## Deployment
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions:
-- Local XAMPP setup
-- cPanel deployment guide
+### cPanel Deployment
+
+For cPanel deployment, see:
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Complete step-by-step guide
+- **[QUICK_DEPLOY.md](QUICK_DEPLOY.md)** - Quick reference guide
+
+**Quick Start:**
+1. Clone repository to `~/laravel-ap/member-contributions`
+2. Setup backend: `composer install`, configure `.env`, run migrations
+3. Setup frontend: `npm install`, `npm run build`
+4. Copy public files to `~/public_html/statement/`
+5. Update `index.php` paths (see `public-index-cpanel.php` template)
+6. Run deployment script: `./deploy.sh`
+
+For detailed instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Testing
 
