@@ -1,0 +1,60 @@
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Backend (Laravel)
+backend/vendor/
+backend/node_modules/
+backend/.env
+backend/.env.backup
+backend/.phpunit.result.cache
+backend/storage/*.key
+backend/storage/logs/*
+backend/storage/framework/cache/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/bootstrap/cache/*
+backend/public/hot
+backend/public/storage
+backend/public/build
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.env
+frontend/.env.local
+frontend/.env.production.local
+frontend/.env.development.local
+frontend/coverage/
+
+# OCR Parser
+ocr-parser/__pycache__/
+ocr-parser/*.pyc
+ocr-parser/venv/
+ocr-parser/.env
+ocr-parser/output.json
+
+# Matching Service
+matching-service/node_modules/
+matching-service/.env
+matching-service/logs/
+
+# General
+*.log
+.env
+.env.local
+node_modules/
+vendor/
+*.pdf
+!fixtures/*.pdf
+
