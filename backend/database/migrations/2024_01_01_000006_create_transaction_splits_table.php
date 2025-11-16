@@ -15,8 +15,9 @@ return new class extends Migration
             $table->decimal('amount', 15, 2);
             $table->text('notes')->nullable();
             $table->timestamps();
-
-            $table->index(['transaction_id', 'member_id']);
+            
+            $table->index('transaction_id');
+            $table->index('member_id');
         });
     }
 

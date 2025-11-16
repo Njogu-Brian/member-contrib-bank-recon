@@ -2,11 +2,10 @@
 
 return [
     'paths' => [
-        resource_path('views'),
+        base_path('resources/views'),
     ],
     'compiled' => env(
         'VIEW_COMPILED_PATH',
-        realpath(storage_path('framework/views'))
+        realpath(storage_path('framework/views')) ?: storage_path('framework/views')
     ),
 ];
-

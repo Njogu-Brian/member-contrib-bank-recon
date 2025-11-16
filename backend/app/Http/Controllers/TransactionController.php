@@ -2,25 +2,39 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Member;
 use App\Models\Transaction;
 use App\Models\TransactionMatchLog;
-use App\Models\Member;
+use App\Models\TransactionSplit;
 use App\Services\MatchingService;
 use App\Services\TransactionParserService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class TransactionController extends Controller
 {
-    public function __construct(
-        protected MatchingService $matchingService,
-        protected TransactionParserService $parserService
-    ) {}
+    protected $parser;
+
+    public function __construct(TransactionParserService $parser)
+    {
+        $this->parser = $parser;
+    }
 
     public function index(Request $request)
     {
-        $query = Transaction::with(['member', 'bankStatement', 'splits.member']);
+        $query = Transaction::with(['member', 'bankStatement', 'matchLogs']);
 
-        // Only apply status filter if status is explicitly provided and not empty
+        if ($request->filled('archived')) {
+            $archived = filter_var($request->archived, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($archived !== null) {
+                $query->where('is_archived', $archived);
+            }
+        } elseif (!$request->boolean('include_archived', false) && !$request->filled('bank_statement_id')) {
+            $query->where('is_archived', false);
+        }
+
+        // Filters - only apply if value is not empty
         if ($request->filled('status')) {
             $query->where('assignment_status', $request->status);
         }
@@ -37,617 +51,1479 @@ class TransactionController extends Controller
             $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('particulars', 'like', "%{$search}%")
-                    ->orWhere('transaction_code', 'like', "%{$search}%")
-                    ->orWhereHas('member', function ($q) use ($search) {
-                        $q->where('name', 'like', "%{$search}%");
-                    });
+                  ->orWhere('transaction_code', 'like', "%{$search}%")
+                  ->orWhereHas('member', function ($q) use ($search) {
+                      $q->where('name', 'like', "%{$search}%");
+                  });
             });
         }
 
-        $perPage = $request->get('per_page', 20);
-        $transactions = $query->orderBy('tran_date', 'desc')
-            ->paginate($perPage);
+        if ($request->filled('date_from')) {
+            $query->where('tran_date', '>=', $request->date_from);
+        }
 
+        if ($request->filled('date_to')) {
+            $query->where('tran_date', '<=', $request->date_to);
+        }
+
+        // Handle sorting
+        $sortBy = $request->get('sort_by', 'tran_date');
+        $sortOrder = $request->get('sort_order', 'desc');
+        
+        if ($sortBy === 'amount' || $sortBy === 'credit') {
+            $query->orderBy('credit', $sortOrder);
+        } else {
+            $query->orderBy($sortBy, $sortOrder);
+        }
+
+        $transactions = $query->paginate($request->get('per_page', 20));
+        
+        // For draft transactions, load draft members
+        if ($request->filled('status') && $request->status === 'draft') {
+            foreach ($transactions->items() as $transaction) {
+                if ($transaction->draft_member_ids && is_array($transaction->draft_member_ids)) {
+                    $transaction->draft_members = \App\Models\Member::whereIn('id', $transaction->draft_member_ids)->get();
+                }
+            }
+        }
+        
         return response()->json($transactions);
     }
 
     public function show(Transaction $transaction)
     {
-        $transaction->load(['member', 'bankStatement', 'matchLogs.member', 'matchLogs.user', 'splits.member']);
-
+        $transaction->load(['member', 'bankStatement', 'matchLogs.member', 'splits.member']);
         return response()->json($transaction);
     }
 
     public function assign(Request $request, Transaction $transaction)
     {
+        if ($transaction->is_archived) {
+            return response()->json([
+                'message' => 'Cannot assign an archived transaction',
+            ], 422);
+        }
+
         $request->validate([
             'member_id' => 'required|exists:members,id',
-            'confidence' => 'nullable|numeric|min:0|max:1',
-            'match_reason' => 'nullable|string',
         ]);
 
         $transaction->update([
             'member_id' => $request->member_id,
             'assignment_status' => 'manual_assigned',
-            'match_confidence' => $request->confidence ?? 1.0,
+            'match_confidence' => 1.0,
         ]);
 
         TransactionMatchLog::create([
             'transaction_id' => $transaction->id,
             'member_id' => $request->member_id,
-            'confidence' => $request->confidence ?? 1.0,
-            'match_reason' => $request->match_reason ?? 'Manual assignment',
+            'confidence' => 1.0,
+            'match_reason' => 'Manual assignment',
             'source' => 'manual',
             'user_id' => $request->user()->id,
         ]);
 
-        return response()->json($transaction->load('member'));
-    }
+        $transaction->load(['member', 'bankStatement']);
 
-    public function askAi(Request $request)
-    {
-        $request->validate([
-            'transaction_id' => 'required|exists:transactions,id',
-        ]);
-
-        $transaction = Transaction::findOrFail($request->transaction_id);
-        $members = \App\Models\Member::where('is_active', true)->get();
-
-        $matches = $this->matchingService->matchBatch([
-            [
-                'client_tran_id' => 't_'.$transaction->id,
-                'tran_date' => $transaction->tran_date->format('Y-m-d'),
-                'particulars' => $transaction->particulars,
-                'credit' => $transaction->credit,
-                'transaction_code' => $transaction->transaction_code,
-                'phones' => $transaction->phones ?? [],
-            ],
-        ], $members->toArray());
-
-        return response()->json([
-            'transaction' => $transaction,
-            'matches' => $matches,
-        ]);
+        return response()->json($transaction);
     }
 
     public function split(Request $request, Transaction $transaction)
     {
+        if ($transaction->is_archived) {
+            return response()->json([
+                'message' => 'Cannot split an archived transaction',
+            ], 422);
+        }
+
         $request->validate([
             'splits' => 'required|array|min:1',
             'splits.*.member_id' => 'required|exists:members,id',
             'splits.*.amount' => 'required|numeric|min:0.01',
-            'splits.*.notes' => 'nullable|string',
         ]);
 
         $totalAmount = collect($request->splits)->sum('amount');
-        
-        if (abs($totalAmount - $transaction->credit) > 0.01) {
+        $transactionAmount = $transaction->credit > 0 ? $transaction->credit : $transaction->debit;
+
+        if (abs($totalAmount - $transactionAmount) > 0.01) {
             return response()->json([
-                'message' => 'Total split amount must equal transaction amount',
-                'transaction_amount' => $transaction->credit,
-                'split_total' => $totalAmount,
+                'message' => 'Split amounts must sum to transaction amount',
+                'expected' => $transactionAmount,
+                'provided' => $totalAmount,
             ], 422);
         }
 
-        // Remove existing splits
-        $transaction->splits()->delete();
+        DB::transaction(function () use ($transaction, $request) {
+            // Delete existing splits
+            $transaction->splits()->delete();
 
-        // Create new splits
-        $splits = [];
-        foreach ($request->splits as $splitData) {
-            $splits[] = $transaction->splits()->create([
-                'member_id' => $splitData['member_id'],
-                'amount' => $splitData['amount'],
-                'notes' => $splitData['notes'] ?? null,
+            // Create new splits
+            foreach ($request->splits as $split) {
+                TransactionSplit::create([
+                    'transaction_id' => $transaction->id,
+                    'member_id' => $split['member_id'],
+                    'amount' => $split['amount'],
+                    'notes' => $split['notes'] ?? null,
+                ]);
+            }
+
+            $transaction->update([
+                'assignment_status' => 'manual_assigned',
             ]);
-        }
+        });
 
-        // Update transaction status
-        $transaction->update([
-            'assignment_status' => 'manual_assigned',
-        ]);
+        $transaction->load(['splits.member']);
 
-        return response()->json([
-            'message' => 'Transaction split successfully',
-            'transaction' => $transaction->load(['splits.member', 'member']),
-            'splits' => $splits,
-        ]);
+        return response()->json($transaction);
     }
 
-    public function autoAssign(Request $request)
+    public function autoAssign(Request $request, MatchingService $matchingService)
     {
-        // First, delete all debit transactions (credit = 0, debit > 0)
-        $deletedCount = Transaction::where('credit', 0)
-            ->where('debit', '>', 0)
+        // Optionally purge debit rows that occasionally sneak in
+        Transaction::where('debit', '>', 0)
+            ->where('is_archived', false)
             ->delete();
-        
-        $limit = (int) $request->get('limit', 500);
 
-        // Get unassigned and draft transactions
-        $transactions = Transaction::whereIn('assignment_status', ['unassigned', 'draft'])
-            ->limit($limit)
+        $transactions = Transaction::whereIn('assignment_status', ['unassigned', 'draft', 'flagged'])
+            ->where('is_archived', false)
+            ->where('credit', '>', 0)
+            ->with(['member'])
             ->get();
 
         if ($transactions->isEmpty()) {
             return response()->json([
-                'message' => 'No unassigned transactions found',
+                'message' => 'No transactions eligible for auto-assignment',
                 'auto_assigned' => 0,
                 'draft_assigned' => 0,
-                'total' => 0,
+                'unassigned' => Transaction::where('assignment_status', 'unassigned')
+                    ->where('is_archived', false)
+                    ->where('credit', '>', 0)
+                    ->count(),
+                'total_processed' => 0,
             ]);
         }
 
-        // Get all active members
         $members = Member::where('is_active', true)->get();
 
-        if ($members->isEmpty()) {
-            return response()->json([
-                'message' => 'No active members found',
-                'auto_assigned' => 0,
-                'draft_assigned' => 0,
-                'total' => $transactions->count(),
-            ], 400);
+        $matchingResults = [];
+        if ($matchingService->isAvailable()) {
+            $membersPayload = $members->map(function ($member) {
+                return [
+                    'id' => $member->id,
+                    'name' => $member->name,
+                    'phone' => $member->phone,
+                    'member_code' => $member->member_code,
+                    'member_number' => $member->member_number,
+                ];
+            })->values()->toArray();
+
+            foreach ($transactions->chunk(50) as $chunk) {
+                $chunkPayload = $chunk->map(function ($transaction) {
+                    return [
+                        'id' => $transaction->id,
+                        'tran_date' => $transaction->tran_date?->format('Y-m-d'),
+                        'particulars' => $transaction->particulars,
+                        'credit' => $transaction->credit,
+                        'transaction_code' => $transaction->transaction_code,
+                    ];
+                })->values()->toArray();
+
+                $response = $matchingService->matchBatch($chunkPayload, $membersPayload);
+                foreach ($response as $result) {
+                    if (isset($result['transaction_id'])) {
+                        $matchingResults[$result['transaction_id']] = $result['matches'] ?? [];
+                    }
+                }
+            }
         }
 
         $autoAssigned = 0;
         $draftAssigned = 0;
-        $results = [];
+        $processed = 0;
 
         foreach ($transactions as $transaction) {
-            // Parse transaction particulars
-            $parsed = $this->parserService->parseParticulars($transaction->particulars);
-
-            // Update transaction type and extracted data
-            $updateData = [];
-            if ($parsed['transaction_type'] && !$transaction->transaction_type) {
-                $updateData['transaction_type'] = $parsed['transaction_type'];
-            }
-            
-            // Only set transaction_code if it's NOT a phone number
-            if ($parsed['transaction_code'] && !$transaction->transaction_code) {
-                // Double-check it's not a phone number
-                if (!preg_match('/^254\d{9}$/', $parsed['transaction_code'])) {
-                    $updateData['transaction_code'] = $parsed['transaction_code'];
-                }
-            }
-            
-            if ($parsed['member_number']) {
-                $updateData['extracted_member_number'] = $parsed['member_number'];
-            }
-            if (!empty($parsed['phone_numbers'])) {
-                $updateData['phones'] = $parsed['phone_numbers'];
-                // If we have phone numbers but no transaction code, ensure transaction_code is null
-                // (don't let phone numbers be stored as transaction codes)
-                if (empty($parsed['transaction_code']) || preg_match('/^254\d{9}$/', $parsed['transaction_code'])) {
-                    $updateData['transaction_code'] = null;
-                }
-            }
-            if (!empty($updateData)) {
-                $transaction->update($updateData);
+            $processed++;
+            $parsed = $this->parser->parseParticulars($transaction->particulars);
+            if ($transaction->transaction_type) {
+                $parsed['transaction_type'] = $transaction->transaction_type;
             }
 
-            // Store member number if found
-            if ($parsed['member_number']) {
-                // Find member by member_number or member_code
-                $memberWithNumber = Member::where('member_number', $parsed['member_number'])
-                    ->orWhere('member_code', $parsed['member_number'])
-                    ->first();
+            $match = null;
+            if (!empty($matchingResults[$transaction->id])) {
+                $match = $this->evaluateMatchingServiceResult($matchingResults[$transaction->id]);
+            }
+
+            $heuristicMatch = $this->findMatch($transaction, $parsed, $members);
+
+            if ($heuristicMatch) {
+                if (!$match) {
+                    $match = $heuristicMatch;
+                } elseif ($match['status'] !== 'auto_assigned' && $heuristicMatch['status'] === 'auto_assigned') {
+                    // Upgrade to auto assignment if heuristics are decisive
+                    $match = $heuristicMatch;
+                } elseif ($match['status'] !== 'auto_assigned' && $heuristicMatch['status'] !== 'auto_assigned') {
+                    $currentConfidence = (float) ($match['confidence'] ?? 0);
+                    $heuristicConfidence = (float) ($heuristicMatch['confidence'] ?? 0);
+                    if ($heuristicConfidence > $currentConfidence) {
+                        $match = $heuristicMatch;
+                    }
+                }
+            }
+
+            if (!$match) {
+                continue;
+            }
+
+            $transaction->update([
+                'member_id' => $match['member_id'],
+                'assignment_status' => $match['status'],
+                'match_confidence' => $match['confidence'],
+                'draft_member_ids' => $match['draft_member_ids'] ?? null,
+            ]);
+
+            TransactionMatchLog::create([
+                'transaction_id' => $transaction->id,
+                'member_id' => $match['member_id'],
+                'confidence' => $match['confidence'],
+                'match_reason' => $match['reason'],
+                'source' => 'auto',
+            ]);
+
+            if ($match['status'] === 'auto_assigned') {
+                $autoAssigned++;
+            } else {
+                $draftAssigned++;
+            }
+        }
+
+        $unassigned = Transaction::where('assignment_status', 'unassigned')
+            ->where('is_archived', false)
+            ->where('credit', '>', 0)
+            ->count();
+
+        return response()->json([
+            'message' => 'Auto-assignment completed',
+            'auto_assigned' => $autoAssigned,
+            'draft_assigned' => $draftAssigned,
+            'unassigned' => $unassigned,
+            'total_processed' => $processed,
+        ]);
+    }
+
+    protected function evaluateMatchingServiceResult(array $matches): ?array
+    {
+        if (empty($matches)) {
+            return null;
+        }
+
+        $top = $matches[0];
+        if (empty($top['member_id'])) {
+            return null;
+        }
+
+        $topConfidence = (float) ($top['confidence'] ?? 0);
+        $candidateIds = collect($matches)
+            ->pluck('member_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
+
+        $status = null;
+
+        if ($topConfidence >= 0.95) {
+            if (isset($matches[1])) {
+                $secondConfidence = (float) ($matches[1]['confidence'] ?? 0);
+                if ($secondConfidence >= 0.9) {
+                    $status = 'draft';
+                }
+            }
+            $status = $status ?? 'auto_assigned';
+        } elseif ($topConfidence >= 0.75) {
+            $status = 'draft';
+        } else {
+            return null;
+        }
+
+        return [
+            'member_id' => $top['member_id'],
+            'status' => $status,
+            'confidence' => min(1.0, round($topConfidence, 2)),
+            'reason' => $top['reason'] ?? 'Matching service suggestion',
+            'draft_member_ids' => $status === 'draft' ? $candidateIds : null,
+        ];
+    }
+
+    protected function findMatch(Transaction $transaction, array $parsed, $members): ?array
+    {
+        // Use stored transaction_type if available, otherwise use parsed one
+        $transactionType = $transaction->transaction_type ?? $parsed['transaction_type'] ?? null;
+        if ($transactionType) {
+            $parsed['transaction_type'] = $transactionType;
+        }
+
+        $normalizedParticulars = strtolower(preg_replace('/\s+/', ' ', (string) $transaction->particulars));
+        $digitsOnlyParticulars = preg_replace('/\D+/', '', (string) $transaction->particulars);
+        $membersWithNameInParticulars = [];
+
+        $isMpesaPaybill = ($parsed['transaction_type'] ?? null) === 'M-Pesa Paybill';
+        
+        // Strategy 1: Name + Phone Match (100% auto-assign)
+        // Full phone (bank) OR last 3 digits (M-Pesa Paybill) + name = 100% auto-assign
+        if (!empty($parsed['member_name'])) {
+            $namePhoneMatches = [];
+            $transactionPhones = collect($parsed['phones'] ?? [])
+                ->map(fn($phone) => $this->parser->normalizePhone($phone))
+                ->filter()
+                ->unique()
+                ->values()
+                ->toArray();
+            
+            foreach ($members as $member) {
+                $memberPhoneNormalized = $this->parser->normalizePhone($member->phone);
+                if ($memberPhoneNormalized && $this->phoneAppearsInText($digitsOnlyParticulars, $memberPhoneNormalized)) {
+                    return [
+                        'member_id' => $member->id,
+                        'status' => 'auto_assigned',
+                        'confidence' => 1.0,
+                        'reason' => 'Full phone match in particulars',
+                    ];
+                }
+
+                // Check name match - count matching words with fuzzy matching
+                // Normalize names: remove extra spaces, convert to lowercase
+                $txName = preg_replace('/\s+/', ' ', strtolower(trim($parsed['member_name'])));
+                $memName = preg_replace('/\s+/', ' ', strtolower(trim($member->name)));
+                $fullNameSimilarityPercent = 0;
+                similar_text($txName, $memName, $fullNameSimilarityPercent);
+                $fullNameSimilarity = $fullNameSimilarityPercent / 100;
                 
-                if ($memberWithNumber && !$memberWithNumber->member_number) {
-                    $memberWithNumber->update(['member_number' => $parsed['member_number']]);
+                // Split into words (filter out short words like "de", "van", etc.)
+                $nameWords = array_filter(explode(' ', $txName), function($w) { return strlen($w) > 2; });
+                $memberNameWords = array_filter(explode(' ', $memName), function($w) { return strlen($w) > 2; });
+                $matchedWordsInParticulars = array_filter($memberNameWords, function ($word) use ($normalizedParticulars) {
+                    return $word && strpos($normalizedParticulars, $word) !== false;
+                });
+                if (count($matchedWordsInParticulars) >= 2) {
+                    $membersWithNameInParticulars[] = $member;
                 }
-            }
-
-            // Strategy 1: Phone number match - AUTO ASSIGN (HIGHEST PRIORITY)
-            if (!empty($parsed['phone_numbers'])) {
-                $phoneMatches = [];
-                foreach ($parsed['phone_numbers'] as $txPhone) {
-                    $normalizedTxPhone = $this->parserService->normalizePhone($txPhone);
-                    foreach ($members as $member) {
-                        if ($member->phone) {
-                            $normalizedMemberPhone = $this->parserService->normalizePhone($member->phone);
-                            // Exact match or last 9 digits match
-                            if ($normalizedTxPhone === $normalizedMemberPhone ||
-                                (strlen($normalizedTxPhone) >= 9 && strlen($normalizedMemberPhone) >= 9 &&
-                                 substr($normalizedTxPhone, -9) === substr($normalizedMemberPhone, -9))) {
-                                $phoneMatches[] = $member;
+                
+                // Exact word matches (order-independent)
+                $matchingWords = array_intersect($nameWords, $memberNameWords);
+                $nameMatchCount = count($matchingWords);
+                
+                // Fuzzy word matching for similar names (e.g., KINYANJUI vs KINYAJUI)
+                // Check all transaction words against all member words (order-independent)
+                $fuzzyMatches = 0;
+                $matchedTxWords = [];
+                $matchedMemWords = [];
+                
+                foreach ($nameWords as $txWord) {
+                    // Skip if already matched exactly
+                    if (in_array($txWord, $matchingWords)) {
+                        continue;
+                    }
+                    
+                    foreach ($memberNameWords as $memWord) {
+                        // Skip if already matched exactly
+                        if (in_array($memWord, $matchingWords)) {
+                            continue;
+                        }
+                        
+                        // Skip if already matched via fuzzy
+                        if (in_array($txWord, $matchedTxWords) || in_array($memWord, $matchedMemWords)) {
+                            continue;
+                        }
+                        
+                        // Use similar_text for fuzzy matching
+                        similar_text($txWord, $memWord, $percent);
+                        // If similarity is 85% or more (or loose partial match), consider it a match
+                        if ($percent >= 85 || $this->wordsLooselyMatch($txWord, $memWord)) {
+                            $fuzzyMatches++;
+                            $matchedTxWords[] = $txWord;
+                            $matchedMemWords[] = $memWord;
+                            break; // Count each transaction word only once
+                        }
+                    }
+                }
+                
+                // Total match count includes both exact and fuzzy matches
+                // This counts ANY matching words regardless of order
+                $totalMatchCount = $nameMatchCount + $fuzzyMatches;
+                
+                // Need at least one name word match (exact or fuzzy)
+                if ($totalMatchCount === 0) {
+                    continue;
+                }
+                
+                // Check for exact name match (all words match, order-independent)
+                // Consider it exact if all transaction words match OR all member words match
+                // This handles cases like "JOHN MWANGI" matching "MWANGI JOHN"
+                $exactNameMatch = false;
+                
+                // If all words from transaction match member words (order-independent)
+                if ($totalMatchCount >= count($nameWords) && count($nameWords) > 0) {
+                    $exactNameMatch = true;
+                }
+                // OR if all words from member match transaction words (order-independent)
+                elseif ($totalMatchCount >= count($memberNameWords) && count($memberNameWords) > 0) {
+                    $exactNameMatch = true;
+                }
+                // Also check for very similar names (fuzzy match on full name)
+                else {
+                    // If names are 90%+ similar, treat as exact match
+                    if ($fullNameSimilarityPercent >= 90) {
+                        $exactNameMatch = true;
+                    }
+                }
+                
+                $phoneMatch = false;
+                $phoneMatchType = null;
+                
+                // Check full phone match (for bank transactions)
+                // CRITICAL: For bank transactions, ONLY check full phone (not last 3 digits)
+                $isBankTransaction = in_array($parsed['transaction_type'] ?? '', ['Bank Transaction', 'RTGS', 'EAZZYPAY', 'USSD', 'EAZZY-FUNDS', 'MPS']);
+                
+                // Also handle masked phone formats (2547*** or 07****)
+                if (!empty($parsed['phones']) && $member->phone) {
+                    $memberPhone = $this->parser->normalizePhone($member->phone);
+                    
+                    foreach ($parsed['phones'] as $txPhone) {
+                        // Handle masked phone formats (2547*** or 07****)
+                        if (preg_match('/^masked_(2547|07)_(\d+)$/', $txPhone, $maskedParts)) {
+                            // Masked phone: extract suffix and match against member phone
+                            $suffix = $maskedParts[2];
+                            $prefix = $maskedParts[1];
+                            
+                            if ($memberPhone && strlen($memberPhone) >= strlen($suffix)) {
+                                $memberSuffix = substr($memberPhone, -strlen($suffix));
+                                if ($memberSuffix === $suffix) {
+                                    // Check if prefix matches (2547 or 07)
+                                    if ($prefix === '2547' && substr($memberPhone, 0, 4) === '2547') {
+                                        $phoneMatch = true;
+                                        $phoneMatchType = 'masked_full';
+                                        break;
+                                    } elseif ($prefix === '07') {
+                                        // 07**** format - check if member phone starts with 2547 (07 converted)
+                                        if (substr($memberPhone, 0, 4) === '2547' || substr($memberPhone, 0, 2) === '07') {
+                                            $phoneMatch = true;
+                                            $phoneMatchType = 'masked_full';
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            continue;
+                        }
+                        
+                        // Regular full phone match
+                        $normalizedTxPhone = $this->parser->normalizePhone($txPhone);
+                        
+                        if ($normalizedTxPhone && $memberPhone) {
+                            if ($normalizedTxPhone === $memberPhone) {
+                                $phoneMatch = true;
+                                $phoneMatchType = 'full';
                                 break;
                             }
                         }
                     }
                 }
-
-                if (count($phoneMatches) === 1) {
-                    // Single phone match - auto assign immediately
-                    $member = $phoneMatches[0];
-                    $transaction->update([
-                        'member_id' => $member->id,
-                        'assignment_status' => 'auto_assigned',
-                        'match_confidence' => 0.98,
-                        'draft_member_ids' => null,
-                    ]);
-
-                    TransactionMatchLog::create([
-                        'transaction_id' => $transaction->id,
-                        'member_id' => $member->id,
-                        'confidence' => 0.98,
-                        'match_reason' => 'Phone number match (254XXXXXXXXX)',
-                        'source' => 'auto',
-                        'user_id' => $request->user()->id,
-                    ]);
-
-                    $autoAssigned++;
-                    $results[] = ['transaction_id' => $transaction->id, 'action' => 'auto_assigned', 'member' => $member->name, 'reason' => 'Phone match'];
-                    continue;
-                } elseif (count($phoneMatches) > 1) {
-                    // Multiple phone matches - draft assign
-                    $draftMemberIds = array_map(fn($m) => $m->id, $phoneMatches);
-                    $transaction->update([
-                        'assignment_status' => 'draft',
-                        'draft_member_ids' => $draftMemberIds,
-                    ]);
-                    $draftAssigned++;
-                    $results[] = ['transaction_id' => $transaction->id, 'action' => 'draft', 'members' => array_map(fn($m) => $m->name, $phoneMatches), 'reason' => 'Multiple phone matches'];
+                
+                // CRITICAL: For M-Pesa Paybill, check last 3 digits ONLY if name also matches
+                // M-Pesa Paybill requires BOTH last 3 digits AND at least one name match
+                $isMpesaPaybill = ($parsed['transaction_type'] ?? null) === 'M-Pesa Paybill';
+                
+                if (!$phoneMatch && $isMpesaPaybill && !empty($parsed['last_3_phone_digits']) && $member->phone) {
+                    // For M-Pesa Paybill: ONLY check last 3 digits if we already have a name match
+                    if ($totalMatchCount >= 1) {
+                        $memberPhone = $this->parser->normalizePhone($member->phone);
+                        if ($memberPhone && strlen($memberPhone) >= 3) {
+                            $memberLast3 = substr($memberPhone, -3);
+                            if ($parsed['last_3_phone_digits'] === $memberLast3) {
+                                $phoneMatch = true;
+                                $phoneMatchType = 'last3';
+                            }
+                        }
+                    }
+                    // If no name match, skip last 3 digits check for M-Pesa Paybill
+                } elseif (!$phoneMatch && !$isMpesaPaybill && !empty($parsed['last_3_phone_digits']) && $member->phone) {
+                    // For non-M-Pesa transactions, we can check last 3 digits (but prefer full phone)
+                    $memberPhone = $this->parser->normalizePhone($member->phone);
+                    if ($memberPhone && strlen($memberPhone) >= 3) {
+                        $memberLast3 = substr($memberPhone, -3);
+                        if ($parsed['last_3_phone_digits'] === $memberLast3) {
+                            $phoneMatch = true;
+                            $phoneMatchType = 'last3';
+                        }
+                    }
+                }
+                
+                if ($totalMatchCount === 0 && !$phoneMatch) {
                     continue;
                 }
-            }
 
-            // Strategy 1.5: For Paybill transactions, match by name + last 3 digits of phone
-            // This is the primary matching strategy for Paybill (should auto-assign ~90% of transactions)
-            if ($transaction->transaction_type === 'M-Pesa Paybill' && $parsed['member_name']) {
-                $accountName = $this->parserService->normalizeName($parsed['member_name']);
-                $phoneLast3 = $parsed['phone_last_3_digits'] ?? null;
-                
-                $paybillMatches = [];
-                
-                foreach ($members as $member) {
-                    $memberName = $this->parserService->normalizeName($member->name);
-                    $nameScore = $this->parserService->compareNames($accountName, $memberName);
-                    
-                    // Check if at least one name matches (score >= 0.6)
-                    if ($nameScore >= 0.6) {
-                        $phoneMatch = false;
+                // If name matches and phone matches (full or last 3) = 100% auto-assign
+                // CRITICAL: For M-Pesa Paybill, we MUST have BOTH last 3 digits AND name match
+                if ($phoneMatch) {
+                    // For M-Pesa Paybill: Verify that the member's name words actually appear in the transaction particulars
+                    if ($phoneMatchType === 'last3' && $isMpesaPaybill) {
+                        // Check if any of the member's name words appear in the transaction particulars
+                        $particulars = strtolower($transaction->particulars);
+                        $memberNameWordsInParticulars = false;
                         
-                        // Check last 3 digits of phone if available
-                        if ($phoneLast3 && $member->phone) {
-                            $memberPhone = $this->parserService->normalizePhone($member->phone);
-                            // Get last 3 digits of member phone (ensure it's a string comparison)
-                            $memberPhoneLast3 = substr($memberPhone, -3);
-                            
-                            // Compare as strings (case-insensitive, but they're digits)
-                            if (strval($phoneLast3) === strval($memberPhoneLast3)) {
-                                $phoneMatch = true;
+                        foreach ($memberNameWords as $memWord) {
+                            if (strlen($memWord) > 2 && strpos($particulars, $memWord) !== false) {
+                                $memberNameWordsInParticulars = true;
+                                break;
                             }
                         }
                         
-                        // For Paybill: if name matches AND phone matches, it's a strong match
-                        if ($phoneMatch) {
-                            // Name matches AND phone matches - STRONG MATCH (100% confidence)
-                            $paybillMatches[] = [
-                                'member' => $member,
-                                'name_score' => $nameScore,
-                                'phone_match' => true,
-                                'confidence' => 1.0, // 100% confidence
-                            ];
-                        } elseif (!$phoneLast3) {
-                            // Name matches but no phone in transaction - still a good match
-                            $paybillMatches[] = [
-                                'member' => $member,
-                                'name_score' => $nameScore,
-                                'phone_match' => false,
-                                'confidence' => $nameScore, // Use name score as confidence
-                            ];
-                        } elseif ($nameScore >= 0.7) {
-                            // Name matches but phone doesn't - consider for draft if high name score
-                            $paybillMatches[] = [
-                                'member' => $member,
-                                'name_score' => $nameScore,
-                                'phone_match' => false,
-                                'confidence' => $nameScore * 0.7, // Lower confidence due to phone mismatch
-                            ];
+                        // If member's name doesn't appear in particulars, skip this match
+                        // M-Pesa Paybill requires BOTH last 3 digits AND name
+                        if (!$memberNameWordsInParticulars || $totalMatchCount < 1) {
+                            continue;
+                        }
+                    }
+                    
+                    $matchScore = ($exactNameMatch ? 1000 : 0)
+                        + ($totalMatchCount * 100)
+                        + intval($fullNameSimilarity * 100);
+                    if ($phoneMatchType === 'full' || $phoneMatchType === 'masked_full') {
+                        $matchScore += 50;
+                    } elseif ($phoneMatchType === 'last3') {
+                        $matchScore += 25;
+                    }
+
+                    $namePhoneMatches[] = [
+                        'member' => $member,
+                        'name_match_count' => $totalMatchCount,
+                        'phone_match_type' => $phoneMatchType,
+                        'exact_name_match' => $exactNameMatch,
+                        'name_similarity' => $fullNameSimilarity,
+                        'match_score' => $matchScore,
+                    ];
+                }
+                // CRITICAL: For bank transactions, auto-assign if 2+ names match (even without phone)
+                // For M-Pesa Paybill, require BOTH last 3 digits AND name (already handled above)
+                elseif ($totalMatchCount >= 2 && $isBankTransaction) {
+                    $matchScore = ($exactNameMatch ? 1000 : 0)
+                        + ($totalMatchCount * 100)
+                        + intval($fullNameSimilarity * 100);
+
+                    $namePhoneMatches[] = [
+                        'member' => $member,
+                        'name_match_count' => $totalMatchCount,
+                        'phone_match_type' => null, // No phone match
+                        'exact_name_match' => $exactNameMatch,
+                        'name_similarity' => $fullNameSimilarity,
+                        'match_score' => $matchScore,
+                    ];
+                }
+            }
+            
+            if (count($membersWithNameInParticulars) === 1) {
+                return [
+                    'member_id' => $membersWithNameInParticulars[0]->id,
+                    'status' => 'auto_assigned',
+                    'confidence' => 1.0,
+                    'reason' => 'Member name appears in particulars',
+                ];
+            }
+            
+            // CRITICAL: Prioritize exact name + full phone matches
+            // If we have exact name + full phone match, auto-assign immediately (even if others have partial matches)
+            $exactNameFullPhoneMatch = collect($namePhoneMatches)->first(function($match) {
+                return $match['exact_name_match'] && 
+                       ($match['phone_match_type'] === 'full' || $match['phone_match_type'] === 'masked_full');
+            });
+            
+            if ($exactNameFullPhoneMatch) {
+                return [
+                    'member_id' => $exactNameFullPhoneMatch['member']->id,
+                    'status' => 'auto_assigned',
+                    'confidence' => 1.0,
+                    'reason' => 'Exact name + full phone match',
+                ];
+            }
+            
+            // CRITICAL: All name + full phone matches = 100% confidence (1.0)
+            // This handles cases where name matches and phone fully matches, even if others have partial matches
+            $nameFullPhoneMatches = collect($namePhoneMatches)->filter(function($match) {
+                return ($match['phone_match_type'] === 'full' || $match['phone_match_type'] === 'masked_full');
+            });
+            
+            if ($nameFullPhoneMatches->isNotEmpty()) {
+                $exactFullPhoneMatches = $nameFullPhoneMatches->filter(function($match) use ($transactionPhones) {
+                    $memberPhone = $this->parser->normalizePhone($match['member']->phone ?? null);
+                    return $memberPhone && in_array($memberPhone, $transactionPhones);
+                });
+                
+                if ($exactFullPhoneMatches->count() === 1) {
+                    $best = $exactFullPhoneMatches->first();
+                    return [
+                        'member_id' => $best['member']->id,
+                        'status' => 'auto_assigned',
+                        'confidence' => 1.0,
+                        'reason' => 'Unique full phone match',
+                    ];
+                }
+
+                // CRITICAL: Full phone match ALWAYS takes priority, even if others have last 3 digits match
+                // All name + full phone matches = 100% confidence and auto-assign
+                
+                $bestFullMatch = $nameFullPhoneMatches->sortByDesc(function ($match) {
+                    return $match['match_score'];
+                })->values();
+
+                if ($bestFullMatch->isNotEmpty()) {
+                    $top = $bestFullMatch->first();
+                    $ties = $bestFullMatch->filter(function ($match) use ($top) {
+                        return abs($match['match_score'] - $top['match_score']) < 0.0001;
+                    });
+
+                    if ($ties->count() === 1) {
+                        return [
+                            'member_id' => $top['member']->id,
+                            'status' => 'auto_assigned',
+                            'confidence' => 1.0,
+                            'reason' => 'Name + full phone match (highest score)',
+                        ];
+                    }
+
+                    return [
+                        'member_id' => $top['member']->id,
+                        'status' => 'draft',
+                        'confidence' => 1.0,
+                        'reason' => 'Multiple full phone matches',
+                        'draft_member_ids' => $ties->map(function ($m) {
+                            return $m['member']->id;
+                        })->toArray(),
+                    ];
+                }
+            }
+            
+            // Check for last 3 digits + name match (also 100%)
+            // CRITICAL: Only auto-assign if name matches (2+ words preferred, but 1+ is OK)
+            // CRITICAL: For M-Pesa Paybill, filter out matches where member's name doesn't appear in particulars
+            $last3Matches = collect($namePhoneMatches)->filter(function($match) use ($isMpesaPaybill, $transaction) {
+                if ($match['phone_match_type'] !== 'last3' || $match['name_match_count'] < 1) {
+                    return false;
+                }
+                
+                // For M-Pesa Paybill, verify member's name actually appears in particulars
+                if ($isMpesaPaybill) {
+                    $particulars = strtolower($transaction->particulars);
+                    $memberNameWords = array_filter(explode(' ', strtolower($match['member']->name)), function($w) { return strlen($w) > 2; });
+                    $memberNameInParticulars = false;
+                    
+                    foreach ($memberNameWords as $memWord) {
+                        if (strpos($particulars, $memWord) !== false) {
+                            $memberNameInParticulars = true;
+                            break;
+                        }
+                    }
+                    
+                    // If member's name doesn't appear in particulars, exclude from matches
+                    if (!$memberNameInParticulars) {
+                        return false; // Don't include this match
+                    }
+                }
+                
+                return true;
+            });
+            
+            if ($last3Matches->isNotEmpty()) {
+                // If 2+ name words match + last 3 digits, always auto-assign (even if multiple)
+                $strongMatches = $last3Matches->filter(function($match) {
+                    return $match['name_match_count'] >= 2;
+                });
+                
+                if ($strongMatches->isNotEmpty() && count($strongMatches) === 1) {
+                    return [
+                        'member_id' => $strongMatches->first()['member']->id,
+                        'status' => 'auto_assigned',
+                        'confidence' => 1.0,
+                        'reason' => '2+ names + last 3 digits match (100%)',
+                    ];
+                }
+                
+                // If only one match with 1+ name words + last 3 digits, auto-assign
+                if (count($last3Matches) === 1) {
+                    return [
+                        'member_id' => $last3Matches->first()['member']->id,
+                        'status' => 'auto_assigned',
+                        'confidence' => 1.0,
+                        'reason' => 'Name + last 3 digits match (100%)',
+                    ];
+                }
+            }
+            
+            // CRITICAL: If 2+ names match (even without phone), auto-assign if unique
+            $nameOnlyMatches = collect($namePhoneMatches)->filter(function($match) {
+                return $match['name_match_count'] >= 2 && !$match['phone_match_type'];
+            });
+            
+            if ($nameOnlyMatches->isNotEmpty() && count($nameOnlyMatches) === 1) {
+                return [
+                    'member_id' => $nameOnlyMatches->first()['member']->id,
+                    'status' => 'auto_assigned',
+                    'confidence' => 1.0,
+                    'reason' => '2+ names match (unique, 100%)',
+                ];
+            }
+            
+            // If we have only one match, auto-assign with 100% confidence
+            if (count($namePhoneMatches) === 1) {
+                $match = $namePhoneMatches[0];
+                return [
+                    'member_id' => $match['member']->id,
+                    'status' => 'auto_assigned',
+                    'confidence' => 1.0,
+                    'reason' => 'Name + phone match (' . $match['phone_match_type'] . ', 100%)',
+                ];
+            } elseif (count($namePhoneMatches) > 1) {
+                // If one has exact name match, prefer it
+                $exactMatch = collect($namePhoneMatches)->firstWhere('exact_name_match', true);
+                if ($exactMatch) {
+                    return [
+                        'member_id' => $exactMatch['member']->id,
+                        'status' => 'auto_assigned',
+                        'confidence' => 1.0,
+                        'reason' => 'Exact name + phone match (' . $exactMatch['phone_match_type'] . ')',
+                    ];
+                }
+                
+                // Check if one has better name match (2+ words) than others
+                $bestNameMatch = collect($namePhoneMatches)->sortByDesc(function($match) {
+                    // Prioritize by: exact match > name count > phone match type
+                    $score = 0;
+                    if ($match['exact_name_match']) {
+                        $score += 1000;
+                    }
+                    $score += $match['name_match_count'] * 100;
+                    if ($match['phone_match_type'] === 'full' || $match['phone_match_type'] === 'masked_full') {
+                        $score += 50;
+                    } elseif ($match['phone_match_type'] === 'last3') {
+                        $score += 25;
+                    }
+                    return $score;
+                })->first();
+                
+                $sameLevelMatches = collect($namePhoneMatches)->filter(function($match) use ($bestNameMatch) {
+                    return $match['name_match_count'] === $bestNameMatch['name_match_count'] &&
+                           $match['member']->id !== $bestNameMatch['member']->id &&
+                           $match['exact_name_match'] === $bestNameMatch['exact_name_match'];
+                });
+                
+                // CRITICAL: If best match has 2+ name words and is unique at that level, auto-assign
+                // OR if best match has significantly more name matches, auto-assign
+                if ($bestNameMatch['name_match_count'] >= 2) {
+                    // If unique at this level, auto-assign
+                    if ($sameLevelMatches->isEmpty()) {
+                        return [
+                            'member_id' => $bestNameMatch['member']->id,
+                            'status' => 'auto_assigned',
+                            'confidence' => 1.0,
+                            'reason' => '2+ names match (best match, 100%)',
+                        ];
+                    }
+                    // If best match has significantly more matches (at least 1 more), auto-assign
+                    $nextBest = collect($namePhoneMatches)->sortByDesc(function($match) {
+                        return $match['name_match_count'];
+                    })->skip(1)->first();
+                    
+                    if ($nextBest && $bestNameMatch['name_match_count'] > $nextBest['name_match_count']) {
+                        return [
+                            'member_id' => $bestNameMatch['member']->id,
+                            'status' => 'auto_assigned',
+                            'confidence' => 1.0,
+                            'reason' => 'Best name match (' . $bestNameMatch['name_match_count'] . ' names, 100%)',
+                        ];
+                    }
+                }
+                
+                // CRITICAL: For M-Pesa Paybill, filter out members whose names don't appear in particulars
+                // Only include members whose names actually appear in the transaction description
+                $filteredMatches = collect($namePhoneMatches);
+                if ($isMpesaPaybill) {
+                    $particulars = strtolower($transaction->particulars);
+                    $filteredMatches = $filteredMatches->filter(function($match) use ($particulars) {
+                        $memberNameWords = array_filter(explode(' ', strtolower($match['member']->name)), function($w) { return strlen($w) > 2; });
+                        foreach ($memberNameWords as $memWord) {
+                            if (strpos($particulars, $memWord) !== false) {
+                                return true; // At least one name word appears in particulars
+                            }
+                        }
+                        return false; // Member's name doesn't appear in particulars - exclude
+                    });
+                }
+                
+                // If after filtering we have only one match, auto-assign it
+                if ($filteredMatches->count() === 1) {
+                    return [
+                        'member_id' => $filteredMatches->first()['member']->id,
+                        'status' => 'auto_assigned',
+                        'confidence' => 1.0,
+                        'reason' => 'Name + phone match (verified in particulars, 100%)',
+                    ];
+                }
+                
+                // Multiple matches = draft (only if truly ambiguous)
+                // Only include filtered matches (members whose names appear in particulars)
+                return [
+                    'member_id' => $filteredMatches->isNotEmpty() ? $filteredMatches->first()['member']->id : $namePhoneMatches[0]['member']->id,
+                    'status' => 'draft',
+                    'confidence' => 0.9,
+                    'reason' => 'Multiple name + phone matches',
+                    'draft_member_ids' => $filteredMatches->isNotEmpty() ? $filteredMatches->pluck('member.id')->toArray() : collect($namePhoneMatches)->pluck('member.id')->toArray(),
+                ];
+            }
+        }
+
+        // Strategy 2: Multiple Name Words Match (2+ names) - 100% auto-assign if unique
+        // CRITICAL: For ALL transactions (including drafts), auto-assign when 2+ names match (order-independent)
+        if (!empty($parsed['member_name'])) {
+            // Apply Strategy 2 for ALL transaction types (not just bank transactions)
+            // This ensures draft transactions with 2+ name matches get auto-assigned
+            $nameMatches = [];
+            
+            foreach ($members as $member) {
+                // Count matching name words with fuzzy matching (order-independent)
+                $txName = preg_replace('/\s+/', ' ', strtolower(trim($parsed['member_name'])));
+                $memName = preg_replace('/\s+/', ' ', strtolower(trim($member->name)));
+                
+                $nameWords = array_filter(explode(' ', $txName), function($w) { return strlen($w) > 2; });
+                $memberNameWords = array_filter(explode(' ', $memName), function($w) { return strlen($w) > 2; });
+                
+                // Exact word matches (order-independent)
+                $matchingWords = array_intersect($nameWords, $memberNameWords);
+                $exactMatchCount = count($matchingWords);
+                
+                // Fuzzy word matching
+                $fuzzyMatches = 0;
+                $matchedTxWords = [];
+                $matchedMemWords = [];
+                
+                foreach ($nameWords as $txWord) {
+                    if (in_array($txWord, $matchingWords)) {
+                        continue; // Already counted
+                    }
+                    
+                    foreach ($memberNameWords as $memWord) {
+                        if (in_array($memWord, $matchingWords) || 
+                            in_array($txWord, $matchedTxWords) || 
+                            in_array($memWord, $matchedMemWords)) {
+                            continue;
+                        }
+                        
+                        similar_text($txWord, $memWord, $percent);
+                        if ($percent >= 85) {
+                            $fuzzyMatches++;
+                            $matchedTxWords[] = $txWord;
+                            $matchedMemWords[] = $memWord;
+                            break;
                         }
                     }
                 }
                 
-                // Sort by confidence descending (phone matches first, then name score)
-                usort($paybillMatches, function($a, $b) {
-                    // First sort by phone match (true first), then by confidence
-                    if ($a['phone_match'] !== $b['phone_match']) {
-                        return $b['phone_match'] ? 1 : -1;
-                    }
-                    return $b['confidence'] <=> $a['confidence'];
-                });
+                $totalMatchCount = $exactMatchCount + $fuzzyMatches;
                 
-                // Filter to only phone matches if any exist
-                $phoneMatches = array_filter($paybillMatches, fn($m) => $m['phone_match']);
-                
-                if (count($phoneMatches) === 1) {
-                    // Single match with phone - AUTO ASSIGN (100% confidence)
-                    $member = $phoneMatches[0]['member'];
-                    $transaction->update([
-                        'member_id' => $member->id,
-                        'assignment_status' => 'auto_assigned',
-                        'match_confidence' => 1.0,
-                        'draft_member_ids' => null,
-                    ]);
-
-                    TransactionMatchLog::create([
-                        'transaction_id' => $transaction->id,
-                        'member_id' => $member->id,
-                        'confidence' => 1.0,
-                        'match_reason' => 'Paybill: Name match + last 3 digits phone match',
-                        'source' => 'auto',
-                        'user_id' => $request->user()->id,
-                    ]);
-
-                    $autoAssigned++;
-                    $results[] = ['transaction_id' => $transaction->id, 'action' => 'auto_assigned', 'member' => $member->name, 'reason' => 'Paybill: Name + phone last 3 digits match'];
-                    continue;
-                } elseif (count($paybillMatches) === 1 && !$paybillMatches[0]['phone_match']) {
-                    // Single match, no phone match but name matches - AUTO ASSIGN if name score is high
-                    if ($paybillMatches[0]['name_score'] >= 0.75) {
-                        $member = $paybillMatches[0]['member'];
-                        $transaction->update([
-                            'member_id' => $member->id,
-                            'assignment_status' => 'auto_assigned',
-                            'match_confidence' => $paybillMatches[0]['confidence'],
-                            'draft_member_ids' => null,
-                        ]);
-
-                        TransactionMatchLog::create([
-                            'transaction_id' => $transaction->id,
-                            'member_id' => $member->id,
-                            'confidence' => $paybillMatches[0]['confidence'],
-                            'match_reason' => 'Paybill: Name match (high confidence, no phone)',
-                            'source' => 'auto',
-                            'user_id' => $request->user()->id,
-                        ]);
-
-                        $autoAssigned++;
-                        $results[] = ['transaction_id' => $transaction->id, 'action' => 'auto_assigned', 'member' => $member->name, 'reason' => 'Paybill: Name match (high confidence)'];
-                        continue;
-                    } else {
-                        // Lower confidence - draft assign
-                        $draftMemberIds = [$paybillMatches[0]['member']->id];
-                        $transaction->update([
-                            'assignment_status' => 'draft',
-                            'draft_member_ids' => $draftMemberIds,
-                            'match_confidence' => $paybillMatches[0]['confidence'],
-                        ]);
-                        $draftAssigned++;
-                        $results[] = [
-                            'transaction_id' => $transaction->id, 
-                            'action' => 'draft', 
-                            'members' => [$paybillMatches[0]['member']->name], 
-                            'reason' => 'Paybill: Name match (moderate confidence, no phone)'
-                        ];
-                        continue;
-                    }
-                } elseif (count($paybillMatches) > 1) {
-                    // Multiple matches - check if all have phone matches
-                    $allHavePhoneMatch = count(array_filter($paybillMatches, fn($m) => $m['phone_match'])) === count($paybillMatches);
-                    
-                    if ($allHavePhoneMatch && count($paybillMatches) === count($phoneMatches)) {
-                        // All matches have phone match - this shouldn't happen, but if it does, draft assign
-                        $draftMemberIds = array_map(fn($m) => $m['member']->id, $paybillMatches);
-                        $transaction->update([
-                            'assignment_status' => 'draft',
-                            'draft_member_ids' => $draftMemberIds,
-                            'match_confidence' => $paybillMatches[0]['confidence'],
-                        ]);
-                        $draftAssigned++;
-                        $results[] = [
-                            'transaction_id' => $transaction->id, 
-                            'action' => 'draft', 
-                            'members' => array_map(fn($m) => $m['member']->name, $paybillMatches), 
-                            'reason' => 'Paybill: Multiple name + phone matches'
-                        ];
-                        continue;
-                    } else {
-                        // Multiple matches with mixed phone matches - draft assign
-                        $draftMemberIds = array_map(fn($m) => $m['member']->id, $paybillMatches);
-                        $transaction->update([
-                            'assignment_status' => 'draft',
-                            'draft_member_ids' => $draftMemberIds,
-                            'match_confidence' => $paybillMatches[0]['confidence'],
-                        ]);
-                        $draftAssigned++;
-                        $results[] = [
-                            'transaction_id' => $transaction->id, 
-                            'action' => 'draft', 
-                            'members' => array_map(fn($m) => $m['member']->name, $paybillMatches), 
-                            'reason' => 'Paybill: Multiple name matches'
-                        ];
-                        continue;
-                    }
-                } elseif (count($phoneMatches) > 1) {
-                    // Multiple phone matches - draft assign
-                    $draftMemberIds = array_map(fn($m) => $m['member']->id, $phoneMatches);
-                    $transaction->update([
-                        'assignment_status' => 'draft',
-                        'draft_member_ids' => $draftMemberIds,
-                        'match_confidence' => 1.0,
-                    ]);
-                    $draftAssigned++;
-                    $results[] = [
-                        'transaction_id' => $transaction->id, 
-                        'action' => 'draft', 
-                        'members' => array_map(fn($m) => $m['member']->name, $phoneMatches), 
-                        'reason' => 'Paybill: Multiple name + phone matches'
+                // Need at least 2 matching words (exact or fuzzy) for ALL transactions
+                if ($totalMatchCount >= 2) {
+                    $nameMatches[] = [
+                        'member' => $member,
+                        'match_count' => $totalMatchCount,
                     ];
-                    continue;
                 }
             }
+            
+            // If 2+ names match and only one member has those names = 100% auto-assign
+            if (count($nameMatches) === 1) {
+                return [
+                    'member_id' => $nameMatches[0]['member']->id,
+                    'status' => 'auto_assigned',
+                    'confidence' => 1.0,
+                    'reason' => $nameMatches[0]['match_count'] . ' name words match (unique)',
+                ];
+            } elseif (count($nameMatches) > 1) {
+                // Multiple members with same names = draft
+                return [
+                    'member_id' => $nameMatches[0]['member']->id,
+                    'status' => 'draft',
+                    'confidence' => 0.9,
+                    'reason' => 'Multiple members with 2+ matching names',
+                    'draft_member_ids' => collect($nameMatches)->pluck('member.id')->toArray(),
+                ];
+            }
+        }
 
-            // Strategy 2: Name match (for non-Paybill or if Paybill account name didn't match)
-            if ($parsed['member_name']) {
-                $nameMatches = [];
-                $bestNameScore = 0;
-
-                foreach ($members as $member) {
-                    $nameScore = $this->parserService->compareNames($parsed['member_name'], $member->name);
-                    if ($nameScore >= 0.6) {
-                        $nameMatches[] = ['member' => $member, 'score' => $nameScore];
-                        $bestNameScore = max($bestNameScore, $nameScore);
+        // Strategy 3: Single Name Match - 100% auto-assign if unique
+        if (!empty($parsed['member_name'])) {
+            $nameMatches = [];
+            
+            foreach ($members as $member) {
+                // Check if at least one name word matches (exact or fuzzy)
+                $txName = preg_replace('/\s+/', ' ', strtolower(trim($parsed['member_name'])));
+                $memName = preg_replace('/\s+/', ' ', strtolower(trim($member->name)));
+                
+                $nameWords = array_filter(explode(' ', $txName), function($w) { return strlen($w) > 2; });
+                $memberNameWords = array_filter(explode(' ', $memName), function($w) { return strlen($w) > 2; });
+                
+                // Exact word matches
+                $matchingWords = array_intersect($nameWords, $memberNameWords);
+                $hasMatch = count($matchingWords) >= 1;
+                
+                // Fuzzy word matching if no exact match
+                if (!$hasMatch) {
+                    foreach ($nameWords as $txWord) {
+                        foreach ($memberNameWords as $memWord) {
+                            similar_text($txWord, $memWord, $percent);
+                            if ($percent >= 85) {
+                                $hasMatch = true;
+                                break 2;
+                            }
+                        }
                     }
                 }
+                
+                if ($hasMatch) {
+                    $nameMatches[] = $member;
+                }
+            }
+            
+            // If only one name matches and no other member has that name = 100% auto-assign
+            if (count($nameMatches) === 1) {
+                return [
+                    'member_id' => $nameMatches[0]->id,
+                    'status' => 'auto_assigned',
+                    'confidence' => 1.0,
+                    'reason' => 'Unique name match (100%)',
+                ];
+            } elseif (count($nameMatches) > 1) {
+                // Multiple members with same name = draft
+                return [
+                    'member_id' => $nameMatches[0]->id,
+                    'status' => 'draft',
+                    'confidence' => 0.7,
+                    'reason' => 'Multiple members with matching name',
+                    'draft_member_ids' => collect($nameMatches)->pluck('id')->toArray(),
+                ];
+            }
+        }
 
-                if (!empty($nameMatches)) {
-                    // Check if any matched members have different phone numbers
-                    $hasPhoneConflict = false;
-                    if (!empty($parsed['phone_numbers'])) {
-                        $normalizedTxPhones = array_map([$this->parserService, 'normalizePhone'], $parsed['phone_numbers']);
-                        foreach ($nameMatches as $match) {
-                            $member = $match['member'];
-                            if ($member->phone) {
-                                $normalizedMemberPhone = $this->parserService->normalizePhone($member->phone);
-                                if (!in_array($normalizedMemberPhone, $normalizedTxPhones)) {
-                                    $hasPhoneConflict = true;
-                                    break;
+        // Strategy 4: Phone Match (100% auto-assign if unique) - EVEN if name was found but didn't match
+        // CRITICAL: If phone matches 100% (full or masked), it should auto-assign, not draft
+        // This applies even if names are not similar - phone number is definitive
+        // EXCEPTION: For M-Pesa Paybill with last 3 digits, member's name MUST appear in particulars
+        $isMpesaPaybill = $parsed['transaction_type'] === 'M-Pesa Paybill';
+        
+        if (!empty($parsed['phones']) || !empty($parsed['last_3_phone_digits'])) {
+            $phoneMatches = [];
+            $fullPhoneMatches = []; // Track 100% matches separately
+            
+            foreach ($parsed['phones'] ?? [] as $phone) {
+                // Handle masked phone formats (100% match)
+                if (preg_match('/^masked_(2547|07)_(\d+)$/', $phone, $maskedParts)) {
+                    $suffix = $maskedParts[2];
+                    $prefix = $maskedParts[1];
+                    
+                    foreach ($members as $member) {
+                        if (!$member->phone) continue;
+                        
+                        $memberPhone = $this->parser->normalizePhone($member->phone);
+                        if (!$memberPhone) continue;
+                        
+                        // Check if suffix matches and prefix matches
+                        if (strlen($memberPhone) >= strlen($suffix)) {
+                            $memberSuffix = substr($memberPhone, -strlen($suffix));
+                            if ($memberSuffix === $suffix) {
+                                // Check prefix match
+                                if ($prefix === '2547' && substr($memberPhone, 0, 4) === '2547') {
+                                    $fullPhoneMatches[] = $member;
+                                } elseif ($prefix === '07' && (substr($memberPhone, 0, 4) === '2547' || substr($memberPhone, 0, 2) === '07')) {
+                                    $fullPhoneMatches[] = $member;
                                 }
                             }
                         }
                     }
+                    continue;
+                }
+                
+                // Regular full phone match (100% match)
+                $normalizedPhone = $this->parser->normalizePhone($phone);
+                if (!$normalizedPhone) continue;
 
-                    if ($hasPhoneConflict || count($nameMatches) > 1) {
-                        // Name matches but phone conflict or multiple name matches - draft assign
-                        $draftMemberIds = array_map(fn($m) => $m['member']->id, $nameMatches);
-                        $transaction->update([
-                            'assignment_status' => 'draft',
-                            'draft_member_ids' => $draftMemberIds,
-                            'match_confidence' => $bestNameScore,
-                        ]);
-                        $draftAssigned++;
-                        $results[] = [
-                            'transaction_id' => $transaction->id,
-                            'action' => 'draft',
-                            'members' => array_map(fn($m) => $m['member']->name, $nameMatches),
-                            'reason' => $hasPhoneConflict ? 'Name match but phone conflict' : 'Multiple name matches'
-                        ];
-                        continue;
-                    } elseif (count($nameMatches) === 1 && empty($parsed['phone_numbers'])) {
-                        // Single name match, no phone - auto assign if high confidence
-                        if ($bestNameScore >= 0.8) {
-                            $member = $nameMatches[0]['member'];
-                            $transaction->update([
-                                'member_id' => $member->id,
-                                'assignment_status' => 'auto_assigned',
-                                'match_confidence' => $bestNameScore,
-                                'draft_member_ids' => null,
-                            ]);
+                foreach ($members as $member) {
+                    if (!$member->phone) continue;
+                    
+                    $memberPhone = $this->parser->normalizePhone($member->phone);
+                    if (!$memberPhone) continue;
 
-                            TransactionMatchLog::create([
-                                'transaction_id' => $transaction->id,
-                                'member_id' => $member->id,
-                                'confidence' => $bestNameScore,
-                                'match_reason' => 'Name match (high confidence)',
-                                'source' => 'auto',
-                                'user_id' => $request->user()->id,
-                            ]);
+                    // Full phone match = 100% match
+                    if ($normalizedPhone === $memberPhone) {
+                        if (!in_array($member->id, collect($fullPhoneMatches)->pluck('id')->toArray())) {
+                            $fullPhoneMatches[] = $member;
+                        }
+                    }
+                    // Partial match (last 4-6 digits) = draft
+                    elseif (strlen($normalizedPhone) >= 4 && strlen($memberPhone) >= 4) {
+                        $txLast4 = substr($normalizedPhone, -4);
+                        $memLast4 = substr($memberPhone, -4);
+                        if ($txLast4 === $memLast4 && !in_array($member->id, collect($phoneMatches)->pluck('id')->toArray())) {
+                            $phoneMatches[] = $member;
+                        }
+                    }
+                }
+            }
+            
+            // Check last 3 digits if available
+            // CRITICAL: For M-Pesa Paybill, member's name MUST appear in particulars
+            // If last 3 digits match but name is NOT in description, do NOT suggest in drafts
+            if (!empty($parsed['last_3_phone_digits'])) {
+                $particulars = strtolower($transaction->particulars);
+                
+                foreach ($members as $member) {
+                    if (!$member->phone) continue;
+                    $memberPhone = $this->parser->normalizePhone($member->phone);
+                    if ($memberPhone && strlen($memberPhone) >= 3) {
+                        $memberLast3 = substr($memberPhone, -3);
+                        if ($parsed['last_3_phone_digits'] === $memberLast3) {
+                            // CRITICAL: For M-Pesa Paybill, verify member's name appears in particulars
+                            $memberNameWords = array_filter(explode(' ', strtolower($member->name)), function($w) { return strlen($w) > 2; });
 
-                            $autoAssigned++;
-                            $results[] = ['transaction_id' => $transaction->id, 'action' => 'auto_assigned', 'member' => $member->name, 'reason' => 'Name match'];
-                            continue;
-                        } else {
-                            // Low confidence - draft
-                            $member = $nameMatches[0]['member'];
-                            $transaction->update([
-                                'assignment_status' => 'draft',
-                                'draft_member_ids' => [$member->id],
-                                'match_confidence' => $bestNameScore,
-                            ]);
-                            $draftAssigned++;
-                            $results[] = ['transaction_id' => $transaction->id, 'action' => 'draft', 'members' => [$member->name], 'reason' => 'Name match (low confidence)'];
-                            continue;
+                            $matchedWords = 0;
+                            foreach ($memberNameWords as $memWord) {
+                                if (strpos($particulars, $memWord) !== false) {
+                                    $matchedWords++;
+                                }
+                            }
+
+                            if ($isMpesaPaybill) {
+                                // Require at least two meaningful words to appear in the particulars.
+                                if ($matchedWords < 2) {
+                                    continue;
+                                }
+                            } elseif ($matchedWords === 0) {
+                                continue;
+                            }
+                            
+                            // Last 3 digits match = 100% match (and name verified for M-Pesa Paybill)
+                            if (!in_array($member->id, collect($fullPhoneMatches)->pluck('id')->toArray())) {
+                                $fullPhoneMatches[] = $member;
+                            }
                         }
                     }
                 }
             }
 
-            // Strategy 3: Member number match
-            if ($parsed['member_number']) {
-                $memberByNumber = Member::where('member_number', $parsed['member_number'])
-                    ->orWhere('member_code', $parsed['member_number'])
-                    ->first();
-                
-                if ($memberByNumber) {
-                    $transaction->update([
-                        'member_id' => $memberByNumber->id,
-                        'assignment_status' => 'auto_assigned',
-                        'match_confidence' => 0.98,
-                        'draft_member_ids' => null,
-                    ]);
+            // If we have 100% phone matches (full or masked), auto-assign if unique
+            if (count($fullPhoneMatches) === 1) {
+                return [
+                    'member_id' => $fullPhoneMatches[0]->id,
+                    'status' => 'auto_assigned',
+                    'confidence' => 1.0,
+                    'reason' => 'Full phone match (no name, 100%)',
+                ];
+            } elseif (count($fullPhoneMatches) > 1) {
+                Log::debug('Multiple full phone matches detected', [
+                    'transaction_id' => $transaction->id,
+                    'member_ids' => collect($fullPhoneMatches)->pluck('id')->toArray(),
+                    'member_names' => collect($fullPhoneMatches)->map(fn($m) => $m->name)->toArray(),
+                ]);
 
-                    TransactionMatchLog::create([
-                        'transaction_id' => $transaction->id,
-                        'member_id' => $memberByNumber->id,
-                        'confidence' => 0.98,
-                        'match_reason' => 'Member number match',
-                        'source' => 'auto',
-                        'user_id' => $request->user()->id,
-                    ]);
+                // Try to break the tie using name evidence from the particulars.
+                $particularWords = preg_split('/\s+/', strtolower($transaction->particulars));
+                $candidateScores = collect($fullPhoneMatches)->map(function ($member) use ($particularWords, $normalizedParticulars) {
+                    $nameWords = array_filter(explode(' ', strtolower($member->name)), function ($word) {
+                        return strlen($word) > 2;
+                    });
 
-                    $autoAssigned++;
-                    $results[] = ['transaction_id' => $transaction->id, 'action' => 'auto_assigned', 'member' => $memberByNumber->name, 'reason' => 'Member number match'];
-                    continue;
+                    $hits = 0;
+                    foreach ($nameWords as $word) {
+                        if (str_contains($normalizedParticulars, $word)) {
+                            $hits++;
+                            continue;
+                        }
+
+                        foreach ($particularWords as $txWord) {
+                            if ($this->wordsLooselyMatch($txWord, $word)) {
+                                $hits++;
+                                break;
+                            }
+                        }
+                    }
+
+                    return [
+                        'member' => $member,
+                        'hits' => $hits,
+                    ];
+                })->sortByDesc('hits')->values();
+
+                if ($candidateScores->isNotEmpty()) {
+                    $best = $candidateScores->first();
+                    $runnerUp = $candidateScores->get(1);
+
+                    if ($best['hits'] > 0 && (!$runnerUp || $best['hits'] > $runnerUp['hits'])) {
+                        Log::debug('Resolving full phone tie via name evidence', [
+                            'transaction_id' => $transaction->id,
+                            'selected_member_id' => $best['member']->id,
+                            'selected_member_name' => $best['member']->name,
+                            'hits' => $best['hits'],
+                            'runner_up_hits' => $runnerUp['hits'] ?? null,
+                        ]);
+
+                        return [
+                            'member_id' => $best['member']->id,
+                            'status' => 'auto_assigned',
+                            'confidence' => 1.0,
+                            'reason' => 'Full phone match + strongest name evidence',
+                        ];
+                    }
                 }
+
+                // Multiple 100% matches = draft
+                return [
+                    'member_id' => $fullPhoneMatches[0]->id,
+                    'status' => 'draft',
+                    'confidence' => 1.0,
+                    'reason' => 'Multiple full phone matches',
+                    'draft_member_ids' => collect($fullPhoneMatches)->pluck('id')->toArray(),
+                ];
+            }
+            
+            // REMOVED: No longer checking last 3 digits alone (without name)
+            // Only check last 3 digits when name is also present (handled in Strategy 1 above)
+            
+            // Only partial matches = draft
+            if (count($phoneMatches) > 0) {
+                return [
+                    'member_id' => $phoneMatches[0]->id,
+                    'status' => 'draft',
+                    'confidence' => 0.6,
+                    'reason' => 'Partial phone match (no name)',
+                    'draft_member_ids' => collect($phoneMatches)->pluck('id')->toArray(),
+                ];
+            }
+        }
+        
+        // Strategy 4b: M-Pesa Partial Phone + Name Match (but name not in description)
+        // This should NOT happen - if name is in description, Strategy 1 should have caught it
+        // But if somehow we have last_3_phone_digits and member_name, ensure name is actually in the transaction particulars
+        if (!empty($parsed['last_3_phone_digits']) && !empty($parsed['member_name'])) {
+            // This case should have been handled by Strategy 1
+            // If we reach here, it means Strategy 1 didn't find a match
+            // So we should NOT create a draft match based on phone alone
+            // Return null to continue to next strategy
+        }
+
+        // Strategy 5: Member Number Match
+        if (!empty($parsed['member_number'])) {
+            $memberNumberMatches = $members->filter(function ($member) use ($parsed) {
+                return $member->member_number === $parsed['member_number'] ||
+                       $member->member_code === $parsed['member_number'];
+            });
+
+            if ($memberNumberMatches->count() === 1) {
+                return [
+                    'member_id' => $memberNumberMatches->first()->id,
+                    'status' => 'auto_assigned',
+                    'confidence' => 1.0,
+                    'reason' => 'Member number match',
+                ];
             }
         }
 
-        return response()->json([
-            'message' => "Auto-assignment completed",
-            'auto_assigned' => $autoAssigned,
-            'draft_assigned' => $draftAssigned,
-            'debit_transactions_deleted' => $deletedCount,
-            'total' => $transactions->count(),
-            'results' => $results,
+        Log::debug('Auto-match heuristics exhausted', [
+            'transaction_id' => $transaction->id,
+            'transaction_type' => $parsed['transaction_type'] ?? null,
+            'has_member_name' => !empty($parsed['member_name']),
+            'has_phones' => !empty($parsed['phones']),
+            'phones' => $parsed['phones'] ?? [],
+            'last_3_digits' => $parsed['last_3_phone_digits'] ?? null,
+            'particulars' => $transaction->particulars,
         ]);
+
+        return null;
+    }
+
+    protected function phoneAppearsInText(string $digitsOnlyParticulars, string $normalizedPhone): bool
+    {
+        $digitsOnlyPhone = preg_replace('/\D+/', '', $normalizedPhone);
+        if (!$digitsOnlyPhone) {
+            return false;
+        }
+
+        if (str_contains($digitsOnlyParticulars, $digitsOnlyPhone)) {
+            return true;
+        }
+
+        if (strlen($digitsOnlyPhone) > 3) {
+            $local = substr($digitsOnlyPhone, 3);
+            if ($local && str_contains($digitsOnlyParticulars, $local)) {
+                return true;
+            }
+            $localWithZero = '0' . $local;
+            if ($local && str_contains($digitsOnlyParticulars, $localWithZero)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function wordsLooselyMatch(string $txWord, string $memWord): bool
+    {
+        $txWord = strtolower($txWord);
+        $memWord = strtolower($memWord);
+
+        if (strlen($txWord) < 3 || strlen($memWord) < 3) {
+            return false;
+        }
+
+        if (str_starts_with($txWord, $memWord) || str_starts_with($memWord, $txWord)) {
+            $shorter = min(strlen($txWord), strlen($memWord));
+            $longer = max(strlen($txWord), strlen($memWord));
+
+            return $shorter / ($longer ?: 1) >= 0.6;
+        }
+
+        return levenshtein($txWord, $memWord) <= 1;
     }
 
     public function bulkAssign(Request $request)
     {
-        $request->validate([
-            'assignments' => 'required|array|min:1',
-            'assignments.*.transaction_id' => 'required|exists:transactions,id',
-            'assignments.*.member_id' => 'required|exists:members,id',
+        $validated = $request->validate([
+            'member_id' => 'required|exists:members,id',
+            'transactions' => 'required_without:transaction_ids|array',
+            'transactions.*' => 'integer|exists:transactions,id',
+            'transaction_ids' => 'required_without:transactions|array',
+            'transaction_ids.*' => 'integer|exists:transactions,id',
         ]);
 
-        $assigned = 0;
+        $transactionIds = $validated['transactions'] ?? $validated['transaction_ids'] ?? [];
+        if (empty($transactionIds)) {
+            return response()->json([
+                'success' => 0,
+                'errors' => ['No transactions supplied for bulk assignment'],
+            ], 422);
+        }
+
+        $success = 0;
         $errors = [];
 
-        foreach ($request->assignments as $assignment) {
+        foreach ($transactionIds as $transactionId) {
             try {
-                $transaction = Transaction::findOrFail($assignment['transaction_id']);
-                
+                $transaction = Transaction::findOrFail($transactionId);
+
+                if ($transaction->is_archived) {
+                    $errors[] = "Transaction {$transactionId}: Archived transactions cannot be assigned";
+                    continue;
+                }
+
                 $transaction->update([
-                    'member_id' => $assignment['member_id'],
+                    'member_id' => $request->member_id,
                     'assignment_status' => 'manual_assigned',
                     'match_confidence' => 1.0,
-                    'draft_member_ids' => null,
                 ]);
 
                 TransactionMatchLog::create([
                     'transaction_id' => $transaction->id,
-                    'member_id' => $assignment['member_id'],
+                    'member_id' => $request->member_id,
                     'confidence' => 1.0,
                     'match_reason' => 'Bulk manual assignment',
                     'source' => 'manual',
                     'user_id' => $request->user()->id,
                 ]);
 
-                $assigned++;
+                $success++;
             } catch (\Exception $e) {
-                $errors[] = [
-                    'transaction_id' => $assignment['transaction_id'],
-                    'error' => $e->getMessage(),
-                ];
+                $errors[] = "Transaction {$transactionId}: " . $e->getMessage();
             }
         }
 
         return response()->json([
-            'message' => "Bulk assignment completed",
-            'assigned' => $assigned,
+            'success' => $success,
             'errors' => $errors,
+        ]);
+    }
+
+    protected function archiveTransactionModel(Transaction $transaction, ?string $reason = null): bool
+    {
+        if ($transaction->is_archived) {
+            return false;
+        }
+
+        $updates = [
+            'is_archived' => true,
+            'archived_at' => now(),
+            'archive_reason' => $reason,
+        ];
+
+        if (
+            $transaction->member_id ||
+            $transaction->assignment_status !== 'unassigned' ||
+            !empty($transaction->draft_member_ids)
+        ) {
+            $transaction->splits()->delete();
+            $updates = array_merge($updates, [
+                'member_id' => null,
+                'assignment_status' => 'unassigned',
+                'match_confidence' => null,
+                'draft_member_ids' => null,
+            ]);
+        }
+
+        $transaction->update($updates);
+
+        return true;
+    }
+
+    public function archive(Request $request, Transaction $transaction)
+    {
+        $request->validate([
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        if (!$this->archiveTransactionModel($transaction, $request->input('reason'))) {
+            return response()->json([
+                'message' => 'Transaction already archived',
+                'transaction' => $transaction,
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Transaction archived successfully',
+            'transaction' => $transaction->fresh(['member', 'bankStatement']),
+        ]);
+    }
+
+    public function unarchive(Transaction $transaction)
+    {
+        if (!$transaction->is_archived) {
+            return response()->json([
+                'message' => 'Transaction is not archived',
+                'transaction' => $transaction,
+            ]);
+        }
+
+        $transaction->update([
+            'is_archived' => false,
+            'archived_at' => null,
+            'archive_reason' => null,
+        ]);
+
+        return response()->json([
+            'message' => 'Transaction restored successfully',
+            'transaction' => $transaction->fresh(['member', 'bankStatement']),
+        ]);
+    }
+
+    public function bulkArchive(Request $request)
+    {
+        $validated = $request->validate([
+            'transaction_ids' => 'required|array|min:1',
+            'transaction_ids.*' => 'exists:transactions,id',
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        $transactions = Transaction::whereIn('id', $validated['transaction_ids'])->get();
+
+        $archived = 0;
+        foreach ($transactions as $transaction) {
+            if ($this->archiveTransactionModel($transaction, $validated['reason'] ?? null)) {
+                $archived++;
+            }
+        }
+
+        return response()->json([
+            'message' => "Archived {$archived} transaction(s)",
+            'archived' => $archived,
+            'requested' => count($validated['transaction_ids']),
+        ]);
+    }
+
+    public function askAi(Request $request, Transaction $transaction, MatchingService $matchingService)
+    {
+        $members = Member::where('is_active', true)->get();
+        
+        $transactionData = [
+            'id' => $transaction->id,
+            'tran_date' => $transaction->tran_date,
+            'particulars' => $transaction->particulars,
+            'credit' => $transaction->credit,
+            'transaction_code' => $transaction->transaction_code,
+            'phones' => $transaction->phones,
+        ];
+
+        $membersData = $members->map(function ($member) {
+            return [
+                'id' => $member->id,
+                'name' => $member->name,
+                'phone' => $member->phone,
+                'member_code' => $member->member_code,
+                'member_number' => $member->member_number,
+            ];
+        })->toArray();
+
+        $matches = $matchingService->matchBatch([$transactionData], $membersData);
+
+        return response()->json([
+            'transaction' => $transaction,
+            'suggestions' => $matches[0] ?? [],
+        ]);
+    }
+
+    public function transfer(Request $request, Transaction $transaction)
+    {
+        if ($transaction->is_archived) {
+            return response()->json([
+                'message' => 'Cannot transfer an archived transaction',
+            ], 422);
+        }
+
+        $request->validate([
+            'to_member_id' => 'required|exists:members,id',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        if (!$transaction->member_id) {
+            return response()->json([
+                'message' => 'Transaction must be assigned to a member before transfer',
+            ], 422);
+        }
+
+        if ($transaction->member_id == $request->to_member_id) {
+            return response()->json([
+                'message' => 'Cannot transfer to the same member',
+            ], 422);
+        }
+
+        $fromMember = Member::findOrFail($transaction->member_id);
+        $toMember = Member::findOrFail($request->to_member_id);
+
+        DB::transaction(function () use ($transaction, $request, $fromMember, $toMember) {
+            // Update transaction to new member
+            $transaction->update([
+                'member_id' => $request->to_member_id,
+                'assignment_status' => 'manual_assigned',
+            ]);
+
+            // Create match log for transfer
+            TransactionMatchLog::create([
+                'transaction_id' => $transaction->id,
+                'member_id' => $request->to_member_id,
+                'confidence' => 1.0,
+                'match_reason' => "Transferred from {$fromMember->name} to {$toMember->name}" . ($request->notes ? ": {$request->notes}" : ''),
+                'source' => 'manual',
+                'user_id' => $request->user()->id,
+            ]);
+        });
+
+        $transaction->load(['member', 'bankStatement']);
+
+        return response()->json([
+            'message' => 'Transaction transferred successfully',
+            'transaction' => $transaction,
         ]);
     }
 }

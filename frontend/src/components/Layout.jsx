@@ -1,99 +1,118 @@
-import { useState } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { useState } from 'react'
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
+import { logout } from '../api/auth'
+import MemberSearchModal from './MemberSearchModal'
 
 export default function Layout() {
-  const { user, logout } = useAuth();
-  const location = useLocation();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showMemberStatementModal, setShowMemberStatementModal] = useState(false)
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login')
+  }
+
+  const isActive = (path) => {
+    return location.pathname === path || location.pathname.startsWith(path + '/')
+  }
 
   const navItems = [
-    { path: '/', label: 'Dashboard', icon: '📊' },
-    { path: '/upload', label: 'Upload', icon: '📤' },
-    { path: '/statements', label: 'Statements', icon: '📄' },
-    { path: '/transactions', label: 'Transactions', icon: '💳' },
-    { path: '/draft-assignments', label: 'Draft Assignments', icon: '📝' },
-    { path: '/members', label: 'Members', icon: '👥' },
-    { path: '/contributions', label: 'Contributions', icon: '💰' },
-    { path: '/manual-contributions', label: 'Cash Contributions', icon: '💵' },
-    { path: '/expenses', label: 'Expenses', icon: '📉' },
-    { path: '/settings', label: 'Settings', icon: '⚙️' },
-  ];
+    { key: 'dashboard', path: '/', label: 'Dashboard', icon: '📊' },
+    { key: 'members', path: '/members', label: 'Members', icon: '👥' },
+    {
+      key: 'member-statement',
+      action: 'memberStatement',
+      label: 'Member Statement',
+      icon: '📘',
+      isActive: (pathname) => pathname.startsWith('/members/') && pathname !== '/members',
+    },
+    { key: 'statements', path: '/statements', label: 'Statements', icon: '📄' },
+    { key: 'attendance-uploads', path: '/attendance-uploads', label: 'Attendance Uploads', icon: '🗂️' },
+    { key: 'transactions', path: '/transactions', label: 'Transactions', icon: '💰' },
+    { key: 'archived-transactions', path: '/archived-transactions', label: 'Archived Transactions', icon: '📦' },
+    { key: 'draft-transactions', path: '/draft-transactions', label: 'Draft Transactions', icon: '📝' },
+    { key: 'duplicate-transactions', path: '/duplicate-transactions', label: 'Duplicate Transactions', icon: '♻️' },
+    { key: 'expenses', path: '/expenses', label: 'Expenses', icon: '💸' },
+    { key: 'manual-contributions', path: '/manual-contributions', label: 'Manual Contributions', icon: '💵' },
+    { key: 'reports', path: '/reports', label: 'Reports', icon: '📈' },
+    { key: 'audit', path: '/audit', label: 'Audit', icon: '✅' },
+    { key: 'settings', path: '/settings', label: 'Settings', icon: '⚙️' },
+  ]
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
-      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-white shadow-lg transition-all duration-300 flex flex-col`}>
-        {/* Logo/Header */}
-        <div className="p-4 border-b">
-          <div className="flex items-center justify-between">
-            {sidebarOpen && (
-              <h1 className="text-xl font-bold text-gray-900">Member Contrib Recon</h1>
-            )}
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 rounded-md hover:bg-gray-100 text-gray-600"
-            >
-              {sidebarOpen ? '←' : '→'}
-            </button>
-          </div>
+      <div className="w-64 bg-white shadow-lg flex flex-col">
+        <div className="p-6 border-b">
+          <h1 className="text-xl font-bold text-gray-900">Member Contributions</h1>
         </div>
-
-        {/* Navigation */}
+        
         <nav className="flex-1 overflow-y-auto py-4">
-          <ul className="space-y-1 px-2">
-            {navItems.map((item) => (
-              <li key={item.path}>
-                <Link
-                  to={item.path}
-                  className={`flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                    location.pathname === item.path
-                      ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-500'
-                      : 'text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  <span className="text-xl mr-3">{item.icon}</span>
-                  {sidebarOpen && <span>{item.label}</span>}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
+          {navItems.map((item) => {
+            const active = item.isActive
+              ? item.isActive(location.pathname)
+              : item.path
+                ? isActive(item.path)
+                : false
 
-        {/* User Info & Logout */}
+            const baseClasses = `flex items-center px-6 py-3 text-sm font-medium transition-colors ${
+              active
+                ? 'bg-indigo-50 text-indigo-700 border-r-2 border-indigo-700'
+                : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+            }`
+
+            if (item.action === 'memberStatement') {
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setShowMemberStatementModal(true)}
+                  className={`${baseClasses} w-full text-left`}
+                >
+                  <span className="mr-3 text-lg">{item.icon}</span>
+                  {item.label}
+                </button>
+              )
+            }
+
+            return (
+              <Link key={item.key} to={item.path} className={baseClasses}>
+                <span className="mr-3 text-lg">{item.icon}</span>
+                {item.label}
+              </Link>
+            )
+          })}
+        </nav>
+        
         <div className="p-4 border-t">
-          <div className="flex items-center mb-3">
-            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
-              {user?.name?.charAt(0).toUpperCase() || 'U'}
-            </div>
-            {sidebarOpen && (
-              <div className="ml-3 flex-1">
-                <p className="text-sm font-medium text-gray-900">{user?.name}</p>
-                <p className="text-xs text-gray-500">{user?.email}</p>
-              </div>
-            )}
-          </div>
           <button
-            onClick={logout}
-            className={`w-full flex items-center px-4 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors ${
-              !sidebarOpen && 'justify-center'
-            }`}
+            onClick={handleLogout}
+            className="w-full flex items-center px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-md transition-colors"
           >
-            <span className="text-lg mr-2">🚪</span>
-            {sidebarOpen && <span>Logout</span>}
+            <span className="mr-3">🚪</span>
+            Logout
           </button>
         </div>
-      </aside>
+      </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-            <Outlet />
-          </div>
+        <main className="flex-1 overflow-y-auto p-6">
+          <Outlet />
         </main>
       </div>
+      <MemberSearchModal
+        isOpen={showMemberStatementModal}
+        onClose={() => setShowMemberStatementModal(false)}
+        onSelect={(member) => {
+          setShowMemberStatementModal(false)
+          if (member?.id) {
+            navigate(`/members/${member.id}`)
+          }
+        }}
+        title="Go to Member Statement"
+      />
     </div>
-  );
+  )
 }
-

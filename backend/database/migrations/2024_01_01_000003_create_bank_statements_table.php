@@ -19,6 +19,9 @@ return new class extends Migration
             $table->text('error_message')->nullable();
             $table->json('raw_metadata')->nullable();
             $table->timestamps();
+            
+            $table->index('status');
+            $table->index('statement_date');
         });
     }
 

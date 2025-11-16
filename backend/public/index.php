@@ -6,39 +6,6 @@ define('LARAVEL_START', microtime(true));
 
 /*
 |--------------------------------------------------------------------------
-| Check If The Application Is Under Maintenance
-|--------------------------------------------------------------------------
-|
-| If the application is in maintenance / demo mode via the "down" command
-| we will load this file so that any pre-rendered content can be shown
-| instead of starting the framework, which could cause an exception.
-|
-*/
-
-// For cPanel deployment: Check if APP_BASE_PATH is set, otherwise use default Laravel structure
-// This will work for both local development and cPanel deployment
-$appBasePath = $_ENV['APP_BASE_PATH'] ?? dirname(__DIR__);
-
-// Check if we're in cPanel deployment (public files are separate from app)
-// If index.php is in public_html/statement but app is in laravel-ap/member-contributions/backend
-if (!file_exists($appBasePath . '/bootstrap/app.php')) {
-    // Try cPanel path structure
-    $homeDir = $_SERVER['HOME'] ?? getenv('HOME') ?? '/home2/royalce1';
-    $cPanelAppPath = $homeDir . '/laravel-ap/member-contributions/backend';
-    
-    if (file_exists($cPanelAppPath . '/bootstrap/app.php')) {
-        $appBasePath = $cPanelAppPath;
-    }
-}
-
-$maintenanceFile = $appBasePath . '/storage/framework/maintenance.php';
-
-if (file_exists($maintenanceFile)) {
-    require $maintenanceFile;
-}
-
-/*
-|--------------------------------------------------------------------------
 | Register The Auto Loader
 |--------------------------------------------------------------------------
 |
@@ -48,20 +15,33 @@ if (file_exists($maintenanceFile)) {
 |
 */
 
-require $appBasePath . '/vendor/autoload.php';
+require __DIR__.'/../vendor/autoload.php';
+
+/*
+|--------------------------------------------------------------------------
+| Turn On The Lights
+|--------------------------------------------------------------------------
+|
+| We need to illuminate PHP development, so let us turn on the lights.
+| This bootstraps the framework and gets it ready for use, then it
+| will load up this application so that we can run it and send
+| the responses back to the browser and delight our users.
+|
+*/
+
+$app = require_once __DIR__.'/../bootstrap/app.php';
 
 /*
 |--------------------------------------------------------------------------
 | Run The Application
 |--------------------------------------------------------------------------
 |
-| Once we have the application, we can handle the incoming request using
-| the application's HTTP kernel. Then, we will send the response back
-| to this client's browser, allowing them to enjoy our application.
+| Once we have the application, we can handle the incoming request
+| through the kernel, and send the associated response back to
+| the client's browser allowing them to enjoy the creative
+| and wonderful application we have prepared for them.
 |
 */
-
-$app = require_once $appBasePath . '/bootstrap/app.php';
 
 $kernel = $app->make(Illuminate\Contracts\Http\Kernel::class);
 

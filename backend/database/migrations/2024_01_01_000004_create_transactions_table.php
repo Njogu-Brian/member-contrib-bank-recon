@@ -14,20 +14,26 @@ return new class extends Migration
             $table->date('tran_date');
             $table->date('value_date')->nullable();
             $table->text('particulars');
+            $table->string('transaction_type')->nullable();
             $table->decimal('credit', 15, 2)->default(0);
             $table->decimal('debit', 15, 2)->default(0);
             $table->decimal('balance', 15, 2)->nullable();
-            $table->string('transaction_code')->nullable()->index();
+            $table->string('transaction_code')->nullable();
             $table->json('phones')->nullable();
-            $table->string('row_hash')->index();
+            $table->string('row_hash')->unique();
             $table->foreignId('member_id')->nullable()->constrained()->onDelete('set null');
-            $table->enum('assignment_status', ['unassigned', 'auto_assigned', 'manual_assigned', 'flagged'])->default('unassigned');
+            $table->enum('assignment_status', ['unassigned', 'auto_assigned', 'manual_assigned', 'draft', 'flagged'])->default('unassigned');
             $table->decimal('match_confidence', 3, 2)->nullable();
+            $table->json('draft_member_ids')->nullable();
             $table->text('raw_text')->nullable();
             $table->json('raw_json')->nullable();
             $table->timestamps();
-
-            $table->index(['transaction_code', 'tran_date']);
+            
+            $table->index('tran_date');
+            $table->index('transaction_code');
+            $table->index('member_id');
+            $table->index('assignment_status');
+            $table->index('row_hash');
         });
     }
 

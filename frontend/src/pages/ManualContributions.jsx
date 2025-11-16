@@ -1,263 +1,268 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { manualContributionsApi } from '../api/manualContributions';
-import { membersApi } from '../api/members';
-import toast from 'react-hot-toast';
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { getManualContributions, createManualContribution, updateManualContribution, deleteManualContribution, importExcel } from '../api/manualContributions'
+import { getMembers } from '../api/members'
+import Pagination from '../components/Pagination'
 
 export default function ManualContributions() {
-  const [page, setPage] = useState(1);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const queryClient = useQueryClient();
+  const [showModal, setShowModal] = useState(false)
+  const [page, setPage] = useState(1)
+  const [editingContribution, setEditingContribution] = useState(null)
+  const [formData, setFormData] = useState({
+    member_id: '',
+    amount: '',
+    contribution_date: new Date().toISOString().split('T')[0],
+    payment_method: 'cash',
+    notes: '',
+  })
+  const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
     queryKey: ['manual-contributions', page],
-    queryFn: () => manualContributionsApi.list({ page, per_page: 20 }),
-  });
+    queryFn: () => getManualContributions({ page }),
+  })
 
   const { data: membersData } = useQuery({
     queryKey: ['members'],
-    queryFn: () => membersApi.list({ per_page: 1000 }),
-  });
+    queryFn: () => getMembers(),
+  })
 
   const createMutation = useMutation({
-    mutationFn: manualContributionsApi.create,
+    mutationFn: createManualContribution,
     onSuccess: () => {
-      toast.success('Contribution added successfully');
-      queryClient.invalidateQueries(['manual-contributions']);
-      setShowAddModal(false);
+      queryClient.invalidateQueries(['manual-contributions'])
+      setShowModal(false)
+      resetForm()
     },
-    onError: (error) => {
-      toast.error(error.response?.data?.message || 'Failed to add contribution');
-    },
-  });
+  })
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => manualContributionsApi.update(id, data),
+    mutationFn: ({ id, data }) => updateManualContribution(id, data),
     onSuccess: () => {
-      toast.success('Contribution updated successfully');
-      queryClient.invalidateQueries(['manual-contributions']);
-      setEditingId(null);
+      queryClient.invalidateQueries(['manual-contributions'])
+      setShowModal(false)
+      setEditingContribution(null)
+      resetForm()
+    },
+  })
+
+  const importMutation = useMutation({
+    mutationFn: importExcel,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(['manual-contributions'])
+      alert(data.message || `Imported ${data.success} contributions`)
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || 'Failed to update contribution');
+      alert(error.response?.data?.message || 'Import failed')
     },
-  });
+  })
 
   const deleteMutation = useMutation({
-    mutationFn: manualContributionsApi.delete,
+    mutationFn: deleteManualContribution,
     onSuccess: () => {
-      toast.success('Contribution deleted successfully');
-      queryClient.invalidateQueries(['manual-contributions']);
+      queryClient.invalidateQueries(['manual-contributions'])
     },
-    onError: (error) => {
-      toast.error(error.response?.data?.message || 'Failed to delete contribution');
-    },
-  });
+  })
+
+  const resetForm = () => {
+    setFormData({
+      member_id: '',
+      amount: '',
+      contribution_date: new Date().toISOString().split('T')[0],
+      payment_method: 'cash',
+      notes: '',
+    })
+  }
+
+  const handleEdit = (contribution) => {
+    setEditingContribution(contribution)
+    setFormData({
+      member_id: contribution.member_id,
+      amount: contribution.amount,
+      contribution_date: contribution.contribution_date,
+      payment_method: contribution.payment_method,
+      notes: contribution.notes || '',
+    })
+    setShowModal(true)
+  }
 
   const handleSubmit = (e) => {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    const data = {
-      member_id: parseInt(formData.get('member_id')),
-      amount: parseFloat(formData.get('amount')),
-      contribution_date: formData.get('contribution_date'),
-      payment_method: formData.get('payment_method') || 'cash',
-      notes: formData.get('notes') || null,
-    };
-
-    if (editingId) {
-      updateMutation.mutate({ id: editingId, data });
+    e.preventDefault()
+    if (editingContribution) {
+      updateMutation.mutate({ id: editingContribution.id, data: formData })
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate(formData)
     }
-  };
+  }
 
-  const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to delete this contribution?')) {
-      deleteMutation.mutate(id);
-    }
-  };
-
-  const editingItem = data?.data?.find((item) => item.id === editingId);
+  if (isLoading) {
+    return <div className="text-center py-12">Loading...</div>
+  }
 
   return (
-    <div className="px-4 py-6 sm:px-0">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Manual Contributions</h1>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-gray-900">Manual Contributions</h1>
         <button
-          onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          onClick={() => {
+            setEditingContribution(null)
+            resetForm()
+            setShowModal(true)
+          }}
+          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
         >
-          + Add Contribution
+          Add Contribution
         </button>
       </div>
 
       <div className="bg-white shadow rounded-lg overflow-hidden">
-        {isLoading ? (
-          <div className="p-8 text-center">Loading...</div>
-        ) : (
-          <>
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Member</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Method</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {data?.data?.length > 0 ? (
-                  data.data.map((contribution) => (
-                    <tr key={contribution.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {new Date(contribution.contribution_date).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {contribution.member?.name || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                        KES {contribution.amount?.toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {contribution.payment_method}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
-                        {contribution.notes || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => setEditingId(contribution.id)}
-                          className="text-blue-600 hover:text-blue-900 mr-3"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(contribution.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
-                      No contributions found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </>
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Method</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {data?.data?.map((contribution) => (
+              <tr key={contribution.id}>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{contribution.contribution_date}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{contribution.member?.name}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(contribution.amount)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">{contribution.payment_method}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <button onClick={() => handleEdit(contribution)} className="text-indigo-600 hover:text-indigo-900 mr-4">
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm('Are you sure you want to delete this contribution?')) {
+                        deleteMutation.mutate(contribution.id)
+                      }
+                    }}
+                    className="text-red-600 hover:text-red-900"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {data && (
+          <Pagination
+            pagination={{
+              current_page: data.current_page || 1,
+              last_page: data.last_page || 1,
+              per_page: data.per_page || 20,
+              total: data.total || 0,
+            }}
+            onPageChange={(newPage) => setPage(newPage)}
+          />
         )}
       </div>
 
-      {(showAddModal || editingId) && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <h3 className="text-lg font-bold mb-4">
-              {editingId ? 'Edit Contribution' : 'Add Contribution'}
-            </h3>
-            <form onSubmit={handleSubmit}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Member *
-                </label>
-                <select
-                  name="member_id"
-                  required
-                  defaultValue={editingItem?.member_id}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                >
-                  <option value="">Select member...</option>
-                  {membersData?.data?.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.name} {member.phone ? `(${member.phone})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Amount *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  name="amount"
-                  required
-                  defaultValue={editingItem?.amount}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Date *
-                </label>
-                <input
-                  type="date"
-                  name="contribution_date"
-                  required
-                  defaultValue={editingItem?.contribution_date || new Date().toISOString().split('T')[0]}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Payment Method
-                </label>
-                <select
-                  name="payment_method"
-                  defaultValue={editingItem?.payment_method || 'cash'}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                >
-                  <option value="cash">Cash</option>
-                  <option value="mpesa">M-Pesa</option>
-                  <option value="bank_transfer">Bank Transfer</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Notes
-                </label>
-                <textarea
-                  name="notes"
-                  rows="3"
-                  defaultValue={editingItem?.notes}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAddModal(false);
-                    setEditingId(null);
-                  }}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={createMutation.isPending || updateMutation.isPending}
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {editingId ? 'Update' : 'Add'}
-                </button>
-              </div>
-            </form>
+      {showModal && (
+        <div className="fixed z-10 inset-0 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setShowModal(false)} />
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <form onSubmit={handleSubmit} className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+                  {editingContribution ? 'Edit Contribution' : 'Add Contribution'}
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Member *</label>
+                    <select
+                      required
+                      value={formData.member_id}
+                      onChange={(e) => setFormData({ ...formData, member_id: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    >
+                      <option value="">Select a member...</option>
+                      {membersData?.data?.map((member) => (
+                        <option key={member.id} value={member.id}>{member.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Amount *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      required
+                      value={formData.amount}
+                      onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Date *</label>
+                    <input
+                      type="date"
+                      required
+                      value={formData.contribution_date}
+                      onChange={(e) => setFormData({ ...formData, contribution_date: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Payment Method *</label>
+                    <select
+                      required
+                      value={formData.payment_method}
+                      onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    >
+                      <option value="cash">Cash</option>
+                      <option value="mpesa">M-Pesa</option>
+                      <option value="bank_transfer">Bank Transfer</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Notes</label>
+                    <textarea
+                      value={formData.notes}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                      rows={3}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                  <button
+                    type="submit"
+                    disabled={createMutation.isPending || updateMutation.isPending}
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:col-start-2 sm:text-sm disabled:opacity-50"
+                  >
+                    {createMutation.isPending || updateMutation.isPending ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowModal(false)
+                      setEditingContribution(null)
+                      resetForm()
+                    }}
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
     </div>
-  );
+  )
 }
 

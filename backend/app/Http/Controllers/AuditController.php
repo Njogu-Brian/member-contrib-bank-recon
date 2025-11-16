@@ -1,0 +1,708 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\AuditExpenseLink;
+use App\Models\AuditRow;
+use App\Models\AuditRun;
+use App\Models\Expense;
+use App\Models\Member;
+use App\Models\Transaction;
+use App\Models\TransactionSplit;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
+
+class AuditController extends Controller
+{
+    protected array $monthMap = [
+        1 => ['jan', 'january'],
+        2 => ['feb', 'february'],
+        3 => ['mar', 'march'],
+        4 => ['apr', 'april'],
+        5 => ['may'],
+        6 => ['jun', 'june'],
+        7 => ['jul', 'july'],
+        8 => ['aug', 'august'],
+        9 => ['sep', 'sept', 'september'],
+        10 => ['oct', 'october'],
+        11 => ['nov', 'november'],
+        12 => ['dec', 'december'],
+    ];
+
+    protected array $registrationAliases = ['registration', 'reg fee', 'registration fee'];
+    protected array $membershipAliases = ['membership', 'renewal', 'membership fee', 'renewal fee'];
+
+    public function index(Request $request)
+    {
+        $query = AuditRun::query()
+            ->withCount([
+                'rows as total_rows',
+                'rows as failing_rows' => fn ($q) => $q->where('status', 'fail'),
+            ])
+            ->orderByDesc('created_at');
+
+        if ($request->filled('year')) {
+            $query->where('year', $request->integer('year'));
+        }
+
+        $runs = $query->get()->map(function (AuditRun $run) {
+            return [
+                'id' => $run->id,
+                'year' => $run->year,
+                'original_filename' => $run->original_filename,
+                'created_at' => $run->created_at->toDateTimeString(),
+                'summary' => $run->summary,
+                'total_rows' => $run->total_rows,
+                'failing_rows' => $run->failing_rows,
+            ];
+        });
+
+        return response()->json(['runs' => $runs]);
+    }
+
+    public function show(Request $request, AuditRun $auditRun)
+    {
+        $auditRun->load(['rows.member']);
+
+        $statusFilter = $request->get('status');
+        $rows = $auditRun->rows->when($statusFilter, fn ($collection) => $collection->where('status', $statusFilter));
+
+        return response()->json($this->formatRunResponse($auditRun, $rows));
+    }
+
+    public function upload(Request $request)
+    {
+        $validated = $request->validate([
+            'file' => 'required|file|mimes:xlsx,xls,csv',
+            'year' => 'nullable|integer|min:2000|max:2100',
+        ]);
+
+        $user = $request->user();
+        $year = (int) ($validated['year'] ?? now()->year);
+        $file = $request->file('file');
+
+        $storedName = time() . '_' . $file->getClientOriginalName();
+        $path = $file->storeAs('audits', $storedName);
+
+        $run = new AuditRun([
+            'user_id' => $user?->id,
+            'year' => $year,
+            'original_filename' => $file->getClientOriginalName(),
+            'stored_filename' => $storedName,
+            'file_path' => $path,
+        ]);
+
+        return $this->processAudit($run, Storage::path($path), $user, $file);
+    }
+
+    public function reanalyze(Request $request, AuditRun $auditRun)
+    {
+        $user = $request->user();
+        $absolutePath = Storage::path($auditRun->file_path);
+
+        if (!is_file($absolutePath)) {
+            abort(404, 'Stored audit source file is missing');
+        }
+
+        return $this->processAudit($auditRun, $absolutePath, $user);
+    }
+
+    public function memberResults(Request $request, Member $member)
+    {
+        $limit = $request->integer('limit', 10);
+
+        $rows = AuditRow::with('run')
+            ->where('member_id', $member->id)
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'member' => [
+                'id' => $member->id,
+                'name' => $member->name,
+            ],
+            'audits' => $rows->map(function (AuditRow $row) {
+                $views = $row->monthly ?? [];
+
+                $summaries = collect($views)->map(function ($view) {
+                    $months = $view['months'] ?? [];
+                    $expected = array_sum(array_column($months, 'expected'));
+                    $actual = array_sum(array_column($months, 'actual'));
+
+                    return [
+                        'label' => $view['label'] ?? null,
+                        'expected' => round($expected, 2),
+                        'actual' => round($actual, 2),
+                        'difference' => round($actual - $expected, 2),
+                        'months' => $months,
+                    ];
+                });
+
+                return [
+                    'run_id' => $row->run_id,
+                    'year' => $row->run->year ?? null,
+                    'uploaded_at' => optional($row->run?->created_at)->toDateTimeString(),
+                    'status' => $row->status,
+                    'expected_total' => $row->expected_total,
+                    'system_total' => $row->system_total,
+                    'difference' => $row->difference,
+                    'mismatched_months' => $row->mismatched_months ?? [],
+                    'views' => $summaries->values(),
+                ];
+            }),
+        ]);
+    }
+
+    public function destroy(AuditRun $auditRun)
+    {
+        DB::transaction(function () use ($auditRun) {
+            $auditRun->rows()->delete();
+
+            $auditRun->expenses()->each(function (AuditExpenseLink $link) {
+                optional($link->expense)->delete();
+                $link->delete();
+            });
+
+            if ($auditRun->file_path) {
+                Storage::delete($auditRun->file_path);
+            }
+
+            $auditRun->delete();
+        });
+
+        return response()->json(['message' => 'Audit deleted']);
+    }
+
+    protected function processAudit(AuditRun $run, string $path, $user = null, ?UploadedFile $uploadedFile = null)
+    {
+        $spreadsheet = IOFactory::load($path);
+        $sheet = $spreadsheet->getActiveSheet();
+        $rows = $sheet->toArray(null, true, true, true);
+
+        $header = $this->locateHeader($rows);
+        $nameColumn = $header['columns']['name'] ?? null;
+        $phoneColumn = $header['columns']['phone'] ?? ($header['columns']['mobile'] ?? null);
+
+        if (!$nameColumn) {
+            throw ValidationException::withMessages([
+                'file' => 'Could not find a "Name" column in the uploaded sheet.',
+            ]);
+        }
+
+        $monthColumns = $this->mapMonthColumns($header['columns']);
+        if (empty($monthColumns)) {
+            throw ValidationException::withMessages([
+                'file' => 'Could not find any month columns (Jan-Dec) in the uploaded sheet.',
+            ]);
+        }
+
+        $feeColumns = $this->mapFeeColumns($header['columns']);
+
+        $runResults = $this->evaluateRows($rows, $header, $monthColumns, $feeColumns, $run->year);
+
+        DB::transaction(function () use ($run, $runResults, $uploadedFile) {
+            if ($run->exists) {
+                $run->rows()->delete();
+                $run->expenses()->each(function (AuditExpenseLink $link) {
+                    optional($link->expense)->delete();
+                });
+                $run->expenses()->delete();
+            } else {
+                $run->save();
+            }
+
+            if ($uploadedFile) {
+                $run->original_filename = $uploadedFile->getClientOriginalName();
+                $run->stored_filename = basename($run->file_path);
+            }
+
+            $run->summary = $runResults['summary'];
+            $run->metadata = $runResults['metadata'];
+            $run->save();
+
+            foreach ($runResults['rows'] as $rowData) {
+                $auditRow = $run->rows()->create($rowData['attributes']);
+
+                foreach ($rowData['expenses'] as $expensePayload) {
+                    $expense = Expense::create($expensePayload['data']);
+                    if (!empty($expensePayload['member_id'])) {
+                        $expense->members()->attach($expensePayload['member_id'], [
+                            'amount' => $expensePayload['data']['amount'],
+                        ]);
+                    }
+
+                    AuditExpenseLink::create([
+                        'audit_run_id' => $run->id,
+                        'audit_row_id' => $auditRow->id,
+                        'expense_id' => $expense->id,
+                        'type' => $expensePayload['type'],
+                    ]);
+                }
+            }
+        });
+
+        $run->load('rows.member');
+
+        return response()->json($this->formatRunResponse($run, $run->rows));
+    }
+
+    protected function locateHeader(array $rows): array
+    {
+        foreach ($rows as $index => $row) {
+            $normalized = [];
+            foreach ($row as $column => $value) {
+                $key = strtolower(trim((string) $value));
+                if ($key !== '') {
+                    $normalized[$key] = $column;
+                }
+            }
+
+            if (isset($normalized['name'])) {
+                return [
+                    'index' => $index,
+                    'columns' => $normalized,
+                ];
+            }
+        }
+
+        throw ValidationException::withMessages([
+            'file' => 'Unable to detect header row in the uploaded sheet.',
+        ]);
+    }
+
+    protected function mapMonthColumns(array $headerColumns): array
+    {
+        $mapped = [];
+
+        foreach ($this->monthMap as $monthNumber => $aliases) {
+            foreach ($aliases as $alias) {
+                if (array_key_exists($alias, $headerColumns)) {
+                    $mapped[$monthNumber] = $headerColumns[$alias];
+                    break;
+                }
+            }
+        }
+
+        return $mapped;
+    }
+
+    protected function mapFeeColumns(array $headerColumns): array
+    {
+        $fees = [
+            'registration' => null,
+            'membership' => null,
+        ];
+
+        foreach ($headerColumns as $key => $column) {
+            foreach ($this->registrationAliases as $alias) {
+                if (str_contains($key, $alias)) {
+                    $fees['registration'] = $column;
+                }
+            }
+            foreach ($this->membershipAliases as $alias) {
+                if (str_contains($key, $alias)) {
+                    $fees['membership'] = $column;
+                }
+            }
+        }
+
+        return array_filter($fees);
+    }
+
+    protected function extractMonthlyData(array $row, array $monthColumns): array
+    {
+        $data = [];
+
+        foreach ($monthColumns as $month => $column) {
+            $raw = $row[$column] ?? 0;
+            $data[$month] = $this->parseNumber($raw);
+        }
+
+        return $data;
+    }
+
+    protected function extractFeeValues(array $row, array $feeColumns): array
+    {
+        $fees = [
+            'registration' => 0,
+            'membership' => 0,
+        ];
+
+        foreach ($feeColumns as $type => $columnKey) {
+            $fees[$type] = $this->parseNumber($row[$columnKey] ?? 0);
+        }
+
+        return $fees;
+    }
+
+    protected function parseNumber($value): float
+    {
+        if (is_numeric($value)) {
+            return (float) $value;
+        }
+
+        $clean = preg_replace('/[^\d\-.]/', '', (string) $value);
+
+        return $clean === '' ? 0.0 : (float) $clean;
+    }
+
+    protected function locateMember(string $name, string $phone): ?Member
+    {
+        $normalizedPhone = $this->normalizePhone($phone);
+
+        if ($normalizedPhone) {
+            $member = Member::query()
+                ->whereRaw("REPLACE(REPLACE(REPLACE(REPLACE(phone, ' ', ''), '-', ''), '+', ''), '(', '') LIKE ?", ['%' . $normalizedPhone])
+                ->first();
+
+            if ($member) {
+                return $member;
+            }
+        }
+
+        if ($name) {
+            return Member::whereRaw('LOWER(name) = ?', [strtolower($name)])->first();
+        }
+
+        return null;
+    }
+
+    protected function normalizePhone(?string $phone): ?string
+    {
+        if (!$phone) {
+            return null;
+        }
+
+        $digits = preg_replace('/\D+/', '', $phone);
+        if (!$digits) {
+            return null;
+        }
+
+        // Use last 9 digits for comparison to account for country codes
+        return substr($digits, -9);
+    }
+
+    protected function fetchActuals(int $memberId): array
+    {
+        $buckets = [];
+
+        $transactions = Transaction::query()
+            ->where('member_id', $memberId)
+            ->where('assignment_status', '!=', 'unassigned')
+            ->where('is_archived', false)
+            ->withSum('splits as distributed_amount', 'amount')
+            ->get(['id', 'tran_date', 'credit']);
+
+        foreach ($transactions as $transaction) {
+            $credit = (float) ($transaction->credit ?? 0);
+            $distributed = (float) ($transaction->distributed_amount ?? 0);
+            $ownerShare = $credit - $distributed;
+            $this->addAmountToBucket($buckets, $transaction->tran_date, $ownerShare);
+        }
+
+        $splitShares = TransactionSplit::query()
+            ->with(['transaction' => function ($query) {
+                $query->select('id', 'tran_date', 'assignment_status', 'is_archived');
+            }])
+            ->where('member_id', $memberId)
+            ->whereHas('transaction', function ($query) {
+                $query->where('assignment_status', '!=', 'unassigned')
+                      ->where('is_archived', false);
+            })
+            ->get();
+
+        foreach ($splitShares as $split) {
+            $this->addAmountToBucket(
+                $buckets,
+                optional($split->transaction)->tran_date,
+                (float) $split->amount
+            );
+        }
+
+        ksort($buckets);
+
+        $byYear = [];
+        $overall = [];
+
+        foreach ($buckets as $year => $months) {
+            ksort($months);
+            $byYear[$year] = [];
+            foreach ($months as $month => $amount) {
+                $rounded = round($amount, 2);
+                $byYear[$year][$month] = $rounded;
+                $overall[$month] = round(($overall[$month] ?? 0) + $rounded, 2);
+            }
+        }
+
+        return [
+            'by_year' => $byYear,
+            'overall' => $overall,
+        ];
+    }
+
+    protected function addAmountToBucket(array &$bucket, $date, float $amount): void
+    {
+        if ($amount <= 0 || !$date) {
+            return;
+        }
+
+        $carbon = Carbon::parse($date);
+        $year = (int) $carbon->format('Y');
+        $month = (int) $carbon->format('n');
+
+        if (!isset($bucket[$year])) {
+            $bucket[$year] = [];
+        }
+
+        $bucket[$year][$month] = ($bucket[$year][$month] ?? 0) + $amount;
+    }
+
+    protected function compareMonths(array $expected, array $actual, ?int $year = null): array
+    {
+        $results = [];
+
+        foreach ($this->monthMap as $monthNumber => $aliases) {
+            $monthName = ucfirst($aliases[0]);
+            $expectedValue = round($expected[$monthNumber] ?? 0, 2);
+            $actualValue = round($actual[$monthNumber] ?? 0, 2);
+            $difference = round($actualValue - $expectedValue, 2);
+            $matches = abs($difference) < 0.5;
+
+            $results[] = [
+                'month' => $monthName,
+                'month_number' => $monthNumber,
+                'year' => $year,
+                'month_key' => $year ? sprintf('%04d-%02d', $year, $monthNumber) : null,
+                'expected' => $expectedValue,
+                'actual' => $actualValue,
+                'difference' => $difference,
+                'matches' => $matches,
+            ];
+        }
+
+        return $results;
+    }
+
+    protected function evaluateRows(array $rows, array $header, array $monthColumns, array $feeColumns, int $year): array
+    {
+        $results = [];
+        $summary = [
+            'rows' => 0,
+            'pass' => 0,
+            'fail' => 0,
+            'missing_member' => 0,
+        ];
+
+        $viewTotals = [
+            'selected_year' => ['label' => (string) $year, 'expected' => 0, 'actual' => 0],
+            'next_year' => ['label' => (string) ($year + 1), 'expected' => 0, 'actual' => 0],
+            'grand_total' => ['label' => 'Grand Total', 'expected' => 0, 'actual' => 0],
+        ];
+
+        $nameColumn = $header['columns']['name'];
+        $phoneColumn = $header['columns']['phone'] ?? ($header['columns']['mobile'] ?? null);
+
+        foreach ($rows as $index => $row) {
+            if ($index <= $header['index']) {
+                continue;
+            }
+
+            $name = trim((string) ($row[$nameColumn] ?? ''));
+            $phone = trim((string) ($phoneColumn ? ($row[$phoneColumn] ?? '') : ''));
+
+            if ($name === '' && $phone === '') {
+                continue;
+            }
+
+            $summary['rows']++;
+
+            $expectedByMonth = $this->extractMonthlyData($row, $monthColumns);
+            $expectedTotal = array_sum($expectedByMonth);
+            $feeValues = $this->extractFeeValues($row, $feeColumns);
+
+            $member = $this->locateMember($name, $phone);
+            if (!$member) {
+                $results[] = $this->buildRowPayload('missing_member', $expectedTotal, 0, $expectedByMonth, [], [
+                    'name' => $name,
+                    'phone' => $phone,
+                ], $year);
+                $summary['missing_member']++;
+                continue;
+            }
+
+            $actuals = $this->fetchActuals($member->id);
+            $selectedMonths = $this->compareMonths($expectedByMonth, $actuals['by_year'][$year] ?? [], $year);
+            $nextMonths = $this->compareMonths(array_fill(1, 12, 0), $actuals['by_year'][$year + 1] ?? [], $year + 1);
+            $overallMonths = $this->compareMonths($expectedByMonth, $actuals['overall'], null);
+
+            $systemTotal = array_sum(array_column($selectedMonths, 'actual'));
+            $difference = round($systemTotal - $expectedTotal, 2);
+            $mismatched = array_values(array_column(array_filter($selectedMonths, fn ($m) => !$m['matches']), 'month'));
+            $status = empty($mismatched) && abs($difference) < 0.5 ? 'pass' : 'fail';
+
+            $monthlyViews = [
+                'selected_year' => [
+                    'label' => (string) $year,
+                    'months' => $selectedMonths,
+                ],
+                'next_year' => [
+                    'label' => (string) ($year + 1),
+                    'months' => $nextMonths,
+                ],
+                'grand_total' => [
+                    'label' => 'Grand Total',
+                    'months' => $overallMonths,
+                ],
+            ];
+
+            $rowAttributes = [
+                'member_id' => $member->id,
+                'name' => $member->name,
+                'phone' => $member->phone,
+                'status' => $status,
+                'expected_total' => round($expectedTotal, 2),
+                'system_total' => round($systemTotal, 2),
+                'difference' => $difference,
+                'mismatched_months' => $mismatched,
+                'monthly' => $monthlyViews,
+                'registration_fee' => $feeValues['registration'] ?? null,
+                'membership_fee' => $feeValues['membership'] ?? null,
+            ];
+
+            $results[] = [
+                'attributes' => $rowAttributes,
+                'expenses' => $this->prepareExpenses($member, $feeValues, $year),
+            ];
+
+            $summary[$status]++;
+            $viewTotals['selected_year']['expected'] += $expectedTotal;
+            $viewTotals['selected_year']['actual'] += $systemTotal;
+            $viewTotals['next_year']['actual'] += array_sum(array_column($nextMonths, 'actual'));
+            $viewTotals['grand_total']['expected'] += $expectedTotal;
+            $viewTotals['grand_total']['actual'] += array_sum(array_column($overallMonths, 'actual'));
+        }
+
+        foreach ($viewTotals as &$viewTotal) {
+            $viewTotal['difference'] = round($viewTotal['actual'] - $viewTotal['expected'], 2);
+        }
+
+        return [
+            'rows' => $results,
+            'summary' => $summary,
+            'metadata' => [
+                'view_totals' => $viewTotals,
+                'view_order' => array_keys($viewTotals),
+            ],
+        ];
+    }
+
+    protected function buildRowPayload(string $status, float $expectedTotal, float $systemTotal, array $expectedByMonth, array $actualByMonth, array $meta, int $year): array
+    {
+        return [
+            'attributes' => [
+                'name' => $meta['name'] ?? null,
+                'phone' => $meta['phone'] ?? null,
+                'status' => $status,
+                'expected_total' => round($expectedTotal, 2),
+                'system_total' => round($systemTotal, 2),
+                'difference' => round($systemTotal - $expectedTotal, 2),
+                'mismatched_months' => array_values($this->listMonthNames(array_keys(array_filter($expectedByMonth)))),
+                'monthly' => [
+                    'selected_year' => [
+                        'label' => (string) $year,
+                    'months' => $this->compareMonths($expectedByMonth, $actualByMonth, $year),
+                    ],
+                    'next_year' => [
+                        'label' => (string) ($year + 1),
+                    'months' => $this->compareMonths(array_fill(1, 12, 0), [], $year + 1),
+                    ],
+                    'grand_total' => [
+                        'label' => 'Grand Total',
+                    'months' => $this->compareMonths($expectedByMonth, $actualByMonth, null),
+                    ],
+                ],
+            ],
+            'expenses' => [],
+        ];
+    }
+
+    protected function prepareExpenses(?Member $member, array $fees, int $year): array
+    {
+        $expenses = [];
+        $baseDate = Carbon::create($year, 1, 1);
+
+        if (!empty($fees['registration'])) {
+            $expenses[] = [
+                'type' => 'registration',
+                'member_id' => $member?->id,
+                'data' => [
+                    'description' => 'Registration fee - ' . ($member?->name ?? 'Member'),
+                    'amount' => $fees['registration'],
+                    'expense_date' => $baseDate->copy(),
+                    'category' => 'registration',
+                    'notes' => 'Generated from audit upload',
+                ],
+            ];
+        }
+
+        if (!empty($fees['membership'])) {
+            $expenses[] = [
+                'type' => 'membership',
+                'member_id' => $member?->id,
+                'data' => [
+                    'description' => 'Membership renewal - ' . ($member?->name ?? 'Member'),
+                    'amount' => $fees['membership'],
+                    'expense_date' => $baseDate->copy()->addMonths(6),
+                    'category' => 'membership',
+                    'notes' => 'Generated from audit upload',
+                ],
+            ];
+        }
+
+        return $expenses;
+    }
+
+    protected function listMonthNames(array $monthNumbers): array
+    {
+        return array_map(function ($monthNumber) {
+            return ucfirst($this->monthMap[$monthNumber][0] ?? $monthNumber);
+        }, $monthNumbers);
+    }
+
+    protected function formatRunResponse(AuditRun $run, $rows)
+    {
+        return [
+            'run' => [
+                'id' => $run->id,
+                'year' => $run->year,
+                'original_filename' => $run->original_filename,
+                'created_at' => $run->created_at->toDateTimeString(),
+                'summary' => $run->summary,
+                'views' => $run->metadata['view_totals'] ?? [],
+                'view_order' => $run->metadata['view_order'] ?? array_keys($run->metadata['view_totals'] ?? []),
+            ],
+            'rows' => $rows->map(function (AuditRow $row) {
+                return [
+                    'id' => $row->id,
+                    'member_id' => $row->member_id,
+                    'member_name' => $row->member->name ?? $row->name,
+                    'phone' => $row->phone,
+                    'status' => $row->status,
+                    'expected_total' => $row->expected_total,
+                    'system_total' => $row->system_total,
+                    'difference' => $row->difference,
+                    'mismatched_months' => $row->mismatched_months ?? [],
+                    'monthly' => $row->monthly,
+                    'registration_fee' => $row->registration_fee,
+                    'membership_fee' => $row->membership_fee,
+                ];
+            })->values(),
+        ];
+    }
+}

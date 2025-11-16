@@ -1,0 +1,2927 @@
+[
+  {
+    "tran_date": "2024-12-09",
+    "value_date": "2024-12-09",
+    "particulars": "MPS 254722884442 SL96V13X6W # SHEM KIHORO/ob",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2024-12-27",
+    "value_date": "2024-12-27",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2024-12-27",
+    "value_date": "2024-12-27",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2024-12-27",
+    "value_date": "2024-12-27",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2024-12-27",
+    "value_date": "2024-12-27",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-01-02",
+    "value_date": "2025-01-02",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-01-02",
+    "value_date": "2025-01-02",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-01-02",
+    "value_date": "2025-01-02",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-01-09",
+    "value_date": "2025-01-09",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-01-09",
+    "value_date": "2025-01-09",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-01-13",
+    "value_date": "2025-01-13",
+    "particulars": "MPS 254727426015 TAC6VW6AY8 # DOMINIC THUKU",
+    "credit": 10000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-01-24",
+    "value_date": "2025-01-24",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-01-24",
+    "value_date": "2025-01-24",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-01-24",
+    "value_date": "2025-01-24",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-02-03",
+    "value_date": "2025-02-03",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-02-03",
+    "value_date": "2025-02-03",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-02-03",
+    "value_date": "2025-02-03",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-02-03",
+    "value_date": "2025-02-03",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-02-06",
+    "value_date": "2025-02-06",
+    "particulars": "MPS 254723861052 TB6921IO59 # DAVID KAMAU KA",
+    "credit": 12000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-02-08",
+    "value_date": "2025-02-08",
+    "particulars": "MPS 254722863461 TB8384NHZB JAMES GITHINJI NGUGI 1",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-02-27",
+    "value_date": "2025-02-27",
+    "particulars": "MPS 254723345969 TBR3PU9AN1 JOSEPH WANJOHI MBUGUA",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-02-28",
+    "value_date": "2025-02-28",
+    "particulars": "MPS 254722908733 TBS1RFWBUV # DAVID KINGORI",
+    "credit": 16000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-02-28",
+    "value_date": "2025-02-28",
+    "particulars": "MPS 254722647545 TBS1RJKO0V # JOHN MBUGUA NJ",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-02-28",
+    "value_date": "2025-02-28",
+    "particulars": "MPS 254722252835 TBS2RJXM56 # PATRICK MUINDI",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-02-28",
+    "value_date": "2025-02-28",
+    "particulars": "MPS 254722252835 TBS6RKA37Y # PATRICK MUINDI",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-02-28",
+    "value_date": "2025-02-28",
+    "particulars": "MPS 254722464111 TBS9RKIJU5 # KELLY MUTHONI",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-02-28",
+    "value_date": "2025-02-28",
+    "particulars": "MPS 254722647545 TBS6RKNUOM # JOHN MBUGUA NJ",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-02-28",
+    "value_date": "2025-02-28",
+    "particulars": "MPS 254798999123 TBS3RL1M89 # EPHANTUS MUREI",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-02-28",
+    "value_date": "2025-02-28",
+    "particulars": "MPS 254720815538 TBS8RO1XBW # MARGARET W NJE",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-02-28",
+    "value_date": "2025-02-28",
+    "particulars": "MPS 254721545271 TBS1RVSUVT # ERIC OWINO OUM _",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-03-01",
+    "value_date": "2025-03-01",
+    "particulars": "MPS 254722863461 TC14WU0DXG JAMES GITHINJI NGUGI 1",
+    "credit": 18250.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-03-04",
+    "value_date": "2025-03-04",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-03-04",
+    "value_date": "2025-03-04",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-03-04",
+    "value_date": "2025-03-04",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-03-04",
+    "value_date": "2025-03-04",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-03-06",
+    "value_date": "2025-03-06",
+    "particulars": "MPS 254721857811 TC69M4RTM5 # AWUOR LENZER J",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-03-08",
+    "value_date": "2025-03-08",
+    "particulars": "MPS 254721834194 TC9837UMBK # LEONARD N AYUB",
+    "credit": 10000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-03-10",
+    "value_date": "2025-03-10",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-03-10",
+    "value_date": "2025-03-10",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-03-10",
+    "value_date": "2025-03-10",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-03-10",
+    "value_date": "2025-03-10",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-04",
+    "value_date": "2025-04-04",
+    "particulars": "C783040425132624 BT25040458278825 EAZZYBIZ",
+    "credit": 345.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-04",
+    "value_date": "2025-04-04",
+    "particulars": "C783040425132624 BT25040458278825 EAZZYBIZ",
+    "credit": 500000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-07",
+    "value_date": "2025-04-07",
+    "particulars": "MPS 254721857811 TD75RVV6HX # AWUOR LENZER J",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-07",
+    "value_date": "2025-04-07",
+    "particulars": "MPS 254721412502 TD76SMAHR2 # DUNCAN NGIGI N",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-10",
+    "value_date": "2025-04-10",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-10",
+    "value_date": "2025-04-10",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-10",
+    "value_date": "2025-04-10",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-10",
+    "value_date": "2025-04-10",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-14",
+    "value_date": "2025-04-14",
+    "particulars": "MPS 254798548939 TDE7RXBSZN # DUNCAN NGIGI N",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-17",
+    "value_date": "2025-04-17",
+    "particulars": "MPS 254798548939 TDH63FJKVI # DUNCAN NGIGI N",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-17",
+    "value_date": "2025-04-17",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-17",
+    "value_date": "2025-04-17",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-17",
+    "value_date": "2025-04-17",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-17",
+    "value_date": "2025-04-17",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-17",
+    "value_date": "2025-04-17",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-17",
+    "value_date": "2025-04-17",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-17",
+    "value_date": "2025-04-17",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-22",
+    "value_date": "2025-04-22",
+    "particulars": "MPS 254710552603 TDL9N085XP # CHRISPINE O OT",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-22",
+    "value_date": "2025-04-22",
+    "particulars": "MPS 254722690761 TDL3N2XLFJ # MARGARET NDUNG",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-22",
+    "value_date": "2025-04-22",
+    "particulars": "MPS 254722449055 TDM0P7X3GG # PURITY WAITHIR",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-23",
+    "value_date": "2025-04-23",
+    "particulars": "MPS 254722905346 TDN4UYJ48O # TERESIA K BACA",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-25",
+    "value_date": "2025-04-25",
+    "particulars": "MPS 254700911621 TDP37PZWGN # GAMALIEL MWASI _",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-26",
+    "value_date": "2025-04-26",
+    "particulars": "MPS 254798548939 TDQ39GWJBL # DUNCAN NGIGI N",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-28",
+    "value_date": "2025-04-28",
+    "particulars": "MPS 254712505968 TDS7I2QFJH # ADEN TOBIAS KA",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-04-30",
+    "value_date": "2025-04-30",
+    "particulars": "MPS 254722449055 TDU8RILP16 # PURITY WAITHIR",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-02",
+    "value_date": "2025-05-02",
+    "particulars": "MPS 254798548939 TE26312BWW # DUNCAN NGIGI N",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-09",
+    "value_date": "2025-05-09",
+    "particulars": "MPS 254798548939 TE95ZXYV1L # DUNCAN NGIGI N",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-12",
+    "value_date": "2025-05-12",
+    "particulars": "MPS 254798548939 TEC3FEN83F # DUNCAN NGIGI N",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-15",
+    "value_date": "2025-05-15",
+    "particulars": "MPS 254723345969 TEF2RZ0BFY # JOSEPH WANJOHI",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-15",
+    "value_date": "2025-05-15",
+    "particulars": "MPS 254711346073 TEF6S0MGWS # JOSHUA OYARO M",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-15",
+    "value_date": "2025-05-15",
+    "particulars": "MPS 254722934939 TEF0S2QRZ2 # SAMUEL NJAGI C _",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-15",
+    "value_date": "2025-05-15",
+    "particulars": "MPS 254700422866 TEF8S2YVJE # HARUN KINYANYA",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-15",
+    "value_date": "2025-05-15",
+    "particulars": "MPS 254722398187 TEF6S9WSNQ # GEOFFREY MONGA",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-15",
+    "value_date": "2025-05-15",
+    "particulars": "MPS 254722666072 TEF7SU3B9L # FRANCIS M MUGO",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-15",
+    "value_date": "2025-05-15",
+    "particulars": "MPS 254711685866 TEF8T2M5DC # MONICAH WANGAR",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-16",
+    "value_date": "2025-05-16",
+    "particulars": "MPS 254722141608 TEG6WK9MSU # JOSEPH CHEGE K",
+    "credit": 13000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-16",
+    "value_date": "2025-05-16",
+    "particulars": "MPS 254714245229 TEG7WKXEGR # PAUL MWANGI KA",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-16",
+    "value_date": "2025-05-16",
+    "particulars": "MPS 254720294807 TEG1XHQEU1 # KEZIAH NJERI N",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-16",
+    "value_date": "2025-05-16",
+    "particulars": "MPS 254798548939 TEG9ZJ7AP3 # DUNCAN NGIGI N _",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-16",
+    "value_date": "2025-05-16",
+    "particulars": "MPS 254700911621 TEG71NWNPN # GAMALIEL MWASI",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-19",
+    "value_date": "2025-05-19",
+    "particulars": "MPS 254720673187 TEJ1F4D9SR # DANIEL KAMAU K",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-22",
+    "value_date": "2025-05-22",
+    "particulars": "MPS 254721552282 TEM7QL7CD3 # MIRIAM WANGARI",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-22",
+    "value_date": "2025-05-22",
+    "particulars": "MPS 254723546478 TEM3QVW73T # RAPHAEL MUTUA",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-23",
+    "value_date": "2025-05-23",
+    "particulars": "MPS 254795109956 TEN7V51IAR # JACINTA WANJIR",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-23",
+    "value_date": "2025-05-23",
+    "particulars": "MPS 254798828040 TEN9XFX7R9 # NELLY WANJIKU",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-24",
+    "value_date": "2025-05-24",
+    "particulars": "MPS 254722690761 TEO4YOIJNG # MARGARET NDUNG",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-24",
+    "value_date": "2025-05-24",
+    "particulars": "MPS 254710552603 TEO4Z6736W # CHRISPINE O OT",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-24",
+    "value_date": "2025-05-24",
+    "particulars": "MPS 254722884442 TEO7Z8H98F # SHEM KIHORO/b4",
+    "credit": 12000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-24",
+    "value_date": "2025-05-24",
+    "particulars": "MPS 254722934939 TEO5ZCYSBP # SAMUEL NJAGI C _",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-24",
+    "value_date": "2025-05-24",
+    "particulars": "MPS 254700422866 TEO0ZLWOQW # HARUN KINYANYA",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-24",
+    "value_date": "2025-05-24",
+    "particulars": "MPS 254722677495 TEO81EQCCS # JEANNE MWIZERW",
+    "credit": 6000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-26",
+    "value_date": "2025-05-26",
+    "particulars": "MPS 254721791775 TEQ29M62A8 # SOLOMON KIMATH",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-26",
+    "value_date": "2025-05-26",
+    "particulars": "MPS 254721307264 TEQ7BCCRVJ # PAUL KARANJA W",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-28",
+    "value_date": "2025-05-28",
+    "particulars": "MPS 254724334176 TER2H2C434 # JOYCE NJAGI/92",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-28",
+    "value_date": "2025-05-28",
+    "particulars": "MPS 254726287956 TER1H2HD43 # DAVID ELIJAH N",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-28",
+    "value_date": "2025-05-28",
+    "particulars": "MPS 254722398187 TES9HL5MJ5 # GEOFFREY MONGA",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-28",
+    "value_date": "2025-05-28",
+    "particulars": "MPS 254723517316 TES1IEEP19 # VERONICAH WAMB",
+    "credit": 8000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-28",
+    "value_date": "2025-05-28",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-28",
+    "value_date": "2025-05-28",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-28",
+    "value_date": "2025-05-28",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-28",
+    "value_date": "2025-05-28",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-28",
+    "value_date": "2025-05-28",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-28",
+    "value_date": "2025-05-28",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-28",
+    "value_date": "2025-05-28",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-28",
+    "value_date": "2025-05-28",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-29",
+    "value_date": "2025-05-29",
+    "particulars": "MPS 254708225397 TET4MVKM72 #BrianNjogu BRIA",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-29",
+    "value_date": "2025-05-29",
+    "particulars": "MPS 254720294807 TET3Q6J1UB # KEZIAH NJERI N",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-30",
+    "value_date": "2025-05-30",
+    "particulars": "MPS 254700422866 TEU2RAWC7O # HARUN KINYANYA",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-30",
+    "value_date": "2025-05-30",
+    "particulars": "MPS 254723546478 TEU2RWWVWI # RAPHAEL MUTUA",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-30",
+    "value_date": "2025-05-30",
+    "particulars": "MPS 254729525903 TEU7S79GXJ # PAULINE WANGUI",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-31",
+    "value_date": "2025-05-31",
+    "particulars": "MPS 254722671621 TEV8VV4ZX4 # MUSEMBI MULATY _",
+    "credit": 8000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-31",
+    "value_date": "2025-05-31",
+    "particulars": "MPS 254728676551 TEV7WU2XEB # MUSYOKAH LEVIE",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-31",
+    "value_date": "2025-05-31",
+    "particulars": "MPS 254722725233 TEV7WY2I29 # FAULU KENYA MI",
+    "credit": 10000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-31",
+    "value_date": "2025-05-31",
+    "particulars": "MPS 254720863085 TEV8X5S5ES # GEORGE KIBET K",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-31",
+    "value_date": "2025-05-31",
+    "particulars": "MPS 254720673187 TEV4XDD0WS # DANIEL KAMAU K",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-31",
+    "value_date": "2025-05-31",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-31",
+    "value_date": "2025-05-31",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-31",
+    "value_date": "2025-05-31",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-05-31",
+    "value_date": "2025-05-31",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-03",
+    "value_date": "2025-06-03",
+    "particulars": "MPS 254727140965 TF111TH0LX # AGNES MATHEKA",
+    "credit": 10000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-03",
+    "value_date": "2025-06-03",
+    "particulars": "MPS 254727953511 TF164DV5C6 # LUCY NDUNGU NU",
+    "credit": 15000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-03",
+    "value_date": "2025-06-03",
+    "particulars": "MPS 254724752270 TF266Q3E1Q # Hellen Wambui/",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-03",
+    "value_date": "2025-06-03",
+    "particulars": "MPS 254798548939 TF227B4IK2 # DUNCAN NGIGI N _",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-03",
+    "value_date": "2025-06-03",
+    "particulars": "MPS 254711496903 TF279YXZR9 # TERESIA NDUTA",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-03",
+    "value_date": "2025-06-03",
+    "particulars": "MPS 254798548939 TF39BUP5Y9 # DUNCAN NGIGI N",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-03",
+    "value_date": "2025-06-03",
+    "particulars": "MPS 254798828040 TF33DXPCGT # NELLY WANJIKU",
+    "credit": 6000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-03",
+    "value_date": "2025-06-03",
+    "particulars": "MPS 254713304335 TF38EE5BFY # JANE W GITUKUI",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-04",
+    "value_date": "2025-06-04",
+    "particulars": "MPS 254728676551 TF43GBNSPF # MUSYOKAH LEVIE",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-04",
+    "value_date": "2025-06-04",
+    "particulars": "MPS 254720434498 TF41GYOV2J # SIMON KAMAU WA",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-04",
+    "value_date": "2025-06-04",
+    "particulars": "MPS 254720434498 TF41I9JCC1 # SIMON KAMAU WA",
+    "credit": 12000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-05",
+    "value_date": "2025-06-05",
+    "particulars": "MPS 254721912577 TF58KDXP3E # PETER MUTINDA",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-05",
+    "value_date": "2025-06-05",
+    "particulars": "MPS 254722349435 TF56KI50QC # JAMES LOKINI L",
+    "credit": 6000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-05",
+    "value_date": "2025-06-05",
+    "particulars": "MPS 254727753824 TF52N9T8V2 # ELIZABETH WAMB",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-07",
+    "value_date": "2025-06-07",
+    "particulars": "MPS 254721791775 TF62P8QV0W # SOLOMON KIMATH _",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-07",
+    "value_date": "2025-06-07",
+    "particulars": "MPS 254722252835 TF68QAYRMY # PATRICK MUINDI",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-07",
+    "value_date": "2025-06-07",
+    "particulars": "MPS 254722934939 TF69S2LIOV # SAMUEL NJAGI C",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-07",
+    "value_date": "2025-06-07",
+    "particulars": "MPS 254700422866 TF65S8P7R5 # HARUN KINYANYA",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-07",
+    "value_date": "2025-06-07",
+    "particulars": "MPS 254713304335 TF61SANONN # JANE W GITUKUI",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-07",
+    "value_date": "2025-06-07",
+    "particulars": "MPS 254712505968 TF61SPSZE1 # ADEN TOBIAS KA",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-07",
+    "value_date": "2025-06-07",
+    "particulars": "MPS 254726291362 TF71U934P5 # CAROLINE WANGU",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-07",
+    "value_date": "2025-06-07",
+    "particulars": "MPS 254720590903 TF72UBB3UM # JAMES WACHIRA",
+    "credit": 8000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-07",
+    "value_date": "2025-06-07",
+    "particulars": "MPS 254722677495 TF74UCZE9E # JEANNE MWIZERW",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-07",
+    "value_date": "2025-06-07",
+    "particulars": "MPS 254721472146 TF71UOA7HN # ARTHUR KAMAU N",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-07",
+    "value_date": "2025-06-07",
+    "particulars": "MPS 254727753824 TF71VWQWFP # ELIZABETH WAMB",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-07",
+    "value_date": "2025-06-07",
+    "particulars": "MPS 254726940263 TF70X0NVLC # Jackson Njogu/",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-09",
+    "value_date": "2025-06-09",
+    "particulars": "MPS 254721851511 TF9259P3WI # GABRIEL THITU",
+    "credit": 9000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-09",
+    "value_date": "2025-06-09",
+    "particulars": "MPS 254711685866 TF92645Q9W # MONICAH WANGAR",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-10",
+    "value_date": "2025-06-10",
+    "particulars": "MPS 254794635007 TFA7950ECH # George Mungai",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-10",
+    "value_date": "2025-06-10",
+    "particulars": "MPS 254722349435 TFA19RMV2F # JAMES LOKINI L",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-10",
+    "value_date": "2025-06-10",
+    "particulars": "MPS 254722666072 TFA8DEHNVK # FRANCIS M MUGO",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-11",
+    "value_date": "2025-06-11",
+    "particulars": "MPS 254721632064 TFB4DYN94Q # PRISCILLAH W M",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-13",
+    "value_date": "2025-06-13",
+    "particulars": "MPS 254700422866 TFD0OJUHL4 # HARUN KINYANYA",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-13",
+    "value_date": "2025-06-13",
+    "particulars": "MPS 254722905346 TFD6ORRU30 # TERESIA K BACA",
+    "credit": 10000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-13",
+    "value_date": "2025-06-13",
+    "particulars": "MPS 254717791404 TFD1RXOVZL # JOSHUA OYARO M _",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-14",
+    "value_date": "2025-06-14",
+    "particulars": "MPS 254722393220 TFE0T9PA5C # JOYCE MUTHONI",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-14",
+    "value_date": "2025-06-14",
+    "particulars": "MPS 254720590903 TFE5TH56CB # JAMES WACHIRA",
+    "credit": 10000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-14",
+    "value_date": "2025-06-14",
+    "particulars": "MPS 254722398187 TFE5TM5T0P # GEOFFREY MONGA",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-14",
+    "value_date": "2025-06-14",
+    "particulars": "MPS 254700911621 TFE1TV9D1X # GAMALIEL MWASI",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-14",
+    "value_date": "2025-06-14",
+    "particulars": "MPS 254722356883 TFE4U8R33S # EVANSON MBURU",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-16",
+    "value_date": "2025-06-16",
+    "particulars": "MPS 254722216788 TFF1YN3L6J # EDWARD MUCHIRI",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-16",
+    "value_date": "2025-06-16",
+    "particulars": "MPS 254724334176 TFF11VIJO3 # JOYCE NJAGI/43",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-16",
+    "value_date": "2025-06-16",
+    "particulars": "MPS 254714245229 TFF9258C9D # PAUL MWANGI KA",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-16",
+    "value_date": "2025-06-16",
+    "particulars": "MPS 254722666072 TFG06M3EJ6 # FRANCIS M MUGO _",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-16",
+    "value_date": "2025-06-16",
+    "particulars": "MPS 254720294807 TFG76VRAUN # KEZIAH NJERI N",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-17",
+    "value_date": "2025-06-17",
+    "particulars": "MPS 254721361442 TFH67E8FMK # PATRICK MBANDI",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-18",
+    "value_date": "2025-06-18",
+    "particulars": "MPS 254723759417 TFI9CFMKBJ # DAVID WAWERU N",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-19",
+    "value_date": "2025-06-19",
+    "particulars": "MPS 254722677495 TFJ4J7T46O # JEANNE MWIZERW",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-20",
+    "value_date": "2025-06-20",
+    "particulars": "MPS 254721307264 TFK8LS6RGU # PAUL KARANJA W",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-20",
+    "value_date": "2025-06-20",
+    "particulars": "MPS 254721912577 TFK5M2UTJ3 # PETER MUTINDA",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-20",
+    "value_date": "2025-06-20",
+    "particulars": "MPS 254722690761 TFK5O0W9RD # MARGARET NDUNG",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-20",
+    "value_date": "2025-06-20",
+    "particulars": "MPS 254710552603 TFK8O1GDYA # CHRISPINE O OT",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-21",
+    "value_date": "2025-06-21",
+    "particulars": "MPS 254711346073 TFL0ROG2M4 # JOSHUA OYARO M",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-21",
+    "value_date": "2025-06-21",
+    "particulars": "MPS 254720673187 TFL2RTBE10 # DANIEL KAMAU K _",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-21",
+    "value_date": "2025-06-21",
+    "particulars": "MPS 254721361442 TFL9RZKYU3 # PATRICK MBANDI",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-21",
+    "value_date": "2025-06-21",
+    "particulars": "MPS 254721554091 TFL0S0QY2A # JOHNSON MWAURA",
+    "credit": 10000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-23",
+    "value_date": "2025-06-23",
+    "particulars": "MPS 254723656900 TFN010RJ9O # David kirui ka",
+    "credit": 38000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-25",
+    "value_date": "2025-06-25",
+    "particulars": "MPS 254721791775 TFO197QG7B # SOLOMON KIMATH",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-25",
+    "value_date": "2025-06-25",
+    "particulars": "MPS 254795109956 TFP9BVS1ZN # JACINTA WANJIR",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-26",
+    "value_date": "2025-06-26",
+    "particulars": "MPS 254726287956 TFQ8F3Y3DU # DAVID ELIJAH N",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-26",
+    "value_date": "2025-06-26",
+    "particulars": "MPS 254724498151 TFQ2IDCEIW # TABITHA WANGU",
+    "credit": 7000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-27",
+    "value_date": "2025-06-27",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-27",
+    "value_date": "2025-06-27",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-27",
+    "value_date": "2025-06-27",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-27",
+    "value_date": "2025-06-27",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-27",
+    "value_date": "2025-06-27",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-27",
+    "value_date": "2025-06-27",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-27",
+    "value_date": "2025-06-27",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-27",
+    "value_date": "2025-06-27",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-27",
+    "value_date": "2025-06-27",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-27",
+    "value_date": "2025-06-27",
+    "particulars": "MPS 254729525903 TFR5LQANRX # PAULINE WANGUI",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-06-28",
+    "value_date": "2025-06-28",
+    "particulars": "MPS 254721472146 TFS0OYML9U # ARTHUR KAMAU N",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-01",
+    "value_date": "2025-07-01",
+    "particulars": "MPS 254712505968 TG105VI7QS # ADEN TOBIAS KA _",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-02",
+    "value_date": "2025-07-02",
+    "particulars": "MPS 254798548939 TG2195DJKZ # DUNCAN NGIGI N",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-02",
+    "value_date": "2025-07-02",
+    "particulars": "MPS 254726836024 TG269OM7I6 # DAVID NJUGUNA",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-03",
+    "value_date": "2025-07-03",
+    "particulars": "MPS 254748342224 TG38DIDTXC # Imaculate Mukh",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-03",
+    "value_date": "2025-07-03",
+    "particulars": "MPS 254711685866 TG32EIKX2K # MONICAH WANGAR",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-03",
+    "value_date": "2025-07-03",
+    "particulars": "MPS 254721307264 TG30EP9DMW # PAUL KARANJA W",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-03",
+    "value_date": "2025-07-03",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-03",
+    "value_date": "2025-07-03",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-03",
+    "value_date": "2025-07-03",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-03",
+    "value_date": "2025-07-03",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-03",
+    "value_date": "2025-07-03",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-04",
+    "value_date": "2025-07-04",
+    "particulars": "MPS 254720352350 TG49J1Q0E9 # FREDRICK ODHIA",
+    "credit": 120.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-04",
+    "value_date": "2025-07-04",
+    "particulars": "MPS 254721554091 TG42LJW8ZM # JOHNSON MWAURA",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-04",
+    "value_date": "2025-07-04",
+    "particulars": "MPS 254708825808 TG44LKQCPA # Purity Mwendwa",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-05",
+    "value_date": "2025-07-05",
+    "particulars": "MPS 254720434498 TG59OAZJN3 # SIMON KAMAU WA",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-05",
+    "value_date": "2025-07-05",
+    "particulars": "MPS 254725271266 TG53OF56OT # George Njukia/",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-05",
+    "value_date": "2025-07-05",
+    "particulars": "MPS 254722666072 TG50QHHICK # FRANCIS M MUGO",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-07",
+    "value_date": "2025-07-07",
+    "particulars": "MPS 254727753824 TG68WRC03E # ELIZABETH WAMB",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-07",
+    "value_date": "2025-07-07",
+    "particulars": "MPS 254720863085 TG65WZAW8N # GEORGE KIBET K",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-07",
+    "value_date": "2025-07-07",
+    "particulars": "MPS 254798828040 TG79ZNNMMT # NELLY WANJIKU",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-08",
+    "value_date": "2025-07-08",
+    "particulars": "MPS 254726338739 TG822RS40Q # ANNE WANGARI M",
+    "credit": 6000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-08",
+    "value_date": "2025-07-08",
+    "particulars": "MPS 254722216788 TG836VSCL5 # EDWARD MUCHIRI",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-09",
+    "value_date": "2025-07-09",
+    "particulars": "MPS 254798548939 TG918IP037 # DUNCAN NGIGI N _",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-09",
+    "value_date": "2025-07-09",
+    "particulars": "MPS 254720673187 TG9591H9X1 # DANIEL KAMAU K",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-10",
+    "value_date": "2025-07-10",
+    "particulars": "MPS 254721912577 TGA8DJ11FY # PETER MUTINDA",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-10",
+    "value_date": "2025-07-10",
+    "particulars": "MPS 254728676551 TGA0FXY7LU # MUSYOKAH LEVIE",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-11",
+    "value_date": "2025-07-11",
+    "particulars": "MPS 254711496903 TGB5I55NPT # TERESIA NDUTA",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-11",
+    "value_date": "2025-07-11",
+    "particulars": "MPS 254721554091 TGB2LOU3E0 # JOHNSON MWAURA",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-12",
+    "value_date": "2025-07-12",
+    "particulars": "MPS 254714245229 TGC4OJEJ4E # PAUL MWANGI KA",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-14",
+    "value_date": "2025-07-14",
+    "particulars": "MPS 254722660395 TGD5TGXPC5 # PETER GITHAE N",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-14",
+    "value_date": "2025-07-14",
+    "particulars": "MPS 254726940263 TGE8WT3YEQ # Jackson Njogu/",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-14",
+    "value_date": "2025-07-14",
+    "particulars": "MPS 254722393220 TGE0X5Z7RI # JOYCE MUTHONI",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-14",
+    "value_date": "2025-07-14",
+    "particulars": "MPS 254727953511 TGE0XA9Y86 # LUCY NDUNGU NU _",
+    "credit": 7000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-16",
+    "value_date": "2025-07-16",
+    "particulars": "MPS 254720499810 TGG77BLCU1 BONIFACE MWAURA WAMBUG",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-17",
+    "value_date": "2025-07-17",
+    "particulars": "MPS 254713304335 TGH2BNRI4E # JANE W GITUKUI",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-17",
+    "value_date": "2025-07-17",
+    "particulars": "MPS 254726940263 TGH7EWXV4X # Jackson Njogu/",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-18",
+    "value_date": "2025-07-18",
+    "particulars": "MPS 254711346073 TGI3JP1FNP # JOSHUA OYARO M",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-19",
+    "value_date": "2025-07-19",
+    "particulars": "MPS 254721554091 TGJ7KY2D1H # JOHNSON MWAURA",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-21",
+    "value_date": "2025-07-21",
+    "particulars": "MPS 254721307264 TGL2VC1AHQ # PAUL KARANJA W",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-21",
+    "value_date": "2025-07-21",
+    "particulars": "MPS 254722216788 TGL9YG8D7V # EDWARD MUCHIRI",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-22",
+    "value_date": "2025-07-22",
+    "particulars": "MPS 254795109956 TGM6Z281SW # JACINTA WANJIR _",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-22",
+    "value_date": "2025-07-22",
+    "particulars": "MPS 254722252835 TGM0ZS5X72 # PATRICK MUINDI",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-22",
+    "value_date": "2025-07-22",
+    "particulars": "MPS 254712505968 TGM01LC5Z6 # ADEN TOBIAS KA",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-22",
+    "value_date": "2025-07-22",
+    "particulars": "MPS 254722216788 TGM04HAJ5U # EDWARD MUCHIRI",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-23",
+    "value_date": "2025-07-23",
+    "particulars": "MPS 254720499810 TGN45GVFOS BONIFACE MWAURA WAMBUG",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-24",
+    "value_date": "2025-07-24",
+    "particulars": "MPS 254113268118 TGO49TOAWK # Daniel Lemayia",
+    "credit": 7000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-24",
+    "value_date": "2025-07-24",
+    "particulars": "MPS 254721791775 TGO6CA2RQO # SOLOMON KIMATH",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-24",
+    "value_date": "2025-07-24",
+    "particulars": "MPS 254708911848 TGO1DCV6X1 # CAROLINE NJERI",
+    "credit": 20000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-25",
+    "value_date": "2025-07-25",
+    "particulars": "MPS 254708825808 TGP1HBUHHT # Purity Mwendwa _",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-28",
+    "value_date": "2025-07-28",
+    "particulars": "MPS 254722660395 TGR5P78G6D # PETER GITHAE N",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-29",
+    "value_date": "2025-07-29",
+    "particulars": "MPS 254721307264 TGT7XKMV1P # PAUL KARANJA W",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-29",
+    "value_date": "2025-07-29",
+    "particulars": "MPS 254723322257 TGT6Y8A14E # SARAH ANN MUTH",
+    "credit": 20000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-29",
+    "value_date": "2025-07-29",
+    "particulars": "MPS 254726287956 TGT7Z7VPV3 # DAVID ELIJAH N",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-30",
+    "value_date": "2025-07-30",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-30",
+    "value_date": "2025-07-30",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-30",
+    "value_date": "2025-07-30",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-30",
+    "value_date": "2025-07-30",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-30",
+    "value_date": "2025-07-30",
+    "particulars": "MPS 254721472146 TGU46UJK7C # ARTHUR KAMAU N",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-31",
+    "value_date": "2025-07-31",
+    "particulars": "MPS 254708825808 TGV68DE8EE # Purity Mwendwa _",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-07-31",
+    "value_date": "2025-07-31",
+    "particulars": "MPS 254722449055 TGV69U3R02 # PURITY WAITHIR",
+    "credit": 20000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-01",
+    "value_date": "2025-08-01",
+    "particulars": "MPS 254729525903 TH10GIXROW # PAULINE WANGUI",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-05",
+    "value_date": "2025-08-05",
+    "particulars": "MPS 254708825808 TH5334TGM9 # Purity Mwendwa",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-06",
+    "value_date": "2025-08-06",
+    "particulars": "MPS 254708825808 TH684KLNGE # Purity Mwendwa",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-07",
+    "value_date": "2025-08-07",
+    "particulars": "MPS 254725271266 TH79AQ1P5R # George Njukia/",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-07",
+    "value_date": "2025-08-07",
+    "particulars": "MPS 254711346073 TH70B0129C # JOSHUA OYARO M",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-07",
+    "value_date": "2025-08-07",
+    "particulars": "MPS 254711685866 TH77BY9NJV # MONICAH WANGAR",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-07",
+    "value_date": "2025-08-07",
+    "particulars": "MPS 254724752270 TH70CTNQ5A # Hellen Wambui/ _",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-08",
+    "value_date": "2025-08-08",
+    "particulars": "MPS 254720863085 TH86FKDNL4 # GEORGE KIBET K",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-08",
+    "value_date": "2025-08-08",
+    "particulars": "MPS 254798828040 TH83H8Y9BT # NELLY WANJIKU",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-09",
+    "value_date": "2025-08-09",
+    "particulars": "MPS 254114257554 TH94K4RNIW BONIFACE MUTWIWA WAMBU",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-09",
+    "value_date": "2025-08-09",
+    "particulars": "MPS 254713304335 TH91KFLBVD # JANE W GITUKUI",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-12",
+    "value_date": "2025-08-12",
+    "particulars": "MPS 254728676551 THC0YYV542 # MUSYOKAH LEVIE",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-15",
+    "value_date": "2025-08-15",
+    "particulars": "MPS 254708825808 THF7HQ85VP # Purity Mwendwa",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-16",
+    "value_date": "2025-08-16",
+    "particulars": "MPS 254748342224 THG7MP3YI5 # Imaculate Mukh",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-19",
+    "value_date": "2025-08-19",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-19",
+    "value_date": "2025-08-19",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-19",
+    "value_date": "2025-08-19",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-19",
+    "value_date": "2025-08-19",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-20",
+    "value_date": "2025-08-20",
+    "particulars": "MPS 254794635007 THK66K15EK # George Mungai",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-25",
+    "value_date": "2025-08-25",
+    "particulars": "MPS 254726940263 THO6R5GBZC # Jackson Njogu/",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-25",
+    "value_date": "2025-08-25",
+    "particulars": "MPS 254711346073 THP9UUET8X # JOSHUA OYARO M",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-25",
+    "value_date": "2025-08-25",
+    "particulars": "MPS 254711496903 THP3V5XMY3 # TERESIA NDUTA",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-26",
+    "value_date": "2025-08-26",
+    "particulars": "MPS 254721307264 THQ8YAF5Z4 # PAUL KARANJA W",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-26",
+    "value_date": "2025-08-26",
+    "particulars": "MPS 254721412502 THQ1YMZYXX # DUNCAN NGIGI N",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-27",
+    "value_date": "2025-08-27",
+    "particulars": "MPS 254726338739 THR17FWF6B # ANNE WANGARI M",
+    "credit": 6000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-08-30",
+    "value_date": "2025-08-30",
+    "particulars": "MPS 254721472146 THU7KQQ7UD # ARTHUR KAMAU N",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-01",
+    "value_date": "2025-09-01",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-01",
+    "value_date": "2025-09-01",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-01",
+    "value_date": "2025-09-01",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-01",
+    "value_date": "2025-09-01",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-01",
+    "value_date": "2025-09-01",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-02",
+    "value_date": "2025-09-02",
+    "particulars": "MPS 254726287956 TI2311PHX1 # DAVID ELIJAH N",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-02",
+    "value_date": "2025-09-02",
+    "particulars": "MPS 254721771073 TI282ANAD0 # IRENE CHESEBE/",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-04",
+    "value_date": "2025-09-04",
+    "particulars": "MPS 254727953511 TI42BM9DD4 # LUCY NDUNGU NU",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-04",
+    "value_date": "2025-09-04",
+    "particulars": "MPS 254711346073 TI40FGK13A # JOSHUA OYARO M",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-05",
+    "value_date": "2025-09-05",
+    "particulars": "MPS 254721771073 TI55HHWH4N # IRENE CHESEBE/",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-06",
+    "value_date": "2025-09-06",
+    "particulars": "MPS 254721912577 TI61OPVGGJ # PETER MUTINDA",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-08",
+    "value_date": "2025-09-08",
+    "particulars": "MPS 254721307264 TI80WMRVLW # PAUL KARANJA W",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-09",
+    "value_date": "2025-09-09",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-11",
+    "value_date": "2025-09-11",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-11",
+    "value_date": "2025-09-11",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-12",
+    "value_date": "2025-09-12",
+    "particulars": "MPS 254721404848 TIC7KHRGV1 # DICKSON NJOGU _",
+    "credit": 100.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-12",
+    "value_date": "2025-09-12",
+    "particulars": "MPS 254748342224 TIC8KU8YLK # Imaculate Mukh",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-12",
+    "value_date": "2025-09-12",
+    "particulars": "MPS 254794635007 TIC5LD92L9 # George Mungai",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-13",
+    "value_date": "2025-09-13",
+    "particulars": "MPS 254705350382 TID9PGC1G9 # PENINA WANJIKU",
+    "credit": 10000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-15",
+    "value_date": "2025-09-15",
+    "particulars": "MPS 254713304335 TIF9ZIHD83 # JANE W GITUKUI",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-16",
+    "value_date": "2025-09-16",
+    "particulars": "MPS 254721412502 TIG351W7O9 # DUNCAN NGIGI N",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-17",
+    "value_date": "2025-09-17",
+    "particulars": "MPS 254721791775 TIH8BQPTES # SOLOMON KIMATH",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-22",
+    "value_date": "2025-09-22",
+    "particulars": "MPS 254724752270 TIM8P5ASID # Hellen Wambui/",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-24",
+    "value_date": "2025-09-24",
+    "particulars": "MPS 254711346073 TIORF5K3D3 # JOSHUA OYARO M",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-26",
+    "value_date": "2025-09-26",
+    "particulars": "MPS 254726291362 TIQMT5PIPQ # CAROLINE WANGU",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-27",
+    "value_date": "2025-09-27",
+    "particulars": "MPS 254700422866 TIR2S5UE8A # HARUN KINYANYA",
+    "credit": 4800.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-29",
+    "value_date": "2025-09-29",
+    "particulars": "MPS 254711496903 TITB761U0Q # TERESIA NDUTA",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-29",
+    "value_date": "2025-09-29",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-29",
+    "value_date": "2025-09-29",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-29",
+    "value_date": "2025-09-29",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-29",
+    "value_date": "2025-09-29",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-09-30",
+    "value_date": "2025-09-30",
+    "particulars": "MPS 254722252835 TIUJB63YR4 # PATRICK MUINDI",
+    "credit": 9000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-10-02",
+    "value_date": "2025-10-02",
+    "particulars": "MPS 254727953511 TJ21E69J6G # LUCY NDUNGU NU",
+    "credit": 7000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-10-02",
+    "value_date": "2025-10-02",
+    "particulars": "MPS 254728676551 TJ27R68ZLY # MUSYOKAH LEVIE",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-10-02",
+    "value_date": "2025-10-02",
+    "particulars": "MPS 254726338739 TJ2KC6D33C # ANNE WANGARI M",
+    "credit": 6000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-10-03",
+    "value_date": "2025-10-03",
+    "particulars": "MPS 254711685866 TJ36H6APS5 # MONICAH WANGAR",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-10-06",
+    "value_date": "2025-10-06",
+    "particulars": "MPS 254708825808 TJ6BE6P70T # Purity Mwendwa",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-10-07",
+    "value_date": "2025-10-07",
+    "particulars": "MPS 254708825808 TJ7BE6S4ED # Purity Mwendwa _",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-10-08",
+    "value_date": "2025-10-08",
+    "particulars": "MPS 254721791775 TJ8JE6SJ15 # SOLOMON KIMATH",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-10-09",
+    "value_date": "2025-10-09",
+    "particulars": "MPS 254722393220 TJ99R6WE2N # JOYCE MUTHONI",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-10-11",
+    "value_date": "2025-10-11",
+    "particulars": "MPS 254700422866 TJA2S711C6 # HARUN KINYANYA",
+    "credit": 2200.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-10-11",
+    "value_date": "2025-10-11",
+    "particulars": "MPS 254748342224 TJA1371AFY # Imaculate Mukh",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-10-11",
+    "value_date": "2025-10-11",
+    "particulars": "MPS 254794635007 TJA0D70L4W # George Mungai",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-10-11",
+    "value_date": "2025-10-11",
+    "particulars": "MPS 254711346073 TJARF72A78 # JOSHUA OYARO M",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-10-14",
+    "value_date": "2025-10-14",
+    "particulars": "MPS 254721912577 TJEML7BNPQ # PETER MUTINDA",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-10-14",
+    "value_date": "2025-10-14",
+    "particulars": "MPS 254708825808 TJEBE7E4CU # Purity Mwendwa",
+    "credit": 3000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  },
+  {
+    "tran_date": "2025-10-17",
+    "value_date": "2025-10-17",
+    "particulars": "LOCHOKA ENTERPRT-",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": null,
+    "transaction_code": null
+  }
+]

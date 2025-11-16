@@ -1,15 +1,45 @@
-import api from './axios';
+import api from './axios'
 
-export const statementsApi = {
-  list: (params) => api.get('/statements', { params }).then((res) => res.data),
-  get: (id) => api.get(`/statements/${id}`).then((res) => res.data),
-  upload: (file) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return api.post('/statements/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    }).then((res) => res.data);
-  },
-  delete: (id) => api.delete(`/statements/${id}`).then((res) => res.data),
-};
+export const getStatements = async (params = {}) => {
+  // Remove empty string values from params
+  const cleanParams = Object.fromEntries(
+    Object.entries(params).filter(([_, value]) => value !== '' && value !== null && value !== undefined)
+  )
+  const response = await api.get('/statements', { params: cleanParams })
+  return response.data
+}
+
+export const getStatement = async (id) => {
+  const response = await api.get(`/statements/${id}`)
+  return response.data
+}
+
+export const uploadStatement = async (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  const response = await api.post('/statements/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return response.data
+}
+
+export const deleteStatement = async (id) => {
+  const response = await api.delete(`/statements/${id}`)
+  return response.data
+}
+
+export const reanalyzeStatement = async (id) => {
+  const response = await api.post(`/statements/${id}/reanalyze`)
+  return response.data
+}
+
+export const reanalyzeAllStatements = async () => {
+  const response = await api.post('/statements/reanalyze-all')
+  return response.data
+}
+
+export const getStatementDocumentMetadata = async (id) => {
+  const response = await api.get(`/statements/${id}/document-metadata`)
+  return response.data
+}
 

@@ -1,27 +1,38 @@
-import api from './axios';
+import api from './axios'
 
-export const authApi = {
-  login: (email, password) =>
-    api.post('/login', { email, password }).then((res) => {
-      if (res.data.token) {
-        localStorage.setItem('token', res.data.token);
-      }
-      return res.data;
-    }),
+export const login = async (email, password) => {
+  try {
+    const response = await api.post('/login', { email, password })
+    if (response.data.token) {
+      localStorage.setItem('token', response.data.token)
+    }
+    return response.data
+  } catch (error) {
+    console.error('Login error:', error)
+    throw error
+  }
+}
 
-  register: (name, email, password, password_confirmation) =>
-    api.post('/register', { name, email, password, password_confirmation }).then((res) => {
-      if (res.data.token) {
-        localStorage.setItem('token', res.data.token);
-      }
-      return res.data;
-    }),
+export const register = async (name, email, password, password_confirmation) => {
+  try {
+    const response = await api.post('/register', { name, email, password, password_confirmation })
+    if (response.data.token) {
+      localStorage.setItem('token', response.data.token)
+    }
+    return response.data
+  } catch (error) {
+    console.error('Register error:', error)
+    throw error
+  }
+}
 
-  logout: () => {
-    localStorage.removeItem('token');
-    return api.post('/logout');
-  },
+export const logout = async () => {
+  await api.post('/logout')
+  localStorage.removeItem('token')
+}
 
-  getUser: () => api.get('/user').then((res) => res.data),
-};
+export const getUser = async () => {
+  const response = await api.get('/user')
+  return response.data
+}
 

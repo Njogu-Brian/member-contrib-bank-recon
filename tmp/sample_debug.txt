@@ -1,0 +1,5 @@
+Extracted 978 transactions
+
+Text length: 143363
+Tables found: 86
+Is Paybill: False

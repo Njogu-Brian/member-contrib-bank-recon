@@ -3,60 +3,92 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Log;
-use Symfony\Component\Process\Process;
+use Illuminate\Support\Facades\Storage;
 
 class OcrParserService
 {
-    protected string $tesseractPath;
+    protected $pythonPath;
+    protected $scriptPath;
 
     public function __construct()
     {
-        $this->tesseractPath = config('app.tesseract_path', 'tesseract');
+        $this->pythonPath = env('PYTHON_PATH', 'python3');
+        $this->scriptPath = base_path('../ocr-parser/parse_pdf.py');
     }
 
-    public function parsePdf(string $filePath): array
+    public function parsePdf(string $pdfPath): array
     {
-        $ocrParserPath = base_path('../ocr-parser/parse_pdf.py');
-        $outputPath = storage_path('app/temp_'.uniqid().'.json');
+        try {
+            $absolutePath = Storage::disk('statements')->path($pdfPath);
+            
+            if (!file_exists($absolutePath)) {
+                throw new \Exception("PDF file not found: {$absolutePath}");
+            }
 
-        if (!file_exists($ocrParserPath)) {
-            throw new \Exception("OCR parser not found at: {$ocrParserPath}");
-        }
+            $outputPath = tempnam(sys_get_temp_dir(), 'ocr_output_') . '.json';
+            $debugPath = $outputPath . '_debug.txt';
 
-        $process = new Process([
-            'python',
-            $ocrParserPath,
-            $filePath,
-            '--output',
-            $outputPath,
-        ]);
+            // On Windows, we need to properly escape paths with spaces
+            // Use escapeshellarg which handles Windows paths correctly
+            $pythonCmd = escapeshellarg($this->pythonPath);
+            $scriptCmd = escapeshellarg($this->scriptPath);
+            $pdfCmd = escapeshellarg($absolutePath);
+            $outputCmd = escapeshellarg($outputPath);
+            
+            // Construct command without extra quotes since escapeshellarg already adds them
+            $command = "{$pythonCmd} {$scriptCmd} {$pdfCmd} --output {$outputCmd} 2>&1";
 
-        $process->setTimeout(300);
-        $process->run();
-
-        if (!$process->isSuccessful()) {
-            Log::error('OCR parsing failed', [
-                'error' => $process->getErrorOutput(),
-                'output' => $process->getOutput(),
+            Log::info("Executing OCR parser", [
+                'command' => $command,
+                'pdf_path' => $absolutePath,
             ]);
-            throw new \Exception('OCR parsing failed: '.$process->getErrorOutput());
+
+            $output = [];
+            $returnVar = 0;
+            exec($command, $output, $returnVar);
+
+            $stderr = implode("\n", $output);
+            
+            if ($returnVar !== 0) {
+                Log::error("OCR parser failed", [
+                    'return_code' => $returnVar,
+                    'stderr' => $stderr,
+                ]);
+                throw new \Exception("OCR parser failed: {$stderr}");
+            }
+
+            if (!file_exists($outputPath)) {
+                throw new \Exception("Output file not created: {$outputPath}");
+            }
+
+            $jsonContent = file_get_contents($outputPath);
+            $transactions = json_decode($jsonContent, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new \Exception("Invalid JSON output: " . json_last_error_msg());
+            }
+
+            if (!is_array($transactions)) {
+                $transactions = [];
+            }
+
+            // Clean up temp files
+            @unlink($outputPath);
+            @unlink($debugPath);
+
+            Log::info("OCR parser completed", [
+                'transactions_found' => count($transactions),
+            ]);
+
+            return $transactions;
+
+        } catch (\Exception $e) {
+            Log::error("OCR parser error", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            throw $e;
         }
-
-        if (!file_exists($outputPath)) {
-            throw new \Exception('OCR parser did not generate output file');
-        }
-
-        $content = file_get_contents($outputPath);
-        $data = json_decode($content, true);
-
-        // Cleanup
-        @unlink($outputPath);
-
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new \Exception('Invalid JSON from OCR parser: '.json_last_error_msg());
-        }
-
-        return $data ?? [];
     }
 }
 

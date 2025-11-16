@@ -7,37 +7,47 @@ use Illuminate\Support\Facades\Log;
 
 class MatchingService
 {
-    protected string $serviceUrl;
+    protected $baseUrl;
 
     public function __construct()
     {
-        $this->serviceUrl = config('app.matching_service_url', 'http://localhost:3001');
+        $this->baseUrl = env('MATCHING_SERVICE_URL', 'http://localhost:3001');
     }
 
     public function matchBatch(array $transactions, array $members): array
     {
         try {
-            $response = Http::timeout(60)->post("{$this->serviceUrl}/match-batch", [
+            $response = Http::timeout(60)->post("{$this->baseUrl}/match-batch", [
                 'transactions' => $transactions,
                 'members' => $members,
             ]);
 
             if ($response->successful()) {
-                return $response->json() ?? [];
+                return $response->json();
             }
 
-            Log::warning('Matching service returned error', [
+            Log::warning("Matching service returned error", [
                 'status' => $response->status(),
                 'body' => $response->body(),
             ]);
 
             return [];
         } catch (\Exception $e) {
-            Log::error('Matching service request failed', [
+            Log::error("Matching service error", [
                 'error' => $e->getMessage(),
             ]);
 
             return [];
+        }
+    }
+
+    public function isAvailable(): bool
+    {
+        try {
+            $response = Http::timeout(5)->get("{$this->baseUrl}/health");
+            return $response->successful();
+        } catch (\Exception $e) {
+            return false;
         }
     }
 }

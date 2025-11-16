@@ -1,7 +1,5 @@
 <?php
 
-use Illuminate\Support\Facades\Storage;
-
 return [
     'default' => env('FILESYSTEM_DISK', 'local'),
     'disks' => [
@@ -15,6 +13,16 @@ return [
             'root' => storage_path('app/public'),
             'url' => env('APP_URL').'/storage',
             'visibility' => 'public',
+            'throw' => false,
+        ],
+        'statements' => [
+            'driver' => 'local',
+            'root' => storage_path('app/statements'),
+            'throw' => false,
+        ],
+        'attendance' => [
+            'driver' => 'local',
+            'root' => storage_path('app/attendance'),
             'throw' => false,
         ],
     ],

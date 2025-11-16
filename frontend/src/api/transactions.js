@@ -1,12 +1,73 @@
-import api from './axios';
+import api from './axios'
 
-export const transactionsApi = {
-  list: (params) => api.get('/transactions', { params }).then((res) => res.data),
-  get: (id) => api.get(`/transactions/${id}`).then((res) => res.data),
-  assign: (id, data) => api.post(`/transactions/${id}/assign`, data).then((res) => res.data),
-  split: (id, data) => api.post(`/transactions/${id}/split`, data).then((res) => res.data),
-  autoAssign: (params) => api.post('/transactions/auto-assign', params).then((res) => res.data),
-  bulkAssign: (assignments) => api.post('/transactions/bulk-assign', { assignments }).then((res) => res.data),
-  askAi: (transactionId) => api.post('/transactions/ask-ai', { transaction_id: transactionId }).then((res) => res.data),
-};
+export const getTransactions = async (params = {}) => {
+  // Remove empty string values from params to avoid filtering issues
+  const cleanParams = Object.fromEntries(
+    Object.entries(params).filter(([_, value]) => value !== '' && value !== null && value !== undefined)
+  )
+  const response = await api.get('/transactions', { params: cleanParams })
+  return response.data
+}
+
+export const getTransaction = async (id) => {
+  const response = await api.get(`/transactions/${id}`)
+  return response.data
+}
+
+export const assignTransaction = async (id, memberId) => {
+  const response = await api.post(`/transactions/${id}/assign`, { member_id: memberId })
+  return response.data
+}
+
+export const splitTransaction = async (id, splits) => {
+  const response = await api.post(`/transactions/${id}/split`, { splits })
+  return response.data
+}
+
+export const autoAssign = async () => {
+  const response = await api.post('/transactions/auto-assign')
+  return response.data
+}
+
+export const bulkAssign = async (transactionIds, memberId) => {
+  const response = await api.post('/transactions/bulk-assign', {
+    transactions: transactionIds,
+    member_id: memberId,
+  })
+  return response.data
+}
+
+export const askAi = async (id) => {
+  const response = await api.post(`/transactions/${id}/ask-ai`)
+  return response.data
+}
+
+export const transferTransaction = async (id, toMemberId, notes = '') => {
+  const response = await api.post(`/transactions/${id}/transfer`, {
+    to_member_id: toMemberId,
+    notes: notes,
+  })
+  return response.data
+}
+
+export const archiveTransaction = async (id, reason = '') => {
+  const response = await api.post(`/transactions/${id}/archive`, {
+    reason: reason || undefined,
+  })
+  return response.data
+}
+
+export const unarchiveTransaction = async (id) => {
+  const response = await api.delete(`/transactions/${id}/archive`)
+  return response.data
+}
+
+export const bulkArchiveTransactions = async (transactionIds, reason = '') => {
+  const response = await api.post('/transactions/archive-bulk', {
+    transaction_ids: transactionIds,
+    reason: reason || undefined,
+  })
+  return response.data
+}
+
 

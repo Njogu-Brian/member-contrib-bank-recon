@@ -1,10 +1,36 @@
-import api from './axios';
+import api from './axios'
 
-export const manualContributionsApi = {
-  list: (params) => api.get('/manual-contributions', { params }).then((res) => res.data),
-  get: (id) => api.get(`/manual-contributions/${id}`).then((res) => res.data),
-  create: (data) => api.post('/manual-contributions', data).then((res) => res.data),
-  update: (id, data) => api.put(`/manual-contributions/${id}`, data).then((res) => res.data),
-  delete: (id) => api.delete(`/manual-contributions/${id}`).then((res) => res.data),
-};
+export const getManualContributions = async (params = {}) => {
+  const response = await api.get('/manual-contributions', { params })
+  return response.data
+}
+
+export const getManualContribution = async (id) => {
+  const response = await api.get(`/manual-contributions/${id}`)
+  return response.data
+}
+
+export const createManualContribution = async (data) => {
+  const response = await api.post('/manual-contributions', data)
+  return response.data
+}
+
+export const updateManualContribution = async (id, data) => {
+  const response = await api.put(`/manual-contributions/${id}`, data)
+  return response.data
+}
+
+export const deleteManualContribution = async (id) => {
+  const response = await api.delete(`/manual-contributions/${id}`)
+  return response.data
+}
+
+export const importExcel = async (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  const response = await api.post('/manual-contributions/import-excel', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return response.data
+}
 

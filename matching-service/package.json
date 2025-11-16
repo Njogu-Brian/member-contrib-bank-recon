@@ -1,13 +1,13 @@
 {
   "name": "matching-service",
   "version": "1.0.0",
-  "description": "AI matching microservice for bank transactions",
+  "description": "Transaction matching microservice",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
-  "keywords": ["matching", "ai", "transactions"],
+  "keywords": ["matching", "transactions"],
   "author": "",
   "license": "MIT",
   "dependencies": {

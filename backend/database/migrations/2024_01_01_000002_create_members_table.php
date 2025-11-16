@@ -11,12 +11,17 @@ return new class extends Migration
         Schema::create('members', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('phone')->nullable()->index();
+            $table->string('phone')->nullable();
             $table->string('email')->nullable();
-            $table->string('member_code')->nullable()->unique();
+            $table->string('member_code')->nullable();
+            $table->string('member_number')->nullable();
             $table->text('notes')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
+            
+            $table->index('phone');
+            $table->index('member_code');
+            $table->index('member_number');
         });
     }
 

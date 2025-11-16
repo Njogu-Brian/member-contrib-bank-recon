@@ -1,141 +1,202 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { statementsApi } from '../api/statements';
-import toast from 'react-hot-toast';
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { getStatements, uploadStatement, deleteStatement, reanalyzeStatement, reanalyzeAllStatements } from '../api/statements'
+import Pagination from '../components/Pagination'
 
 export default function Statements() {
-  const [page, setPage] = useState(1);
-  const queryClient = useQueryClient();
+  const navigate = useNavigate()
+  const [uploading, setUploading] = useState(false)
+  const [page, setPage] = useState(1)
+  const queryClient = useQueryClient()
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ['statements', page],
-    queryFn: () => statementsApi.list({ page, per_page: 20 }),
-  });
+    queryFn: () => getStatements({ page }),
+    retry: 1,
+  })
 
   const deleteMutation = useMutation({
-    mutationFn: statementsApi.delete,
+    mutationFn: deleteStatement,
     onSuccess: () => {
-      toast.success('Statement deleted successfully');
-      queryClient.invalidateQueries(['statements']);
+      queryClient.invalidateQueries(['statements'])
+    },
+  })
+
+  const reanalyzeMutation = useMutation({
+    mutationFn: reanalyzeStatement,
+    onSuccess: () => {
+      queryClient.invalidateQueries(['statements'])
+      alert('Statement queued for re-analysis. Please wait for processing to complete.')
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || 'Delete failed');
+      alert('Failed to re-analyze statement: ' + (error.response?.data?.message || error.message))
     },
-  });
+  })
 
-  const handleDelete = (id, filename) => {
-    if (window.confirm(`Are you sure you want to delete "${filename}"? This will also delete all associated transactions.`)) {
-      deleteMutation.mutate(id);
+  const reanalyzeAllMutation = useMutation({
+    mutationFn: reanalyzeAllStatements,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(['statements'])
+      alert(`${data.count} statements queued for re-analysis. Please wait for processing to complete.`)
+    },
+    onError: (error) => {
+      alert('Failed to re-analyze statements: ' + (error.response?.data?.message || error.message))
+    },
+  })
+
+  const handleUpload = async (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      setUploading(true)
+      try {
+        await uploadStatement(file)
+        queryClient.invalidateQueries(['statements'])
+        alert('Statement uploaded successfully!')
+      } catch (error) {
+        alert('Upload failed: ' + error.message)
+      } finally {
+        setUploading(false)
+        e.target.value = ''
+      }
     }
-  };
+  }
 
   if (isLoading) {
-    return <div className="p-8 text-center">Loading...</div>;
+    return <div className="text-center py-12">Loading...</div>
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-600 mb-4">Error loading statements: {error.message}</p>
+        <button
+          onClick={() => queryClient.invalidateQueries(['statements'])}
+          className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+        >
+          Retry
+        </button>
+      </div>
+    )
   }
 
   return (
-    <div className="px-4 py-6 sm:px-0">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Bank Statements</h1>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-gray-900">Bank Statements</h1>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => {
+              if (confirm('This will re-analyze all completed and failed statements. Continue?')) {
+                reanalyzeAllMutation.mutate()
+              }
+            }}
+            disabled={reanalyzeAllMutation.isPending}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
+          >
+            {reanalyzeAllMutation.isPending ? 'Processing...' : 'Re-analyze All'}
+          </button>
+          <label className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 cursor-pointer disabled:opacity-50">
+            <input
+              type="file"
+              accept=".pdf"
+              className="hidden"
+              onChange={handleUpload}
+              disabled={uploading}
+            />
+            {uploading ? 'Uploading...' : 'Upload Statement'}
+          </label>
+        </div>
+      </div>
 
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Filename</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Upload Date</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transactions</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Error</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filename</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transactions</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uploaded</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {data?.data?.length > 0 ? (
-              data.data.map((statement) => (
-                <tr key={statement.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    <Link
-                      to={`/transactions?bank_statement_id=${statement.id}`}
-                      className="text-blue-600 hover:text-blue-800 hover:underline"
-                    >
-                      {statement.filename}
-                    </Link>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(statement.created_at).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      statement.status === 'completed' ? 'bg-green-100 text-green-800' :
-                      statement.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
-                      statement.status === 'failed' ? 'bg-red-100 text-red-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {statement.status}
+            {data?.data?.map((statement) => (
+              <tr key={statement.id}>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <button
+                    onClick={() => navigate(`/statements/${statement.id}`)}
+                    className="text-indigo-600 hover:text-indigo-900 hover:underline"
+                  >
+                    {statement.filename}
+                  </button>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    statement.status === 'completed' ? 'bg-green-100 text-green-800' :
+                    statement.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
+                    statement.status === 'failed' ? 'bg-red-100 text-red-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {statement.status}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{statement.transactions_count || 0}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {new Date(statement.created_at).toLocaleDateString()}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                  {statement.error_message && (
+                    <span className="text-red-600 text-xs" title={statement.error_message}>
+                      Error
                     </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {statement.transactions_count || 0}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 max-w-md">
-                    {statement.status === 'failed' && statement.error_message ? (
-                      <div className="truncate" title={statement.error_message}>
-                        {statement.error_message}
-                      </div>
-                    ) : (
-                      '-'
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => handleDelete(statement.id, statement.filename)}
-                      disabled={deleteMutation.isPending}
-                      className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
-                  No statements found
+                  )}
+                  <button
+                    onClick={() => navigate(`/statements/${statement.id}/transactions`)}
+                    className="text-indigo-600 hover:text-indigo-900"
+                  >
+                    View Transactions
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm('Re-analyze this statement? Existing transactions will be deleted and re-processed.')) {
+                        reanalyzeMutation.mutate(statement.id)
+                      }
+                    }}
+                    disabled={reanalyzeMutation.isPending || statement.status === 'processing'}
+                    className="text-purple-600 hover:text-purple-900 disabled:opacity-50"
+                    title="Re-analyze statement"
+                  >
+                    Re-analyze
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm('Are you sure you want to delete this statement?')) {
+                        deleteMutation.mutate(statement.id)
+                      }
+                    }}
+                    className="text-red-600 hover:text-red-900"
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
-            )}
+            ))}
           </tbody>
         </table>
-
-        {/* Pagination */}
-        {data && data.last_page > 1 && (
-          <div className="bg-white px-4 py-3 border-t border-gray-200 sm:px-6">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-700">
-                Showing {data.from} to {data.to} of {data.total} statements
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={!data.prev_page_url || isLoading}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setPage(p => p + 1)}
-                  disabled={!data.next_page_url || isLoading}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          </div>
+        {data && (
+          <Pagination
+            pagination={{
+              current_page: data.current_page || 1,
+              last_page: data.last_page || 1,
+              per_page: data.per_page || 20,
+              total: data.total || 0,
+            }}
+            onPageChange={(newPage) => setPage(newPage)}
+          />
         )}
       </div>
     </div>
-  );
+  )
 }
 

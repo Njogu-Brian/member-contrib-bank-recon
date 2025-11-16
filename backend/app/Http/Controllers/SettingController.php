@@ -9,45 +9,22 @@ class SettingController extends Controller
 {
     public function index()
     {
-        $settings = Setting::all()->mapWithKeys(function ($setting) {
-            return [$setting->key => [
-                'value' => $setting->value,
-                'type' => $setting->type,
-                'description' => $setting->description,
-            ]];
-        });
-
+        $settings = Setting::all()->pluck('value', 'key');
         return response()->json($settings);
     }
 
     public function update(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'contribution_start_date' => 'nullable|date',
+            'weekly_contribution_amount' => 'nullable|numeric|min:0',
         ]);
 
-        if ($request->has('contribution_start_date')) {
-            Setting::set('contribution_start_date', $request->contribution_start_date, 'date', 'The start date for calculating contribution weeks');
+        foreach ($validated as $key => $value) {
+            Setting::set($key, $value);
         }
 
-        return response()->json([
-            'message' => 'Settings updated successfully',
-            'settings' => Setting::all()->mapWithKeys(function ($setting) {
-                return [$setting->key => $setting->value];
-            }),
-        ]);
-    }
-
-    public function getCurrentWeek()
-    {
-        $startDate = Setting::getContributionStartDate();
-        $currentWeek = Setting::getCurrentWeek();
-
-        return response()->json([
-            'start_date' => $startDate?->format('Y-m-d'),
-            'current_week' => $currentWeek,
-            'today' => now('Africa/Nairobi')->format('Y-m-d'),
-        ]);
+        return response()->json(['message' => 'Settings updated successfully']);
     }
 }
 

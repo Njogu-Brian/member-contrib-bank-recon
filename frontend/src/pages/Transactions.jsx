@@ -1,825 +1,934 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { transactionsApi } from '../api/transactions';
-import { membersApi } from '../api/members';
-import toast from 'react-hot-toast';
+import { useState, useEffect } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { getTransactions, autoAssign, transferTransaction, archiveTransaction, unarchiveTransaction, bulkArchiveTransactions, bulkAssign, splitTransaction } from '../api/transactions'
+import { getMembers } from '../api/members'
+import MemberSearchModal from '../components/MemberSearchModal'
+import Pagination from '../components/Pagination'
 
-export default function Transactions() {
-  const [page, setPage] = useState(1);
-  const [status, setStatus] = useState('');
-  const [search, setSearch] = useState('');
-  const [selectedTransaction, setSelectedTransaction] = useState(null);
-  const [showAssignModal, setShowAssignModal] = useState(false);
-  const [showSplitModal, setShowSplitModal] = useState(false);
-  const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
-  const [selectedTransactions, setSelectedTransactions] = useState([]);
-  const [memberSearch, setMemberSearch] = useState('');
-  const [bulkMemberSearch, setBulkMemberSearch] = useState('');
-  const [selectedBulkMember, setSelectedBulkMember] = useState(null);
-  const [splits, setSplits] = useState([{ member_id: '', amount: '', notes: '' }]);
-  const queryClient = useQueryClient();
+export default function Transactions({ initialArchivedFilter = 'active', isArchivedView = false }) {
+  const [filters, setFilters] = useState({
+    status: '',
+    search: '',
+    member_id: '',
+    sort_by: 'tran_date',
+    sort_order: 'desc',
+  })
+  const [page, setPage] = useState(1)
+  const [archivedFilter, setArchivedFilter] = useState(initialArchivedFilter)
+  const [selectedTransactions, setSelectedTransactions] = useState([])
+  const [showAssignModal, setShowAssignModal] = useState(false)
+  const [showTransferModal, setShowTransferModal] = useState(false)
+  const [selectedTransaction, setSelectedTransaction] = useState(null)
+  const [selectedMemberForAssign, setSelectedMemberForAssign] = useState(null)
+  const [selectedMemberForTransfer, setSelectedMemberForTransfer] = useState(null)
+  const [transferNotes, setTransferNotes] = useState('')
+  const [isTransferSearchOpen, setIsTransferSearchOpen] = useState(false)
+  const [isShareMode, setIsShareMode] = useState(false)
+  const [shareEntries, setShareEntries] = useState([])
+  const [activeShareIndex, setActiveShareIndex] = useState(null)
+  const queryClient = useQueryClient()
 
-  const urlParams = new URLSearchParams(window.location.search);
-  const bankStatementId = urlParams.get('bank_statement_id');
+  useEffect(() => {
+    if (!showTransferModal) {
+      setSelectedTransaction(null)
+      setSelectedMemberForTransfer(null)
+      setTransferNotes('')
+      setIsShareMode(false)
+      setShareEntries([])
+      setActiveShareIndex(null)
+      setIsTransferSearchOpen(false)
+    }
+  }, [showTransferModal])
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['transactions', page, status, search, bankStatementId],
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['transactions', filters, page, archivedFilter],
     queryFn: () => {
-      const params = { page, per_page: 20 };
-      if (status) params.status = status;
-      if (search) params.search = search;
-      if (bankStatementId) params.bank_statement_id = bankStatementId;
-      return transactionsApi.list(params);
+      const params = { ...filters, page }
+
+      if (archivedFilter === 'archived') {
+        params.archived = true
+      } else if (archivedFilter === 'active') {
+        params.archived = false
+      } else if (archivedFilter === 'all') {
+        params.include_archived = true
+      }
+
+      return getTransactions(params)
     },
-  });
+  })
 
   const { data: membersData } = useQuery({
-    queryKey: ['members'],
-    queryFn: () => membersApi.list({ per_page: 1000 }),
-  });
+    queryKey: ['members', 'filter'],
+    queryFn: () => getMembers({ per_page: 1000 }),
+  })
 
-  const assignMutation = useMutation({
-    mutationFn: ({ id, data }) => transactionsApi.assign(id, data),
-    onSuccess: () => {
-      toast.success('Transaction assigned successfully');
-      queryClient.invalidateQueries(['transactions']);
-      setShowAssignModal(false);
-    },
-    onError: (error) => {
-      toast.error(error.response?.data?.message || 'Assignment failed');
-    },
-  });
+  const resetTransferState = () => {
+    setShowTransferModal(false)
+  }
 
-  const splitMutation = useMutation({
-    mutationFn: ({ id, data }) => transactionsApi.split(id, data),
-    onSuccess: () => {
-      toast.success('Transaction split successfully');
-      queryClient.invalidateQueries(['transactions']);
-      setShowSplitModal(false);
-      setSplits([{ member_id: '', amount: '', notes: '' }]);
-    },
-    onError: (error) => {
-      toast.error(error.response?.data?.message || 'Split failed');
-    },
-  });
-
-  const autoAssignMutation = useMutation({
-    mutationFn: (params) => transactionsApi.autoAssign(params),
-    onSuccess: (response) => {
-      toast.success(`Auto-assigned ${response.auto_assigned} out of ${response.total} transactions`);
-      queryClient.invalidateQueries(['transactions']);
-    },
-    onError: (error) => {
-      toast.error(error.response?.data?.message || 'Auto-assignment failed');
-    },
-  });
 
   const bulkAssignMutation = useMutation({
-    mutationFn: (assignments) => transactionsApi.bulkAssign(assignments),
-    onSuccess: (response) => {
-      toast.success(`Bulk assigned ${response.assigned} transactions`);
-      queryClient.invalidateQueries(['transactions']);
-      setShowBulkAssignModal(false);
-      setSelectedTransactions([]);
+    mutationFn: ({ transactionIds, memberId }) => bulkAssign(transactionIds, memberId),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries(['transactions'])
+      setSelectedTransactions([])
+      setSelectedMemberForAssign(null)
+      const success = result?.success ?? 0
+      const errors = Array.isArray(result?.errors) ? result.errors.filter(Boolean) : []
+      const message = [
+        `Bulk assignment complete.`,
+        `Successful: ${success}`,
+        errors.length ? `Failed: ${errors.length}\n${errors.join('\n')}` : null,
+      ].filter(Boolean).join('\n\n')
+      alert(message)
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || 'Bulk assignment failed');
+      alert(error.response?.data?.message || 'Bulk assignment failed')
     },
-  });
+  })
 
-  const handleAssign = (transaction) => {
-    setSelectedTransaction({...transaction, selectedMemberId: null});
-    setMemberSearch('');
-    setShowAssignModal(true);
-  };
+  const autoAssignMutation = useMutation({
+    mutationFn: autoAssign,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(['transactions'])
+      const message = `Auto-assignment completed!\n\n` +
+        `✅ Auto-assigned: ${data.auto_assigned}\n` +
+        `⚠️ Draft assignments: ${data.draft_assigned}\n` +
+        `❌ Remaining unassigned: ${data.unassigned}\n` +
+        `📊 Total processed: ${data.total_processed}`
+      alert(message)
+    },
+  })
 
-  const handleSplit = (transaction) => {
-    setSelectedTransaction(transaction);
-    setSplits([{ member_id: '', amount: '', notes: '' }]);
-    setShowSplitModal(true);
-  };
+  const transferMutation = useMutation({
+    mutationFn: ({ id, toMemberId, notes }) => transferTransaction(id, toMemberId, notes),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['transactions'])
+      resetTransferState()
+      alert('Transaction transferred successfully!')
+    },
+    onError: (error) => {
+      alert(error.response?.data?.message || 'Failed to transfer transaction')
+    },
+  })
 
-  const handleAssignSubmit = (e) => {
-    e.preventDefault();
-    if (!selectedTransaction?.selectedMemberId) {
-      toast.error('Please select a member');
-      return;
+  const splitMutation = useMutation({
+    mutationFn: ({ transactionId, splits }) => splitTransaction(transactionId, splits),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['transactions'])
+      resetTransferState()
+      alert('Deposit shared successfully!')
+    },
+    onError: (error) => {
+      alert(error.response?.data?.message || 'Failed to share deposit')
+    },
+  })
+
+  const archiveMutation = useMutation({
+    mutationFn: ({ id, reason }) => archiveTransaction(id, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['transactions'])
+      alert('Transaction archived')
+    },
+    onError: (error) => {
+      alert(error.response?.data?.message || 'Failed to archive transaction')
+    },
+  })
+
+  const unarchiveMutation = useMutation({
+    mutationFn: (id) => unarchiveTransaction(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['transactions'])
+      alert('Transaction restored')
+    },
+    onError: (error) => {
+      alert(error.response?.data?.message || 'Failed to restore transaction')
+    },
+  })
+
+  const bulkArchiveMutation = useMutation({
+    mutationFn: ({ ids, reason }) => bulkArchiveTransactions(ids, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['transactions'])
+      setSelectedTransactions([])
+      alert('Selected transactions archived')
+    },
+    onError: (error) => {
+      alert(error.response?.data?.message || 'Failed to archive transactions')
+    },
+  })
+
+  const handleAssignMemberSelect = (member) => {
+    setSelectedMemberForAssign(member)
+    setShowAssignModal(false)
+    if (selectedTransactions.length === 0) {
+      alert('Select at least one transaction to assign')
+      return
     }
-    
-    assignMutation.mutate({
-      id: selectedTransaction.id,
-      data: { member_id: selectedTransaction.selectedMemberId },
-    });
-  };
-
-  const handleSplitSubmit = (e) => {
-    e.preventDefault();
-    const splitData = splits
-      .filter(s => s.member_id && s.amount)
-      .map(s => ({
-        member_id: parseInt(s.member_id),
-        amount: parseFloat(s.amount),
-        notes: s.notes || null,
-      }));
-
-    if (splitData.length === 0) {
-      toast.error('Please add at least one split');
-      return;
-    }
-
-    splitMutation.mutate({
-      id: selectedTransaction.id,
-      data: { splits: splitData },
-    });
-  };
-
-  const addSplit = () => {
-    setSplits([...splits, { member_id: '', amount: '', notes: '' }]);
-  };
-
-  const removeSplit = (index) => {
-    setSplits(splits.filter((_, i) => i !== index));
-  };
-
-  const updateSplit = (index, field, value) => {
-    const newSplits = [...splits];
-    newSplits[index][field] = value;
-    setSplits(newSplits);
-  };
-
-  const getTotalSplitAmount = () => {
-    return splits.reduce((sum, split) => sum + (parseFloat(split.amount) || 0), 0);
-  };
+    bulkAssignMutation.mutate({
+      transactionIds: selectedTransactions,
+      memberId: member.id,
+    })
+  }
 
   const handleAutoAssign = () => {
-    if (window.confirm('This will attempt to auto-assign unassigned transactions based on name and phone number matches. Continue?')) {
-      autoAssignMutation.mutate({ limit: 500 });
+    if (confirm('This will run auto-assignment on all unassigned transactions. Continue?')) {
+      autoAssignMutation.mutate()
     }
-  };
+  }
 
-  const totalPages = data?.last_page || 1;
-  const currentPage = data?.current_page || page;
-  const getPageNumbers = () => {
-    const pages = [];
-    const maxPages = 5;
-    let startPage = Math.max(1, currentPage - Math.floor(maxPages / 2));
-    let endPage = Math.min(totalPages, startPage + maxPages - 1);
-    
-    if (endPage - startPage < maxPages - 1) {
-      startPage = Math.max(1, endPage - maxPages + 1);
+  const initializeShareEntriesForTransaction = (transaction) => {
+    const amount = Number(transaction?.credit || transaction?.debit || 0)
+    const member = transaction?.member || null
+    setShareEntries([
+      {
+        member,
+        amount: amount ? amount.toFixed(2) : '',
+      },
+    ])
+  }
+
+  const handleShareModeToggle = (checked, transaction) => {
+    setIsShareMode(checked)
+    setSelectedMemberForTransfer(null)
+    if (checked) {
+      initializeShareEntriesForTransaction(transaction)
+    } else {
+      setShareEntries([])
+      setActiveShareIndex(null)
     }
-    
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(i);
+  }
+
+  const handleAddShareEntry = () => {
+    setShareEntries((prev) => [
+      ...prev,
+      {
+        member: null,
+        amount: '',
+      },
+    ])
+  }
+
+  const handleShareAmountChange = (index, value) => {
+    setShareEntries((prev) =>
+      prev.map((entry, idx) =>
+        idx === index ? { ...entry, amount: value } : entry
+      )
+    )
+  }
+
+  const handleRemoveShareEntry = (index) => {
+    setShareEntries((prev) => prev.filter((_, idx) => idx !== index))
+  }
+
+  const handleTransfer = (transaction) => {
+    if (!transaction.member_id) {
+      alert('This transaction is not assigned to any member. Please assign it first.')
+      return
     }
-    return pages;
-  };
+    setSelectedTransaction(transaction)
+    setSelectedMemberForTransfer(null)
+    setTransferNotes('')
+    setIsShareMode(false)
+    setShareEntries([])
+    setActiveShareIndex(null)
+    setShowTransferModal(true)
+  }
+
+  const handleTransferSubmit = () => {
+    if (!selectedTransaction) {
+      return
+    }
+
+    if (isShareMode) {
+      if (shareEntries.length === 0) {
+        alert('Add at least one member to share with')
+        return
+      }
+
+      const totalAmount = shareEntries.reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0)
+      const transactionAmount = Number(selectedTransaction.credit || selectedTransaction.debit || 0)
+
+      if (shareEntries.some(entry => !entry.member || !entry.member.id)) {
+        alert('Each share entry must have a selected member')
+        return
+      }
+
+      if (shareEntries.some(entry => !entry.amount || Number(entry.amount) <= 0)) {
+        alert('Each share entry must have a positive amount')
+        return
+      }
+
+      if (Math.abs(totalAmount - transactionAmount) > 0.01) {
+        alert('Shared amounts must add up exactly to the transaction total')
+        return
+      }
+
+      const splitsPayload = shareEntries.map(entry => ({
+        member_id: entry.member.id,
+        amount: Number(entry.amount),
+        notes: transferNotes || undefined,
+      }))
+
+      splitMutation.mutate({
+        transactionId: selectedTransaction.id,
+        splits: splitsPayload,
+      })
+      return
+    }
+
+    if (!selectedMemberForTransfer) {
+      alert('Please select a member to transfer to')
+      return
+    }
+
+    if (selectedTransaction.member_id === selectedMemberForTransfer.id) {
+      alert('Cannot transfer to the same member')
+      return
+    }
+
+    transferMutation.mutate({
+      id: selectedTransaction.id,
+      toMemberId: selectedMemberForTransfer.id,
+      notes: transferNotes,
+    })
+  }
+
+  const handleTransferMemberSelect = (member) => {
+    if (!member) return
+
+    if (isShareMode) {
+      if (activeShareIndex === null) {
+        setIsTransferSearchOpen(false)
+        return
+      }
+      setShareEntries((prev) =>
+        prev.map((entry, idx) =>
+          idx === activeShareIndex ? { ...entry, member } : entry
+        )
+      )
+      setActiveShareIndex(null)
+      setIsTransferSearchOpen(false)
+      return
+    }
+
+    if (selectedTransaction && selectedTransaction.member_id === member.id) {
+      alert('Cannot transfer to the same member')
+      return
+    }
+
+    setSelectedMemberForTransfer(member)
+    setIsTransferSearchOpen(false)
+  }
+
+  const handleArchive = (transaction) => {
+    if (archiveMutation.isPending) {
+      return
+    }
+
+    const reason = prompt('Enter a reason for archiving (optional):')?.trim()
+    if (reason === undefined) {
+      return
+    }
+
+    archiveMutation.mutate({
+      id: transaction.id,
+      reason: reason || undefined,
+    })
+  }
+
+  const handleBulkArchive = () => {
+    if (bulkArchiveMutation.isPending || selectedTransactions.length === 0 || isArchivedView) {
+      return
+    }
+
+    if (!confirm(`Archive ${selectedTransactions.length} transaction(s)?`)) {
+      return
+    }
+
+    const reason = prompt('Enter a reason for archiving (optional):')?.trim()
+    if (reason === undefined) {
+      return
+    }
+
+    bulkArchiveMutation.mutate({
+      ids: selectedTransactions,
+      reason: reason || undefined,
+    })
+  }
+
+  const handleUnarchive = (transaction) => {
+    if (unarchiveMutation.isPending) {
+      return
+    }
+
+    if (!confirm('Restore this transaction?')) {
+      return
+    }
+
+    unarchiveMutation.mutate(transaction.id)
+  }
+
+  if (isLoading) {
+    return <div className="text-center py-12">Loading...</div>
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-600">Error loading transactions: {error.message}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
+
+  const pageTitle = isArchivedView ? 'Archived Transactions' : 'Transactions'
+
+  // Handle Laravel paginated response structure
+  // Laravel paginator returns: { data: [...], current_page: 1, last_page: 5, ... }
+  const transactions = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : [])
+  const pagination = data && !Array.isArray(data) ? data : {}
+  const selectableTransactionIds = transactions
+    .filter((tx) => !tx.is_archived)
+    .map((tx) => tx.id)
+  const archivingId = archiveMutation.variables?.id
+  const unarchivingId = unarchiveMutation.variables
+  
+  // Debug logging (remove in production)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Transactions data:', { data, transactions, pagination })
+  }
 
   return (
-    <div className="px-4 py-6 sm:px-0">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
-          {bankStatementId && (
-            <p className="text-sm text-gray-500 mt-1">
-              Filtered by statement ID: {bankStatementId}
-              <Link
-                to="/transactions"
-                className="ml-2 text-blue-600 hover:text-blue-800"
-              >
-                (Clear filter)
-              </Link>
-            </p>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleAutoAssign}
-            disabled={autoAssignMutation.isPending}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {autoAssignMutation.isPending ? 'Auto-assigning...' : 'Auto-Assign Transactions'}
-          </button>
-          <button
-            onClick={() => {
-              const unassigned = data?.data?.filter(t => t.assignment_status === 'unassigned' || t.assignment_status === 'draft') || [];
-              if (unassigned.length === 0) {
-                toast.error('No unassigned or draft transactions on this page');
-                return;
-              }
-              setSelectedTransactions(unassigned.map(t => ({...t, selected: false})));
-              setSelectedBulkMember(null);
-              setBulkMemberSearch('');
-              setShowBulkAssignModal(true);
-            }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            Bulk Assign
-          </button>
-        </div>
-      </div>
-
-      {autoAssignMutation.isSuccess && autoAssignMutation.data && (
-        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-md">
-          <p className="text-sm text-green-800">
-            <strong>Auto-assignment completed:</strong> {autoAssignMutation.data.auto_assigned} auto-assigned, {autoAssignMutation.data.draft_assigned} draft-assigned out of {autoAssignMutation.data.total} transactions.
-          </p>
-        </div>
-      )}
-
-      <div className="bg-white shadow rounded-lg">
-        <div className="p-4 border-b">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <input
-              type="text"
-              placeholder="Search..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
-            />
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md"
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-gray-900">{pageTitle}</h1>
+        {!isArchivedView && (
+          <div className="flex space-x-3">
+            <button
+              onClick={handleAutoAssign}
+              disabled={autoAssignMutation.isPending}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
             >
-              <option value="">All Status</option>
-              <option value="unassigned">Unassigned</option>
-              <option value="draft">Draft</option>
-              <option value="auto_assigned">Auto-Assigned</option>
-              <option value="manual_assigned">Manual Assigned</option>
-              <option value="flagged">Flagged</option>
-            </select>
+              {autoAssignMutation.isPending ? 'Processing...' : 'Auto Assign'}
+            </button>
+            {selectedTransactions.length > 0 && (
+              <>
+                <button
+                  onClick={() => setShowAssignModal(true)}
+                  disabled={bulkAssignMutation.isPending}
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                >
+                  {bulkAssignMutation.isPending ? 'Assigning...' : `Assign Selected (${selectedTransactions.length})`}
+                </button>
+                <button
+                  onClick={handleBulkArchive}
+                  disabled={bulkArchiveMutation.isPending}
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+                >
+                  {bulkArchiveMutation.isPending ? 'Archiving...' : 'Archive Selected'}
+                </button>
+              </>
+            )}
           </div>
-        </div>
-
-        {isLoading ? (
-          <div className="p-8 text-center">Loading...</div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Type
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Particulars
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Code
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Credit
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Member
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {data?.data && data.data.length > 0 ? (
-                    data.data.map((transaction) => (
-                    <tr key={transaction.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {new Date(transaction.tran_date).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {transaction.transaction_type || '-'}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        <div className="max-w-2xl break-words" title={transaction.particulars}>
-                          {transaction.particulars}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono text-xs">
-                        {transaction.transaction_code || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                        KES {transaction.credit?.toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {transaction.member?.name || '-'}
-                        {transaction.draft_member_ids && transaction.draft_member_ids.length > 0 && (
-                          <span className="ml-2 text-xs text-orange-600">
-                            ({transaction.draft_member_ids.length} draft)
-                          </span>
-                        )}
-                        {transaction.match_confidence && (
-                          <span className="ml-2 text-xs text-gray-400">
-                            ({Math.round(transaction.match_confidence * 100)}%)
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          transaction.assignment_status === 'auto_assigned' ? 'bg-green-100 text-green-800' :
-                          transaction.assignment_status === 'manual_assigned' ? 'bg-blue-100 text-blue-800' :
-                          transaction.assignment_status === 'draft' ? 'bg-orange-100 text-orange-800' :
-                          transaction.assignment_status === 'flagged' ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {transaction.assignment_status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex gap-2">
-                          {(transaction.assignment_status === 'unassigned' || transaction.assignment_status === 'draft') && (
-                            <>
-                              <button
-                                onClick={() => handleAssign(transaction)}
-                                className="text-blue-600 hover:text-blue-900"
-                              >
-                                {transaction.assignment_status === 'draft' ? 'Select' : 'Assign'}
-                              </button>
-                              {transaction.assignment_status === 'unassigned' && (
-                                <button
-                                  onClick={() => handleSplit(transaction)}
-                                  className="text-green-600 hover:text-green-900"
-                                >
-                                  Split
-                                </button>
-                              )}
-                            </>
-                          )}
-                          {transaction.splits && transaction.splits.length > 0 && (
-                            <span className="text-xs text-gray-500">
-                              ({transaction.splits.length} splits)
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                    ))
-                  ) : (
-                    <tr>
-                    <td colSpan="8" className="px-6 py-8 text-center text-gray-500">
-                      No transactions found
-                    </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-              <div className="flex-1 flex justify-between sm:hidden">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1 || isLoading}
-                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Previous
-                </button>
-                <button
-                  onClick={() => setPage((p) => p + 1)}
-                  disabled={!data?.next_page_url || isLoading}
-                  className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
-              <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm text-gray-700">
-                    Showing <span className="font-medium">{data?.from || 0}</span> to{' '}
-                    <span className="font-medium">{data?.to || 0}</span> of{' '}
-                    <span className="font-medium">{data?.total || 0}</span> results
-                  </p>
-                </div>
-                <div>
-                  <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                    <button
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={page === 1 || isLoading}
-                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Previous
-                    </button>
-                    {getPageNumbers().map((pageNum) => (
-                      <button
-                        key={pageNum}
-                        onClick={() => setPage(pageNum)}
-                        disabled={isLoading}
-                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                          pageNum === currentPage
-                            ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
-                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                        } disabled:opacity-50`}
-                      >
-                        {pageNum}
-                      </button>
-                    ))}
-                    <button
-                      onClick={() => setPage((p) => p + 1)}
-                      disabled={!data?.next_page_url || isLoading}
-                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Next
-                    </button>
-                  </nav>
-                </div>
-              </div>
-            </div>
-          </>
         )}
       </div>
 
-      {showAssignModal && selectedTransaction && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <h3 className="text-lg font-bold mb-4">
-              {selectedTransaction.assignment_status === 'draft' ? 'Select Member from Draft' : 'Assign Transaction'}
-            </h3>
-            {selectedTransaction.draft_member_ids && selectedTransaction.draft_member_ids.length > 0 && (
-              <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-md">
-                <p className="text-sm text-orange-800 font-semibold mb-2">Suggested Members:</p>
-                <ul className="text-sm text-orange-700 list-disc list-inside">
-                  {selectedTransaction.draft_member_ids.map((memberId) => {
-                    const member = membersData?.data?.find((m) => m.id === memberId);
-                    return member ? <li key={memberId}>{member.name} {member.phone ? `(${member.phone})` : ''}</li> : null;
-                  })}
-                </ul>
-              </div>
-            )}
-            <form onSubmit={handleAssignSubmit}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Search Member (Name or Phone)
-                </label>
-                <input
-                  type="text"
-                  value={memberSearch}
-                  onChange={(e) => setMemberSearch(e.target.value)}
-                  placeholder="Type name or phone number..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md mb-2"
-                />
-                <input type="hidden" name="member_id" value={selectedTransaction?.selectedMemberId || ''} required />
-                <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-md">
-                  {selectedTransaction.draft_member_ids && selectedTransaction.draft_member_ids.length > 0 && (
-                    <div className="p-2 bg-orange-50">
-                      <p className="text-xs font-semibold text-orange-800 mb-1">Suggested:</p>
-                      {selectedTransaction.draft_member_ids
-                        .map((memberId) => membersData?.data?.find((m) => m.id === memberId))
-                        .filter(Boolean)
-                        .filter((m) => 
-                          !memberSearch || 
-                          m.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
-                          m.phone?.includes(memberSearch)
-                        )
-                        .map((member) => (
-                          <div
-                            key={member.id}
-                            onClick={() => {
-                              setSelectedTransaction({...selectedTransaction, selectedMemberId: member.id});
-                              setMemberSearch(`${member.name} ${member.phone || ''}`);
-                            }}
-                            className={`p-2 cursor-pointer rounded hover:bg-orange-100 ${
-                              selectedTransaction?.selectedMemberId === member.id ? 'bg-orange-200' : ''
-                            }`}
-                          >
-                            <div className="text-sm font-medium">{member.name}</div>
-                            {member.phone && <div className="text-xs text-gray-600">{member.phone}</div>}
-                          </div>
-                        ))}
-                    </div>
-                  )}
-                  {membersData?.data
-                    ?.filter((m) => 
-                      !memberSearch || 
-                      m.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
-                      m.phone?.includes(memberSearch)
-                    )
-                    .slice(0, 10)
-                    .map((member) => (
-                      <div
-                        key={member.id}
-                        onClick={() => {
-                          setSelectedTransaction({...selectedTransaction, selectedMemberId: member.id});
-                          setMemberSearch(`${member.name} ${member.phone || ''}`);
-                        }}
-                        className={`p-2 cursor-pointer hover:bg-gray-50 ${
-                          selectedTransaction?.selectedMemberId === member.id ? 'bg-blue-50' : ''
-                        }`}
-                      >
-                        <div className="text-sm font-medium">{member.name}</div>
-                        {member.phone && <div className="text-xs text-gray-600">{member.phone}</div>}
-                      </div>
-                    ))}
-                  {memberSearch && membersData?.data?.filter((m) => 
-                    m.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
-                    m.phone?.includes(memberSearch)
-                  ).length === 0 && (
-                    <div className="p-4 text-center text-gray-500 text-sm">No members found</div>
-                  )}
-                </div>
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAssignModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={assignMutation.isPending}
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-                >
-                  Assign
-                </button>
-              </div>
-            </form>
+      <div className="bg-white shadow rounded-lg p-4">
+        <div className={`grid grid-cols-1 ${isArchivedView ? 'md:grid-cols-3' : 'md:grid-cols-4'} gap-4`}>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Status</label>
+            <select
+              value={filters.status}
+              onChange={(e) => {
+                setFilters({ ...filters, status: e.target.value })
+                setPage(1)
+              }}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            >
+              <option value="">All</option>
+              <option value="unassigned">Unassigned</option>
+              <option value="auto_assigned">Auto Assigned</option>
+              <option value="manual_assigned">Manual Assigned</option>
+              <option value="draft">Draft</option>
+            </select>
           </div>
-        </div>
-      )}
-
-      {showSplitModal && selectedTransaction && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
-            <h3 className="text-lg font-bold mb-4">Split Transaction</h3>
-            <div className="mb-4 p-3 bg-gray-50 rounded">
-              <p className="text-sm text-gray-600">
-                <strong>Amount:</strong> KES {selectedTransaction.credit?.toLocaleString()}
-              </p>
-              <p className="text-sm text-gray-600">
-                <strong>Particulars:</strong> {selectedTransaction.particulars}
-              </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Search</label>
+            <input
+              type="text"
+              value={filters.search}
+              onChange={(e) => {
+                setFilters({ ...filters, search: e.target.value })
+                setPage(1)
+              }}
+              placeholder="Search transactions..."
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Member</label>
+            <select
+              value={filters.member_id}
+              onChange={(e) => {
+                setFilters({ ...filters, member_id: e.target.value })
+                setPage(1)
+              }}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            >
+              <option value="">All Members</option>
+              {membersData?.data?.map((member) => (
+                <option key={member.id} value={member.id}>{member.name}</option>
+              ))}
+            </select>
+          </div>
+          {!isArchivedView ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Archived</label>
+              <select
+                value={archivedFilter}
+                onChange={(e) => {
+                  setArchivedFilter(e.target.value)
+                  setPage(1)
+                  setSelectedTransactions([])
+                }}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              >
+                <option value="active">Active Only</option>
+                <option value="archived">Archived Only</option>
+                <option value="all">All (Include Archived)</option>
+              </select>
             </div>
-            <form onSubmit={handleSplitSubmit}>
-              <div className="mb-4">
-                <div className="flex justify-between items-center mb-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Splits
-                  </label>
-                  <button
-                    type="button"
-                    onClick={addSplit}
-                    className="text-sm text-blue-600 hover:text-blue-800"
-                  >
-                    + Add Split
-                  </button>
-                </div>
-                {splits.map((split, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-2 mb-2">
-                    <div className="col-span-5">
-                      <select
-                        value={split.member_id}
-                        onChange={(e) => updateSplit(index, 'member_id', e.target.value)}
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+          ) : (
+            <div className="flex items-end">
+              <span className="text-sm text-gray-500">Showing archived transactions only</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <input
+                    type="checkbox"
+                    checked={
+                      selectableTransactionIds.length > 0 &&
+                      selectableTransactionIds.every((id) => selectedTransactions.includes(id))
+                    }
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedTransactions(selectableTransactionIds)
+                      } else {
+                        setSelectedTransactions([])
+                      }
+                    }}
+                    disabled={selectableTransactionIds.length === 0}
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <div className="flex items-center space-x-1">
+                    <span>Date</span>
+                    <div className="flex flex-col">
+                      <button
+                        onClick={() => {
+                          setFilters({ ...filters, sort_by: 'tran_date', sort_order: 'asc' })
+                          setPage(1)
+                        }}
+                        className={`text-xs ${filters.sort_by === 'tran_date' && filters.sort_order === 'asc' ? 'text-indigo-600' : 'text-gray-400'}`}
+                        title="Sort: Oldest to Newest"
                       >
-                        <option value="">Select member...</option>
-                        {membersData?.data?.map((member) => (
-                          <option key={member.id} value={member.id}>
-                            {member.name} {member.phone ? `(${member.phone})` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-span-3">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0.01"
-                        value={split.amount}
-                        onChange={(e) => updateSplit(index, 'amount', e.target.value)}
-                        placeholder="Amount"
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                      />
-                    </div>
-                    <div className="col-span-3">
-                      <input
-                        type="text"
-                        value={split.notes}
-                        onChange={(e) => updateSplit(index, 'notes', e.target.value)}
-                        placeholder="Notes (optional)"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                      />
-                    </div>
-                    <div className="col-span-1">
-                      {splits.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeSplit(index)}
-                          className="text-red-600 hover:text-red-800 text-sm"
-                        >
-                          ×
-                        </button>
-                      )}
+                        ↑
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFilters({ ...filters, sort_by: 'tran_date', sort_order: 'desc' })
+                          setPage(1)
+                        }}
+                        className={`text-xs ${filters.sort_by === 'tran_date' && filters.sort_order === 'desc' ? 'text-indigo-600' : 'text-gray-400'}`}
+                        title="Sort: Newest to Oldest"
+                      >
+                        ↓
+                      </button>
                     </div>
                   </div>
-                ))}
-                <div className="mt-2 text-sm">
-                  <strong>Total:</strong> KES {getTotalSplitAmount().toLocaleString()} / KES {selectedTransaction.credit?.toLocaleString()}
-                  {Math.abs(getTotalSplitAmount() - selectedTransaction.credit) > 0.01 && (
-                    <span className="text-red-600 ml-2">(Amounts must match)</span>
-                  )}
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Particulars</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statement</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <div className="flex items-center space-x-1">
+                    <span>Amount</span>
+                    <div className="flex flex-col">
+                      <button
+                        onClick={() => {
+                          setFilters({ ...filters, sort_by: 'credit', sort_order: 'asc' })
+                          setPage(1)
+                        }}
+                        className={`text-xs ${filters.sort_by === 'credit' && filters.sort_order === 'asc' ? 'text-indigo-600' : 'text-gray-400'}`}
+                        title="Sort: Lowest to Highest"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFilters({ ...filters, sort_by: 'credit', sort_order: 'desc' })
+                          setPage(1)
+                        }}
+                        className={`text-xs ${filters.sort_by === 'credit' && filters.sort_order === 'desc' ? 'text-indigo-600' : 'text-gray-400'}`}
+                        title="Sort: Highest to Lowest"
+                      >
+                        ↓
+                      </button>
+                    </div>
+                  </div>
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {transactions.length === 0 ? (
+                <tr>
+                  <td colSpan="8" className="px-6 py-12 text-center text-sm text-gray-500">
+                    No transactions found. {filters.status || filters.search || filters.member_id ? 'Try adjusting your filters.' : 'Upload a bank statement to get started.'}
+                  </td>
+                </tr>
+              ) : (
+                transactions.map((tx) => (
+                  <tr key={tx.id} className={tx.is_archived ? 'bg-gray-50 text-gray-500' : ''}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={selectedTransactions.includes(tx.id)}
+                        onChange={(e) => {
+                          if (tx.is_archived) {
+                            return
+                          }
+                          if (e.target.checked) {
+                            setSelectedTransactions([...new Set([...selectedTransactions, tx.id])])
+                          } else {
+                            setSelectedTransactions(selectedTransactions.filter(id => id !== tx.id))
+                          }
+                        }}
+                        disabled={tx.is_archived}
+                        title={tx.is_archived ? 'Archived transactions cannot be selected' : undefined}
+                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(tx.tran_date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                        {tx.transaction_type || 'Unknown'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {tx.transaction_code || '-'}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900 max-w-md">
+                      <div className="break-words" title={tx.particulars}>
+                        {tx.particulars}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {tx.bank_statement ? (
+                        <div>
+                          <p className="font-medium text-gray-900">
+                            {tx.bank_statement.filename || `Statement #${tx.bank_statement.id}`}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            #{tx.bank_statement.id}
+                            {tx.bank_statement.statement_date
+                              ? ` · ${new Date(tx.bank_statement.statement_date).toLocaleDateString('en-GB')}`
+                              : ''}
+                          </p>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400">Manual / Imported</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(tx.credit || tx.debit || 0)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tx.member?.name || '-'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          tx.assignment_status === 'auto_assigned' ? 'bg-green-100 text-green-800' :
+                          tx.assignment_status === 'manual_assigned' ? 'bg-blue-100 text-blue-800' :
+                          tx.assignment_status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {tx.assignment_status}
+                        </span>
+                        {tx.is_archived && (
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                            Archived
+                          </span>
+                        )}
+                      </div>
+                      {tx.is_archived && tx.archive_reason && (
+                        <div className="mt-1 text-xs text-gray-500">
+                          Reason: {tx.archive_reason}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex justify-end space-x-2">
+                        {tx.is_archived ? (
+                          <button
+                            onClick={() => handleUnarchive(tx)}
+                            disabled={unarchiveMutation.isPending && unarchivingId === tx.id}
+                            className="text-green-600 hover:text-green-900 disabled:opacity-50"
+                          >
+                            {unarchiveMutation.isPending && unarchivingId === tx.id ? 'Restoring...' : 'Restore'}
+                          </button>
+                        ) : (
+                          <>
+                            {!tx.member_id ? (
+                              <button
+                                onClick={() => {
+                                  setSelectedTransactions([tx.id])
+                                  setShowAssignModal(true)
+                                }}
+                                className="text-indigo-600 hover:text-indigo-900"
+                              >
+                                Assign
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    setSelectedTransactions([tx.id])
+                                    setShowAssignModal(true)
+                                  }}
+                                  className="text-indigo-600 hover:text-indigo-900"
+                                >
+                                  Reassign
+                                </button>
+                                <button
+                                  onClick={() => handleTransfer(tx)}
+                                  className="text-purple-600 hover:text-purple-900"
+                                >
+                                  Transfer
+                                </button>
+                              </>
+                            )}
+                            <button
+                              onClick={() => handleArchive(tx)}
+                              disabled={archiveMutation.isPending && archivingId === tx.id}
+                              className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                            >
+                              {archiveMutation.isPending && archivingId === tx.id ? 'Archiving...' : 'Archive'}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        {pagination && (pagination.last_page > 1 || pagination.total > 0) && (
+          <Pagination
+            pagination={{
+              current_page: pagination.current_page || data?.current_page || page,
+              last_page: pagination.last_page || data?.last_page || 1,
+              per_page: pagination.per_page || data?.per_page || 20,
+              total: pagination.total || data?.total || 0,
+            }}
+            onPageChange={(newPage) => setPage(newPage)}
+          />
+        )}
+      </div>
+
+
+      {showTransferModal && selectedTransaction && (
+        <div className="fixed z-40 inset-0 overflow-y-auto">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75" onClick={resetTransferState}></div>
+            </div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">
+              &#8203;
+            </span>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">Transfer Transaction</h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Amount:{' '}
+                      {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(selectedTransaction.credit || selectedTransaction.debit || 0)}{' '}
+                      {selectedTransaction.member?.name ? `• Currently assigned to ${selectedTransaction.member.name}` : ''}
+                    </p>
+
+                    <div className="mt-4 flex items-center gap-2">
+                      <input
+                        id="share-mode"
+                        type="checkbox"
+                        checked={isShareMode}
+                        onChange={(e) => handleShareModeToggle(e.target.checked, selectedTransaction)}
+                        className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                      />
+                      <label htmlFor="share-mode" className="text-sm text-gray-700">
+                        Share this deposit among multiple members
+                      </label>
+                    </div>
+
+                    {isShareMode ? (
+                      <div className="mt-4 space-y-4">
+                        {shareEntries.map((entry, index) => (
+                          <div key={index} className="border rounded-md p-3 space-y-2">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex-1">
+                                <label className="block text-sm font-medium text-gray-700">Member</label>
+                                <button
+                                  onClick={() => {
+                                    setActiveShareIndex(index)
+                                    setIsTransferSearchOpen(true)
+                                  }}
+                                  className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm text-left focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                                >
+                                  {entry.member ? entry.member.name : 'Select member'}
+                                </button>
+                              </div>
+                              <div className="w-40">
+                                <label className="block text-sm font-medium text-gray-700">Amount (KES)</label>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={entry.amount}
+                                  onChange={(e) => handleShareAmountChange(index, e.target.value)}
+                                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                                />
+                              </div>
+                              {shareEntries.length > 1 && (
+                                <button
+                                  onClick={() => handleRemoveShareEntry(index)}
+                                  className="text-sm text-red-600 hover:text-red-800"
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+
+                        <div className="flex items-center justify-between text-sm">
+                          <div>
+                            Total shared:{' '}
+                            {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(
+                              shareEntries.reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0)
+                            )}
+                          </div>
+                          <div>
+                            Remaining:{' '}
+                            {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(
+                              (selectedTransaction.credit || selectedTransaction.debit || 0) -
+                                shareEntries.reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0)
+                            )}
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={handleAddShareEntry}
+                          className="text-sm text-indigo-600 hover:text-indigo-800"
+                        >
+                          + Add another member
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="mt-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Transfer To Member</label>
+                        <button
+                          onClick={() => {
+                            setActiveShareIndex(null)
+                            setIsTransferSearchOpen(true)
+                          }}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm text-left focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                        >
+                          {selectedMemberForTransfer ? selectedMemberForTransfer.name : 'Click to search for member...'}
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700">Notes (Optional)</label>
+                      <textarea
+                        value={transferNotes}
+                        onChange={(e) => setTransferNotes(e.target.value)}
+                        rows={3}
+                        placeholder="Reason for transfer or sharing..."
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      />
+                    </div>
+
+                    <div className="mt-5 sm:mt-6 sm:flex sm:flex-row-reverse gap-3">
+                      <button
+                        onClick={handleTransferSubmit}
+                        disabled={transferMutation.isPending || splitMutation.isPending}
+                        className="inline-flex justify-center w-full sm:w-auto rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm disabled:opacity-50"
+                      >
+                        {isShareMode
+                          ? (splitMutation.isPending ? 'Sharing...' : 'Share Deposit')
+                          : (transferMutation.isPending ? 'Transferring...' : 'Transfer')}
+                      </button>
+                      <button
+                        onClick={resetTransferState}
+                        className="inline-flex justify-center w-full sm:w-auto rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowSplitModal(false);
-                    setSplits([{ member_id: '', amount: '', notes: '' }]);
-                  }}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={splitMutation.isPending || Math.abs(getTotalSplitAmount() - selectedTransaction.credit) > 0.01}
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
-                >
-                  Split Transaction
-                </button>
-              </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
 
-      {showBulkAssignModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-10 mx-auto p-5 border w-full max-w-6xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold mb-4">Bulk Assign Transactions</h3>
-            
-            {/* Member Search */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Search Member (Name or Phone)
-              </label>
-              <input
-                type="text"
-                value={bulkMemberSearch}
-                onChange={(e) => {
-                  setBulkMemberSearch(e.target.value);
-                  setSelectedBulkMember(null);
-                }}
-                placeholder="Type name or phone number..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md mb-2"
-              />
-              <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-md">
-                {membersData?.data
-                  ?.filter((m) => 
-                    !bulkMemberSearch || 
-                    m.name.toLowerCase().includes(bulkMemberSearch.toLowerCase()) ||
-                    m.phone?.includes(bulkMemberSearch)
-                  )
-                  .slice(0, 10)
-                  .map((member) => (
-                    <div
-                      key={member.id}
-                      onClick={() => {
-                        setSelectedBulkMember(member);
-                        setBulkMemberSearch(`${member.name} ${member.phone || ''}`);
-                      }}
-                      className={`p-2 cursor-pointer hover:bg-gray-50 ${
-                        selectedBulkMember?.id === member.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''
-                      }`}
-                    >
-                      <div className="text-sm font-medium">{member.name}</div>
-                      {member.phone && <div className="text-xs text-gray-600">{member.phone}</div>}
-                    </div>
-                  ))}
-                {bulkMemberSearch && membersData?.data?.filter((m) => 
-                  m.name.toLowerCase().includes(bulkMemberSearch.toLowerCase()) ||
-                  m.phone?.includes(bulkMemberSearch)
-                ).length === 0 && (
-                  <div className="p-4 text-center text-gray-500 text-sm">No members found</div>
-                )}
-              </div>
-              {selectedBulkMember && (
-                <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
-                  <p className="text-sm text-green-800">
-                    <strong>Selected:</strong> {selectedBulkMember.name} {selectedBulkMember.phone ? `(${selectedBulkMember.phone})` : ''}
-                  </p>
-                </div>
-              )}
-            </div>
+      {/* Member Search Modal for Assign */}
+      <MemberSearchModal
+        isOpen={showAssignModal}
+        onClose={() => {
+          setShowAssignModal(false)
+          setSelectedMemberForAssign(null)
+        }}
+        onSelect={handleAssignMemberSelect}
+        title="Select Member to Assign"
+      />
 
-            {/* Transaction Selection */}
-            <div className="mb-4">
-              <div className="flex justify-between items-center mb-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Select Transactions ({selectedTransactions.filter(t => t.selected).length} selected)
-                </label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedTransactions(selectedTransactions.map(t => ({...t, selected: true})));
-                    }}
-                    className="text-xs text-blue-600 hover:text-blue-800"
-                  >
-                    Select All
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedTransactions(selectedTransactions.map(t => ({...t, selected: false})));
-                    }}
-                    className="text-xs text-gray-600 hover:text-gray-800"
-                  >
-                    Deselect All
-                  </button>
-                </div>
-              </div>
-              <div className="max-h-96 overflow-y-auto border border-gray-200 rounded-md">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50 sticky top-0">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Select</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Date</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Particulars</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {selectedTransactions.map((transaction) => (
-                      <tr key={transaction.id} className={transaction.selected ? 'bg-blue-50' : ''}>
-                        <td className="px-4 py-2">
-                          <input
-                            type="checkbox"
-                            checked={transaction.selected || false}
-                            onChange={(e) => {
-                              setSelectedTransactions(selectedTransactions.map(t => 
-                                t.id === transaction.id ? {...t, selected: e.target.checked} : t
-                              ));
-                            }}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
-                        </td>
-                        <td className="px-4 py-2 text-sm text-gray-900">
-                          {new Date(transaction.tran_date).toLocaleDateString()}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-gray-900 max-w-md">
-                          <div className="truncate">{transaction.particulars}</div>
-                        </td>
-                        <td className="px-4 py-2 text-sm font-medium text-green-600">
-                          KES {transaction.credit?.toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowBulkAssignModal(false);
-                  setSelectedTransactions([]);
-                  setSelectedBulkMember(null);
-                  setBulkMemberSearch('');
-                }}
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (!selectedBulkMember) {
-                    toast.error('Please select a member');
-                    return;
-                  }
-                  const selected = selectedTransactions.filter(t => t.selected);
-                  if (selected.length === 0) {
-                    toast.error('Please select at least one transaction');
-                    return;
-                  }
-                  const assignments = selected.map(t => ({
-                    transaction_id: t.id,
-                    member_id: selectedBulkMember.id,
-                  }));
-                  bulkAssignMutation.mutate(assignments);
-                }}
-                disabled={bulkAssignMutation.isPending || !selectedBulkMember}
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-              >
-                {bulkAssignMutation.isPending ? 'Assigning...' : `Assign ${selectedTransactions.filter(t => t.selected).length} Selected`}
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Member Search Modal for Transfer */}
+      {!isArchivedView && (
+        <MemberSearchModal
+          isOpen={isTransferSearchOpen}
+          onClose={() => {
+            setIsTransferSearchOpen(false)
+            setActiveShareIndex(null)
+          }}
+          onSelect={handleTransferMemberSelect}
+          title={isShareMode ? 'Select member to share with' : 'Transfer Transaction to Member'}
+        />
       )}
     </div>
-  );
+  )
 }
 

@@ -1,7 +1,9 @@
 const express = require('express');
 const cors = require('cors');
+const dotenv = require('dotenv');
 const { matchBatch } = require('./matcher');
-require('dotenv').config();
+
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -9,29 +11,32 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-app.post('/match-batch', async (req, res) => {
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', service: 'matching-service' });
+});
+
+// Batch matching endpoint
+app.post('/match-batch', (req, res) => {
   try {
     const { transactions, members } = req.body;
 
-    if (!transactions || !Array.isArray(transactions)) {
-      return res.status(400).json({ error: 'transactions array is required' });
+    if (!Array.isArray(transactions) || !Array.isArray(members)) {
+      return res.status(400).json({
+        error: 'transactions and members must be arrays'
+      });
     }
 
-    if (!members || !Array.isArray(members)) {
-      return res.status(400).json({ error: 'members array is required' });
-    }
+    const results = matchBatch(transactions, members);
 
-    const matches = await matchBatch(transactions, members);
-
-    res.json(matches);
+    res.json(results);
   } catch (error) {
-    console.error('Matching error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Error in match-batch:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message
+    });
   }
-});
-
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'matching-service' });
 });
 
 app.listen(PORT, () => {

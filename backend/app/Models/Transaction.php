@@ -4,8 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Transaction extends Model
 {
@@ -21,7 +19,6 @@ class Transaction extends Model
         'debit',
         'balance',
         'transaction_code',
-        'extracted_member_number',
         'phones',
         'row_hash',
         'member_id',
@@ -30,6 +27,9 @@ class Transaction extends Model
         'draft_member_ids',
         'raw_text',
         'raw_json',
+        'is_archived',
+        'archived_at',
+        'archive_reason',
     ];
 
     protected $casts = [
@@ -39,29 +39,52 @@ class Transaction extends Model
         'debit' => 'decimal:2',
         'balance' => 'decimal:2',
         'phones' => 'array',
-        'draft_member_ids' => 'array',
         'match_confidence' => 'decimal:2',
+        'draft_member_ids' => 'array',
         'raw_json' => 'array',
+        'is_archived' => 'boolean',
+        'archived_at' => 'datetime',
     ];
 
-    public function bankStatement(): BelongsTo
+    protected static function booted(): void
+    {
+        static::saved(function (Transaction $transaction) {
+            if (
+                !$transaction->member_id ||
+                !$transaction->tran_date ||
+                $transaction->is_archived ||
+                $transaction->assignment_status === 'unassigned'
+            ) {
+                return;
+            }
+
+            $transaction->member?->recordInvestmentDate($transaction->tran_date);
+        });
+    }
+
+    public function bankStatement()
     {
         return $this->belongsTo(BankStatement::class);
     }
 
-    public function member(): BelongsTo
+    public function member()
     {
         return $this->belongsTo(Member::class);
     }
 
-    public function matchLogs(): HasMany
+    public function matchLogs()
     {
         return $this->hasMany(TransactionMatchLog::class);
     }
 
-    public function splits(): HasMany
+    public function splits()
     {
         return $this->hasMany(TransactionSplit::class);
+    }
+
+    public function expense()
+    {
+        return $this->hasOne(Expense::class);
     }
 }
 

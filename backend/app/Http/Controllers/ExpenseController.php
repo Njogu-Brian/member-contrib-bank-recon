@@ -9,7 +9,7 @@ class ExpenseController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Expense::with('transaction');
+        $query = Expense::with(['transaction', 'members']);
 
         if ($request->has('category')) {
             $query->where('category', $request->category);
@@ -23,10 +23,11 @@ class ExpenseController extends Controller
             $query->where('expense_date', '<=', $request->date_to);
         }
 
-        $expenses = $query->orderBy('expense_date', 'desc')
-            ->paginate($request->get('per_page', 20));
+        if ($request->has('member_id')) {
+            $query->whereHas('members', fn($q) => $q->where('members.id', $request->member_id));
+        }
 
-        return response()->json($expenses);
+        return response()->json($query->orderBy('expense_date', 'desc')->paginate($request->get('per_page', 20)));
     }
 
     public function store(Request $request)
@@ -38,16 +39,39 @@ class ExpenseController extends Controller
             'expense_date' => 'required|date',
             'category' => 'nullable|string|max:100',
             'notes' => 'nullable|string',
+            'assign_to_all_members' => 'boolean',
+            'amount_per_member' => 'nullable|numeric|min:0',
+            'member_ids' => 'nullable|array',
+            'member_ids.*' => 'exists:members,id',
         ]);
 
         $expense = Expense::create($validated);
+        
+        // Assign to members
+        if ($validated['assign_to_all_members'] ?? false) {
+            $members = \App\Models\Member::where('is_active', true)->get();
+            $amountPerMember = $validated['amount_per_member'] ?? ($validated['amount'] / $members->count());
+            
+            foreach ($members as $member) {
+                $expense->members()->attach($member->id, ['amount' => $amountPerMember]);
+            }
+        } elseif (!empty($validated['member_ids'])) {
+            $amountPerMember = $validated['amount_per_member'] ?? ($validated['amount'] / count($validated['member_ids']));
+            
+            foreach ($validated['member_ids'] as $memberId) {
+                $expense->members()->attach($memberId, ['amount' => $amountPerMember]);
+            }
+        }
+        
+        $expense->load(['transaction', 'members']);
 
         return response()->json($expense, 201);
     }
 
     public function show(Expense $expense)
     {
-        return response()->json($expense->load('transaction'));
+        $expense->load('transaction');
+        return response()->json($expense);
     }
 
     public function update(Request $request, Expense $expense)
@@ -62,6 +86,7 @@ class ExpenseController extends Controller
         ]);
 
         $expense->update($validated);
+        $expense->load('transaction');
 
         return response()->json($expense);
     }

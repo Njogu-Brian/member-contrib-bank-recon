@@ -1,10 +1,27 @@
-import api from './axios';
+import api from './axios'
 
-export const expensesApi = {
-  list: (params) => api.get('/expenses', { params }).then((res) => res.data),
-  get: (id) => api.get(`/expenses/${id}`).then((res) => res.data),
-  create: (data) => api.post('/expenses', data).then((res) => res.data),
-  update: (id, data) => api.put(`/expenses/${id}`, data).then((res) => res.data),
-  delete: (id) => api.delete(`/expenses/${id}`).then((res) => res.data),
-};
+export const getExpenses = async (params = {}) => {
+  const response = await api.get('/expenses', { params })
+  return response.data
+}
+
+export const getExpense = async (id) => {
+  const response = await api.get(`/expenses/${id}`)
+  return response.data
+}
+
+export const createExpense = async (data) => {
+  const response = await api.post('/expenses', data)
+  return response.data
+}
+
+export const updateExpense = async (id, data) => {
+  const response = await api.put(`/expenses/${id}`, data)
+  return response.data
+}
+
+export const deleteExpense = async (id) => {
+  const response = await api.delete(`/expenses/${id}`)
+  return response.data
+}
 
