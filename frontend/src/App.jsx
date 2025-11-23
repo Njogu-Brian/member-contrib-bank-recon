@@ -19,6 +19,13 @@ import Audit from './pages/Audit'
 import DuplicateTransactions from './pages/DuplicateTransactions'
 import Layout from './components/Layout'
 import AttendanceUploads from './pages/AttendanceUploads'
+import Wallets from './pages/Wallets'
+import Investments from './pages/Investments'
+import Announcements from './pages/Announcements'
+import Meetings from './pages/Meetings'
+import Budgets from './pages/Budgets'
+import Notifications from './pages/Notifications'
+import Compliance from './pages/Compliance'
 
 function PrivateRoute({ children }) {
   const token = localStorage.getItem('token')
@@ -54,6 +61,13 @@ function App() {
         <Route path="duplicate-transactions" element={<DuplicateTransactions />} />
         <Route path="expenses" element={<Expenses />} />
         <Route path="manual-contributions" element={<ManualContributions />} />
+        <Route path="wallets" element={<Wallets />} />
+        <Route path="investments" element={<Investments />} />
+        <Route path="announcements" element={<Announcements />} />
+        <Route path="meetings" element={<Meetings />} />
+        <Route path="budgets" element={<Budgets />} />
+        <Route path="notifications" element={<Notifications />} />
+        <Route path="compliance" element={<Compliance />} />
         <Route path="attendance-uploads" element={<AttendanceUploads />} />
         <Route path="settings" element={<Settings />} />
         <Route path="reports" element={<Reports />} />
