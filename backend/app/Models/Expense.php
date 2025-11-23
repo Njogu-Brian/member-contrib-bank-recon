@@ -18,6 +18,8 @@ class Expense extends Model
         'notes',
         'assign_to_all_members',
         'amount_per_member',
+        'budget_month_id',
+        'expense_category_id',
     ];
 
     protected $casts = [
@@ -37,6 +39,16 @@ class Expense extends Model
         return $this->belongsToMany(Member::class, 'expense_members')
                     ->withPivot('amount')
                     ->withTimestamps();
+    }
+
+    public function budgetMonth()
+    {
+        return $this->belongsTo(BudgetMonth::class);
+    }
+
+    public function expenseCategory()
+    {
+        return $this->belongsTo(ExpenseCategory::class);
     }
 }
 

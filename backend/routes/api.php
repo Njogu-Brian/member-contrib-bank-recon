@@ -1,8 +1,11 @@
 <?php
 
-use App\Http\Controllers\AuthController;
 use App\Http\Controllers\API\AuthController as MobileAuthController;
 use App\Http\Controllers\API\MemberController as MobileMemberController;
+use App\Http\Controllers\API\InvestmentController;
+use App\Http\Controllers\API\PaymentController;
+use App\Http\Controllers\API\WalletController;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AuditController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DuplicateController;
@@ -27,6 +30,8 @@ Route::get('/health', function () {
 Route::get('/test', function () {
     return response()->json(['message' => 'API is working']);
 });
+
+Route::post('/payments/mpesa/callback', [PaymentController::class, 'mpesaCallback']);
 
 Route::prefix('mobile')->group(function () {
     Route::post('/auth/login', [MobileAuthController::class, 'login']);
@@ -60,6 +65,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/members/{member}/statement', [MemberController::class, 'statement']);
     Route::get('/members/{member}/statement/export', [MemberController::class, 'exportStatement']);
     Route::get('/members/statements/export', [MemberController::class, 'exportBulkStatements']);
+
+    // Wallets & Contributions
+    Route::get('/wallets', [WalletController::class, 'index']);
+    Route::post('/wallets', [WalletController::class, 'store']);
+    Route::get('/wallets/{wallet}', [WalletController::class, 'show']);
+    Route::post('/wallets/{wallet}/contributions', [WalletController::class, 'contribute']);
+    Route::get('/members/{member}/penalties', [WalletController::class, 'penalties']);
+
+    // Payments
+    Route::post('/payments/{payment}/receipt', [PaymentController::class, 'issueReceipt']);
+
+    // Investments
+    Route::apiResource('investments', InvestmentController::class);
 
     // Contribution status rules
     Route::get('/contribution-statuses', [ContributionStatusRuleController::class, 'index']);
