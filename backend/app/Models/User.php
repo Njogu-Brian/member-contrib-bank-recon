@@ -52,6 +52,11 @@ class User extends Authenticatable
         return $this->hasOne(MfaSecret::class);
     }
 
+    public function notificationPreference()
+    {
+        return $this->hasOne(NotificationPreference::class);
+    }
+
     public function hasRole(string $role): bool
     {
         return $this->roles()->where('slug', $role)->exists();

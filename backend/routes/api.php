@@ -1,9 +1,14 @@
 <?php
 
+use App\Http\Controllers\API\AnnouncementController;
 use App\Http\Controllers\API\AuthController as MobileAuthController;
+use App\Http\Controllers\API\BudgetController;
 use App\Http\Controllers\API\MemberController as MobileMemberController;
+use App\Http\Controllers\API\MeetingController;
 use App\Http\Controllers\API\InvestmentController;
 use App\Http\Controllers\API\PaymentController;
+use App\Http\Controllers\API\ReportExportController;
+use App\Http\Controllers\API\NotificationPreferenceController;
 use App\Http\Controllers\API\WalletController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AuditController;
@@ -83,6 +88,29 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Investments
     Route::apiResource('investments', InvestmentController::class);
+
+    // Announcements
+    Route::apiResource('announcements', AnnouncementController::class);
+
+    // Notification preferences
+    Route::get('/notification-preferences', [NotificationPreferenceController::class, 'show']);
+    Route::put('/notification-preferences', [NotificationPreferenceController::class, 'update']);
+    Route::get('/notifications/log', [NotificationPreferenceController::class, 'log']);
+
+    // Meetings & motions
+    Route::get('/meetings', [MeetingController::class, 'index']);
+    Route::post('/meetings', [MeetingController::class, 'store']);
+    Route::post('/meetings/{meeting}/motions', [MeetingController::class, 'addMotion']);
+    Route::post('/motions/{motion}/votes', [MeetingController::class, 'vote']);
+
+    // Budgets
+    Route::get('/budgets', [BudgetController::class, 'index']);
+    Route::post('/budgets', [BudgetController::class, 'store']);
+    Route::put('/budget-months/{budgetMonth}', [BudgetController::class, 'updateMonth']);
+
+    // Reports & exports
+    Route::get('/report-exports', [ReportExportController::class, 'index']);
+    Route::post('/report-exports', [ReportExportController::class, 'store']);
 
     // Contribution status rules
     Route::get('/contribution-statuses', [ContributionStatusRuleController::class, 'index']);

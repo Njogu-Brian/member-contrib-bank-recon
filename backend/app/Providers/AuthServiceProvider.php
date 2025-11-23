@@ -29,6 +29,8 @@ class AuthServiceProvider extends ServiceProvider
         Gate::define('manage-investments', fn (User $user) => $user->hasRole('admin') || $user->hasRole('treasurer'));
         Gate::define('manage-announcements', fn (User $user) => $user->hasRole('admin'));
         Gate::define('manage-meetings', fn (User $user) => $user->hasRole('admin') || $user->hasRole('treasurer'));
+        Gate::define('manage-budget', fn (User $user) => $user->hasRole('admin') || $user->hasRole('treasurer'));
+        Gate::define('manage-reports', fn (User $user) => $user->hasRole('admin'));
     }
 }
 
