@@ -12,9 +12,17 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('contribution_status_rules', function (Blueprint $table) {
-            $table->string('type')->default('percentage')->after('description');
-            $table->decimal('min_amount', 15, 2)->nullable()->after('max_ratio');
-            $table->decimal('max_amount', 15, 2)->nullable()->after('min_amount');
+            if (! Schema::hasColumn('contribution_status_rules', 'type')) {
+                $table->string('type')->default('percentage')->after('description');
+            }
+
+            if (! Schema::hasColumn('contribution_status_rules', 'min_amount')) {
+                $table->decimal('min_amount', 15, 2)->nullable()->after('max_ratio');
+            }
+
+            if (! Schema::hasColumn('contribution_status_rules', 'max_amount')) {
+                $table->decimal('max_amount', 15, 2)->nullable()->after('min_amount');
+            }
         });
     }
 
