@@ -7,8 +7,8 @@ class MemberService {
 
   final ApiService _api;
 
-  Future<List<Member>> fetchMembers(String token) async {
-    final response = await _api.get(AppConstants.membersPath, token: token);
+  Future<List<Member>> fetchMembers() async {
+    final response = await _api.get(AppConstants.membersPath);
     final data = response['data'] as List<dynamic>? ?? [];
     return data
         .map((json) => Member.fromJson(json as Map<String, dynamic>))
