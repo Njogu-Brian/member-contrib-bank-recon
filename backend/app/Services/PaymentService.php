@@ -91,12 +91,7 @@ class PaymentService
         $qrBinary = Storage::disk('public')->get($qrPath);
         $qrBase64 = 'data:image/png;base64,' . base64_encode($qrBinary);
 
-        $html = view('pdf.receipt', [
-            'payment' => $payment,
-            'receiptNumber' => $receiptNumber,
-            'qrImage' => $qrBase64,
-            'notes' => $notes,
-        ])->render();
+        $html = $this->buildReceiptHtml($payment, $receiptNumber, $qrBase64, $notes);
 
         $dompdf = new Dompdf();
         $dompdf->loadHtml($html);
@@ -106,6 +101,68 @@ class PaymentService
         Storage::disk('public')->put($fileName, $dompdf->output());
 
         return $fileName;
+    }
+
+    protected function buildReceiptHtml(Payment $payment, string $receiptNumber, string $qrImage, ?string $notes): string
+    {
+        $memberName = $payment->member?->name ?? 'N/A';
+        $amount = number_format($payment->amount, 2);
+        $channel = strtoupper($payment->channel);
+        $reference = $payment->provider_reference ?? 'N/A';
+        $date = optional($payment->created_at)->toDateTimeString();
+        $notesRow = $notes ? "<tr><th>Notes</th><td>{$notes}</td></tr>" : '';
+
+        return <<<HTML
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Receipt {$receiptNumber}</title>
+    <style>
+        body { font-family: DejaVu Sans, sans-serif; font-size: 12px; color: #111; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .details { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        .details th, .details td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        .qr { text-align: center; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>Evimeria Group Receipt</h2>
+        <p>Receipt #: {$receiptNumber}</p>
+    </div>
+
+    <table class="details">
+        <tr>
+            <th>Member</th>
+            <td>{$memberName}</td>
+        </tr>
+        <tr>
+            <th>Amount</th>
+            <td>{$amount} {$payment->currency}</td>
+        </tr>
+        <tr>
+            <th>Channel</th>
+            <td>{$channel}</td>
+        </tr>
+        <tr>
+            <th>Reference</th>
+            <td>{$reference}</td>
+        </tr>
+        <tr>
+            <th>Date</th>
+            <td>{$date}</td>
+        </tr>
+        {$notesRow}
+    </table>
+
+    <div class="qr">
+        <p>Scan to verify</p>
+        <img src="{$qrImage}" width="150" height="150" alt="QR Code">
+    </div>
+</body>
+</html>
+HTML;
     }
 }
 
