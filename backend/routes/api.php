@@ -40,6 +40,11 @@ Route::prefix('mobile')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/auth/me', [MobileAuthController::class, 'user']);
         Route::post('/auth/logout', [MobileAuthController::class, 'logout']);
+        Route::get('/kyc/profile', [MobileAuthController::class, 'profile']);
+        Route::put('/kyc/profile', [MobileAuthController::class, 'updateProfile']);
+        Route::post('/kyc/documents', [MobileAuthController::class, 'uploadDocument']);
+        Route::post('/mfa/enable', [MobileAuthController::class, 'enableMfa']);
+        Route::post('/mfa/disable', [MobileAuthController::class, 'disableMfa']);
 
         Route::get('/members', [MobileMemberController::class, 'index']);
         Route::get('/members/{member}', [MobileMemberController::class, 'show']);
