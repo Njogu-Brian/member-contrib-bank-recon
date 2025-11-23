@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\API\AuthController as MobileAuthController;
+use App\Http\Controllers\API\MemberController as MobileMemberController;
 use App\Http\Controllers\AuditController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DuplicateController;
@@ -15,9 +17,28 @@ use App\Http\Controllers\StatementController;
 use App\Http\Controllers\TransactionController;
 use Illuminate\Support\Facades\Route;
 
-// Test endpoint
+// Health checks
+Route::get('/health', function () {
+    return response()->json([
+        'status' => 'ok',
+        'timestamp' => now(),
+    ]);
+});
 Route::get('/test', function () {
     return response()->json(['message' => 'API is working']);
+});
+
+Route::prefix('mobile')->group(function () {
+    Route::post('/auth/login', [MobileAuthController::class, 'login']);
+    Route::post('/auth/register', [MobileAuthController::class, 'register']);
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/auth/me', [MobileAuthController::class, 'user']);
+        Route::post('/auth/logout', [MobileAuthController::class, 'logout']);
+
+        Route::get('/members', [MobileMemberController::class, 'index']);
+        Route::get('/members/{member}', [MobileMemberController::class, 'show']);
+    });
 });
 
 // Public routes
