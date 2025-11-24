@@ -82,6 +82,11 @@ class Transaction extends Model
         return $this->hasMany(TransactionSplit::class);
     }
 
+    public function transfers()
+    {
+        return $this->hasMany(TransactionTransfer::class);
+    }
+
     public function expense()
     {
         return $this->hasOne(Expense::class);

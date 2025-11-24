@@ -69,7 +69,7 @@ class Member extends Model
                 DB::raw('COALESCE(SUM(transaction_splits.amount), 0) as distributed')
             )
             ->where('transactions.member_id', $this->id)
-            ->where('transactions.assignment_status', '!=', 'unassigned')
+            ->whereNotIn('transactions.assignment_status', ['unassigned', 'duplicate'])
             ->where('transactions.is_archived', false)
             ->groupBy('transactions.id', 'transactions.credit')
             ->get()
@@ -166,7 +166,7 @@ class Member extends Model
 
         $transactionDate = DB::table('transactions')
             ->where('member_id', $this->id)
-            ->where('assignment_status', '!=', 'unassigned')
+            ->whereNotIn('assignment_status', ['unassigned', 'duplicate'])
             ->where('is_archived', false)
             ->min('tran_date');
         if ($transactionDate) {

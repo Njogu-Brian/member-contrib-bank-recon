@@ -6,6 +6,7 @@ use App\Models\Member;
 use App\Models\Transaction;
 use App\Models\TransactionMatchLog;
 use App\Models\TransactionSplit;
+use App\Models\TransactionTransfer;
 use App\Services\MatchingService;
 use App\Services\TransactionParserService;
 use Illuminate\Http\Request;
@@ -140,6 +141,8 @@ class TransactionController extends Controller
             'splits' => 'required|array|min:1',
             'splits.*.member_id' => 'required|exists:members,id',
             'splits.*.amount' => 'required|numeric|min:0.01',
+            'splits.*.notes' => 'nullable|string|max:500',
+            'notes' => 'nullable|string|max:500',
         ]);
 
         $totalAmount = collect($request->splits)->sum('amount');
@@ -153,22 +156,40 @@ class TransactionController extends Controller
             ], 422);
         }
 
-        DB::transaction(function () use ($transaction, $request) {
-            // Delete existing splits
+        DB::transaction(function () use ($transaction, $request, $totalAmount) {
             $transaction->splits()->delete();
+            $transaction->transfers()->delete();
 
-            // Create new splits
+            $transfer = TransactionTransfer::create([
+                'transaction_id' => $transaction->id,
+                'from_member_id' => $transaction->member_id,
+                'initiated_by' => optional($request->user())->id,
+                'mode' => 'split',
+                'total_amount' => $totalAmount,
+                'notes' => $request->input('notes'),
+                'metadata' => [
+                    'entries' => collect($request->splits)->map(function ($split) {
+                        return [
+                            'member_id' => $split['member_id'],
+                            'amount' => $split['amount'],
+                            'notes' => $split['notes'] ?? null,
+                        ];
+                    })->toArray(),
+                ],
+            ]);
+
             foreach ($request->splits as $split) {
                 TransactionSplit::create([
                     'transaction_id' => $transaction->id,
                     'member_id' => $split['member_id'],
                     'amount' => $split['amount'],
                     'notes' => $split['notes'] ?? null,
+                    'transfer_id' => $transfer->id,
                 ]);
             }
 
             $transaction->update([
-                'assignment_status' => 'manual_assigned',
+                'assignment_status' => 'transferred',
             ]);
         });
 
@@ -1481,34 +1502,102 @@ class TransactionController extends Controller
             ], 422);
         }
 
+        // Support both single transfer and multiple recipients (split)
         $request->validate([
-            'to_member_id' => 'required|exists:members,id',
+            'to_member_id' => 'required_without:recipients|exists:members,id',
+            'recipients' => 'required_without:to_member_id|array|min:1',
+            'recipients.*.member_id' => 'required|exists:members,id',
+            'recipients.*.amount' => 'required|numeric|min:0.01',
+            'recipients.*.notes' => 'nullable|string|max:500',
             'notes' => 'nullable|string|max:500',
         ]);
 
-        if (!$transaction->member_id) {
-            return response()->json([
-                'message' => 'Transaction must be assigned to a member before transfer',
-            ], 422);
+        $transactionAmount = (float) ($transaction->credit > 0 ? $transaction->credit : $transaction->debit);
+        $fromMemberId = $transaction->member_id;
+        $previousStatus = $transaction->assignment_status;
+
+        // If multiple recipients provided, use split logic
+        if ($request->has('recipients') && is_array($request->recipients) && count($request->recipients) > 0) {
+            $totalAmount = collect($request->recipients)->sum('amount');
+
+            if (abs($totalAmount - $transactionAmount) > 0.01) {
+                return response()->json([
+                    'message' => 'Recipient amounts must sum to transaction amount',
+                    'expected' => $transactionAmount,
+                    'provided' => $totalAmount,
+                ], 422);
+            }
+
+            return $this->handleMultiRecipientTransfer($transaction, $request, $fromMemberId, $previousStatus, $transactionAmount);
         }
 
-        if ($transaction->member_id == $request->to_member_id) {
+        // Single recipient transfer or assignment
+        if (!$fromMemberId) {
+            // Unassigned transaction - treat as initial assignment
+            $toMember = Member::findOrFail($request->to_member_id);
+
+            DB::transaction(function () use ($transaction, $request, $toMember, $transactionAmount, $previousStatus) {
+                $transaction->splits()->delete();
+                $transaction->transfers()->delete();
+
+                $transaction->update([
+                    'member_id' => $request->to_member_id,
+                    'assignment_status' => 'manual_assigned',
+                    'match_confidence' => 1.0,
+                    'draft_member_ids' => null,
+                ]);
+
+                TransactionMatchLog::create([
+                    'transaction_id' => $transaction->id,
+                    'member_id' => $request->to_member_id,
+                    'confidence' => 1.0,
+                    'match_reason' => 'Manual assignment via transfer' . ($request->notes ? ": {$request->notes}" : ''),
+                    'source' => 'manual',
+                    'user_id' => $request->user()->id,
+                ]);
+            });
+
+            $transaction->load(['member', 'bankStatement', 'splits.member']);
+
+            return response()->json([
+                'message' => 'Transaction assigned successfully',
+                'transaction' => $transaction,
+            ]);
+        }
+
+        if ($fromMemberId == $request->to_member_id) {
             return response()->json([
                 'message' => 'Cannot transfer to the same member',
             ], 422);
         }
 
-        $fromMember = Member::findOrFail($transaction->member_id);
+        $fromMember = Member::findOrFail($fromMemberId);
         $toMember = Member::findOrFail($request->to_member_id);
 
-        DB::transaction(function () use ($transaction, $request, $fromMember, $toMember) {
-            // Update transaction to new member
+        DB::transaction(function () use ($transaction, $request, $fromMember, $toMember, $transactionAmount, $previousStatus) {
+            $transaction->splits()->delete();
+            $transaction->transfers()->delete();
+
             $transaction->update([
                 'member_id' => $request->to_member_id,
-                'assignment_status' => 'manual_assigned',
+                'assignment_status' => 'transferred',
+                'draft_member_ids' => null,
             ]);
 
-            // Create match log for transfer
+            TransactionTransfer::create([
+                'transaction_id' => $transaction->id,
+                'from_member_id' => $fromMember->id,
+                'initiated_by' => optional($request->user())->id,
+                'mode' => 'single',
+                'total_amount' => $transactionAmount,
+                'notes' => $request->input('notes'),
+                'metadata' => [
+                    'previous_member_id' => $fromMember->id,
+                    'new_member_id' => $toMember->id,
+                    'previous_assignment_status' => $previousStatus,
+                ],
+            ]);
+
             TransactionMatchLog::create([
                 'transaction_id' => $transaction->id,
                 'member_id' => $request->to_member_id,
@@ -1519,12 +1608,79 @@ class TransactionController extends Controller
             ]);
         });
 
-        $transaction->load(['member', 'bankStatement']);
+        $transaction->load(['member', 'bankStatement', 'splits.member']);
 
         return response()->json([
             'message' => 'Transaction transferred successfully',
             'transaction' => $transaction,
         ]);
+    }
+
+    protected function handleMultiRecipientTransfer(Transaction $transaction, Request $request, $fromMemberId, $previousStatus, $transactionAmount)
+    {
+        return DB::transaction(function () use ($transaction, $request, $fromMemberId, $previousStatus, $transactionAmount) {
+            $transaction->splits()->delete();
+            $transaction->transfers()->delete();
+
+            $fromMember = $fromMemberId ? Member::find($fromMemberId) : null;
+            $fromMemberName = $fromMember ? $fromMember->name : 'Unassigned';
+
+            $transfer = TransactionTransfer::create([
+                'transaction_id' => $transaction->id,
+                'from_member_id' => $fromMemberId,
+                'initiated_by' => optional($request->user())->id,
+                'mode' => 'split',
+                'total_amount' => $transactionAmount,
+                'notes' => $request->input('notes'),
+                'metadata' => [
+                    'previous_member_id' => $fromMemberId,
+                    'previous_assignment_status' => $previousStatus,
+                    'entries' => collect($request->recipients)->map(function ($recipient) {
+                        return [
+                            'member_id' => $recipient['member_id'],
+                            'amount' => $recipient['amount'],
+                            'notes' => $recipient['notes'] ?? null,
+                        ];
+                    })->toArray(),
+                ],
+            ]);
+
+            foreach ($request->recipients as $recipient) {
+                TransactionSplit::create([
+                    'transaction_id' => $transaction->id,
+                    'member_id' => $recipient['member_id'],
+                    'amount' => $recipient['amount'],
+                    'notes' => $recipient['notes'] ?? null,
+                    'transfer_id' => $transfer->id,
+                ]);
+
+                TransactionMatchLog::create([
+                    'transaction_id' => $transaction->id,
+                    'member_id' => $recipient['member_id'],
+                    'confidence' => 1.0,
+                    'match_reason' => "Transferred from {$fromMemberName} (split)" . ($request->notes ? ": {$request->notes}" : ''),
+                    'source' => 'manual',
+                    'user_id' => $request->user()->id,
+                ]);
+            }
+
+            // If only one recipient, assign to that member; otherwise keep unassigned but mark as transferred
+            $recipientIds = collect($request->recipients)->pluck('member_id')->unique();
+            $newMemberId = $recipientIds->count() === 1 ? $recipientIds->first() : null;
+
+            $transaction->update([
+                'member_id' => $newMemberId,
+                'assignment_status' => 'transferred',
+                'draft_member_ids' => null,
+            ]);
+
+            $transaction->load(['member', 'bankStatement', 'splits.member']);
+
+            return response()->json([
+                'message' => 'Transaction transferred to multiple recipients successfully',
+                'transaction' => $transaction,
+            ]);
+        });
     }
 }
 

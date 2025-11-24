@@ -1,6 +1,4 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { getUser } from './api/auth'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Members from './pages/Members'
@@ -26,40 +24,79 @@ import Meetings from './pages/Meetings'
 import Budgets from './pages/Budgets'
 import Notifications from './pages/Notifications'
 import Compliance from './pages/Compliance'
+import BulkSms from './pages/BulkSms'
+import Unauthorized from './pages/Unauthorized'
+import UiKit from './pages/UiKit'
+import FullScreenLoader from './components/FullScreenLoader'
+import { useAuthContext } from './context/AuthContext'
+import { hasRole, ROLES } from './lib/rbac'
 
-function PrivateRoute({ children }) {
-  const token = localStorage.getItem('token')
-  
-  if (!token) {
+function ProtectedRoute({ children, roles = [] }) {
+  const { isAuthenticated, user } = useAuthContext()
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }
-  
+  if (roles.length && !hasRole(user, roles)) {
+    return <Navigate to="/unauthorized" replace />
+  }
+  return children
+}
+
+function PublicRoute({ children }) {
+  const { isAuthenticated } = useAuthContext()
+  if (isAuthenticated) {
+    return <Navigate to="/" replace />
+  }
   return children
 }
 
 function App() {
+  const { isLoading } = useAuthContext()
+  if (isLoading) {
+    return <FullScreenLoader />
+  }
+
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
+      <Route
+        path="/login"
+        element={
+          <PublicRoute>
+            <Login />
+          </PublicRoute>
+        }
+      />
+      <Route path="/unauthorized" element={<Unauthorized />} />
       <Route
         path="/"
         element={
-          <PrivateRoute>
+          <ProtectedRoute>
             <Layout />
-          </PrivateRoute>
+          </ProtectedRoute>
         }
       >
         <Route index element={<Dashboard />} />
-        <Route path="members" element={<Members />} />
-        <Route path="members/:id" element={<MemberProfile />} />
-        <Route path="statements" element={<Statements />} />
-        <Route path="statements/:id" element={<StatementViewer />} />
-        <Route path="statements/:id/transactions" element={<StatementTransactions />} />
+        <Route path="members">
+          <Route index element={<Members />} />
+          <Route path=":id" element={<MemberProfile />} />
+        </Route>
+        <Route path="statements">
+          <Route index element={<Statements />} />
+          <Route path=":id" element={<StatementViewer />} />
+          <Route path=":id/transactions" element={<StatementTransactions />} />
+        </Route>
         <Route path="transactions" element={<Transactions />} />
         <Route path="archived-transactions" element={<ArchivedTransactions />} />
         <Route path="draft-transactions" element={<DraftTransactions />} />
         <Route path="duplicate-transactions" element={<DuplicateTransactions />} />
-        <Route path="expenses" element={<Expenses />} />
+        <Route
+          path="expenses"
+          element={
+            <ProtectedRoute roles={[ROLES.SUPER_ADMIN, ROLES.TREASURER, ROLES.ACCOUNTANT]}>
+              <Expenses />
+            </ProtectedRoute>
+          }
+        />
         <Route path="manual-contributions" element={<ManualContributions />} />
         <Route path="wallets" element={<Wallets />} />
         <Route path="investments" element={<Investments />} />
@@ -67,12 +104,22 @@ function App() {
         <Route path="meetings" element={<Meetings />} />
         <Route path="budgets" element={<Budgets />} />
         <Route path="notifications" element={<Notifications />} />
+        <Route path="bulk-sms" element={<BulkSms />} />
         <Route path="compliance" element={<Compliance />} />
         <Route path="attendance-uploads" element={<AttendanceUploads />} />
         <Route path="settings" element={<Settings />} />
         <Route path="reports" element={<Reports />} />
         <Route path="audit" element={<Audit />} />
+        <Route
+          path="ui-kit"
+          element={
+            <ProtectedRoute roles={[ROLES.SUPER_ADMIN, ROLES.IT_SUPPORT]}>
+              <UiKit />
+            </ProtectedRoute>
+          }
+        />
       </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

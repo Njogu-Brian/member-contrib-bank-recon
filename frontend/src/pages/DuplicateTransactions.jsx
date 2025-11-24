@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { getDuplicates } from '../api/duplicates'
+import { getDuplicates, reanalyzeDuplicates } from '../api/duplicates'
 import { getStatements } from '../api/statements'
 import Pagination from '../components/Pagination'
 
@@ -20,6 +20,19 @@ export default function DuplicateTransactions() {
   const { data: statementsData } = useQuery({
     queryKey: ['statements', 'all'],
     queryFn: () => getStatements({ per_page: 500 }),
+  })
+
+  const queryClient = useQueryClient()
+
+  const reanalyzeMutation = useMutation({
+    mutationFn: (statementId) => reanalyzeDuplicates(statementId),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['duplicates'])
+      alert('Duplicate reanalysis completed successfully!')
+    },
+    onError: (error) => {
+      alert(error.response?.data?.message || 'Failed to reanalyze duplicates')
+    },
   })
 
   const duplicates = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []
@@ -49,8 +62,34 @@ export default function DuplicateTransactions() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Duplicate Transactions</h1>
           <p className="text-sm text-gray-500 mt-1">
-            These entries were skipped during import because they matched an existing transaction.
+            Transactions flagged as duplicates based on matching date, description, and amount.
           </p>
+        </div>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => {
+              if (confirm('Reanalyze all duplicate transactions? This will re-check all statements.')) {
+                reanalyzeMutation.mutate(null)
+              }
+            }}
+            disabled={reanalyzeMutation.isPending}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {reanalyzeMutation.isPending ? 'Reanalyzing...' : 'Reanalyze All'}
+          </button>
+          {filters.statement_id && (
+            <button
+              onClick={() => {
+                if (confirm(`Reanalyze duplicates for this statement only?`)) {
+                  reanalyzeMutation.mutate(filters.statement_id)
+                }
+              }}
+              disabled={reanalyzeMutation.isPending}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+            >
+              {reanalyzeMutation.isPending ? 'Reanalyzing...' : 'Reanalyze Statement'}
+            </button>
+          )}
         </div>
       </div>
 

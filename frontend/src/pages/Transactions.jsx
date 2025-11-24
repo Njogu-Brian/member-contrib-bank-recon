@@ -1,19 +1,27 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getTransactions, autoAssign, transferTransaction, archiveTransaction, unarchiveTransaction, bulkArchiveTransactions, bulkAssign, splitTransaction } from '../api/transactions'
 import { getMembers } from '../api/members'
 import MemberSearchModal from '../components/MemberSearchModal'
 import Pagination from '../components/Pagination'
+import { HiEllipsisVertical, HiOutlineChevronDown } from 'react-icons/hi2'
 
-export default function Transactions({ initialArchivedFilter = 'active', isArchivedView = false }) {
+export default function Transactions({
+  initialArchivedFilter = 'active',
+  isArchivedView = false,
+  initialStatus = '',
+  titleOverride,
+  showAutoAssign = true,
+}) {
   const [filters, setFilters] = useState({
-    status: '',
+    status: initialStatus,
     search: '',
     member_id: '',
     sort_by: 'tran_date',
     sort_order: 'desc',
   })
   const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(25)
   const [archivedFilter, setArchivedFilter] = useState(initialArchivedFilter)
   const [selectedTransactions, setSelectedTransactions] = useState([])
   const [showAssignModal, setShowAssignModal] = useState(false)
@@ -26,7 +34,20 @@ export default function Transactions({ initialArchivedFilter = 'active', isArchi
   const [isShareMode, setIsShareMode] = useState(false)
   const [shareEntries, setShareEntries] = useState([])
   const [activeShareIndex, setActiveShareIndex] = useState(null)
+  const [actionMenuOpen, setActionMenuOpen] = useState(null)
+  const actionMenuRef = useRef(null)
   const queryClient = useQueryClient()
+
+  // Close action menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (actionMenuRef.current && !actionMenuRef.current.contains(event.target)) {
+        setActionMenuOpen(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   useEffect(() => {
     if (!showTransferModal) {
@@ -41,9 +62,9 @@ export default function Transactions({ initialArchivedFilter = 'active', isArchi
   }, [showTransferModal])
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['transactions', filters, page, archivedFilter],
+    queryKey: ['transactions', filters, page, perPage, archivedFilter],
     queryFn: () => {
-      const params = { ...filters, page }
+      const params = { ...filters, page, per_page: perPage }
 
       if (archivedFilter === 'archived') {
         params.archived = true
@@ -101,7 +122,7 @@ export default function Transactions({ initialArchivedFilter = 'active', isArchi
   })
 
   const transferMutation = useMutation({
-    mutationFn: ({ id, toMemberId, notes }) => transferTransaction(id, toMemberId, notes),
+    mutationFn: ({ id, toMemberId, recipients, notes }) => transferTransaction(id, { toMemberId, recipients, notes }),
     onSuccess: () => {
       queryClient.invalidateQueries(['transactions'])
       resetTransferState()
@@ -113,7 +134,7 @@ export default function Transactions({ initialArchivedFilter = 'active', isArchi
   })
 
   const splitMutation = useMutation({
-    mutationFn: ({ transactionId, splits }) => splitTransaction(transactionId, splits),
+    mutationFn: ({ transactionId, splits, notes }) => splitTransaction(transactionId, { splits, notes }),
     onSuccess: () => {
       queryClient.invalidateQueries(['transactions'])
       resetTransferState()
@@ -222,15 +243,16 @@ export default function Transactions({ initialArchivedFilter = 'active', isArchi
   }
 
   const handleTransfer = (transaction) => {
-    if (!transaction.member_id) {
-      alert('This transaction is not assigned to any member. Please assign it first.')
-      return
-    }
     setSelectedTransaction(transaction)
     setSelectedMemberForTransfer(null)
     setTransferNotes('')
-    setIsShareMode(false)
-    setShareEntries([])
+    const shouldUseShareMode = !transaction.member_id // Default to share mode if unassigned
+    setIsShareMode(shouldUseShareMode)
+    if (shouldUseShareMode) {
+      initializeShareEntriesForTransaction(transaction)
+    } else {
+      setShareEntries([])
+    }
     setActiveShareIndex(null)
     setShowTransferModal(true)
   }
@@ -264,15 +286,17 @@ export default function Transactions({ initialArchivedFilter = 'active', isArchi
         return
       }
 
-      const splitsPayload = shareEntries.map(entry => ({
+      const recipientsPayload = shareEntries.map(entry => ({
         member_id: entry.member.id,
         amount: Number(entry.amount),
         notes: transferNotes || undefined,
       }))
 
-      splitMutation.mutate({
-        transactionId: selectedTransaction.id,
-        splits: splitsPayload,
+      // Use transfer endpoint with multiple recipients
+      transferMutation.mutate({
+        id: selectedTransaction.id,
+        recipients: recipientsPayload,
+        notes: transferNotes || undefined,
       })
       return
     }
@@ -387,7 +411,7 @@ export default function Transactions({ initialArchivedFilter = 'active', isArchi
     )
   }
 
-  const pageTitle = isArchivedView ? 'Archived Transactions' : 'Transactions'
+  const pageTitle = titleOverride ?? (isArchivedView ? 'Archived Transactions' : 'Transactions')
 
   // Handle Laravel paginated response structure
   // Laravel paginator returns: { data: [...], current_page: 1, last_page: 5, ... }
@@ -399,17 +423,13 @@ export default function Transactions({ initialArchivedFilter = 'active', isArchi
   const archivingId = archiveMutation.variables?.id
   const unarchivingId = unarchiveMutation.variables
   
-  // Debug logging (remove in production)
-  if (process.env.NODE_ENV === 'development') {
-    console.log('Transactions data:', { data, transactions, pagination })
-  }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-900">{pageTitle}</h1>
         {!isArchivedView && (
-          <div className="flex space-x-3">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={handleAutoAssign}
               disabled={autoAssignMutation.isPending}
@@ -417,23 +437,42 @@ export default function Transactions({ initialArchivedFilter = 'active', isArchi
             >
               {autoAssignMutation.isPending ? 'Processing...' : 'Auto Assign'}
             </button>
+            <button
+              onClick={() => {
+                if (selectedTransactions.length === 0) {
+                  alert('Please select at least one transaction using the checkboxes')
+                  return
+                }
+                setShowAssignModal(true)
+              }}
+              disabled={bulkAssignMutation.isPending || selectedTransactions.length === 0}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              title={selectedTransactions.length === 0 ? 'Select transactions using checkboxes to enable bulk assign' : ''}
+            >
+              {bulkAssignMutation.isPending ? 'Assigning...' : `Bulk Assign${selectedTransactions.length > 0 ? ` (${selectedTransactions.length})` : ''}`}
+            </button>
+            <button
+              onClick={() => {
+                if (selectedTransactions.length === 0) {
+                  alert('Please select at least one transaction using the checkboxes')
+                  return
+                }
+                handleBulkArchive()
+              }}
+              disabled={bulkArchiveMutation.isPending || selectedTransactions.length === 0}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              title={selectedTransactions.length === 0 ? 'Select transactions using checkboxes to enable bulk archive' : ''}
+            >
+              {bulkArchiveMutation.isPending ? 'Archiving...' : `Bulk Archive${selectedTransactions.length > 0 ? ` (${selectedTransactions.length})` : ''}`}
+            </button>
             {selectedTransactions.length > 0 && (
-              <>
-                <button
-                  onClick={() => setShowAssignModal(true)}
-                  disabled={bulkAssignMutation.isPending}
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
-                >
-                  {bulkAssignMutation.isPending ? 'Assigning...' : `Assign Selected (${selectedTransactions.length})`}
-                </button>
-                <button
-                  onClick={handleBulkArchive}
-                  disabled={bulkArchiveMutation.isPending}
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
-                >
-                  {bulkArchiveMutation.isPending ? 'Archiving...' : 'Archive Selected'}
-                </button>
-              </>
+              <button
+                onClick={() => setSelectedTransactions([])}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                title="Clear selection"
+              >
+                Clear Selection
+              </button>
             )}
           </div>
         )}
@@ -512,12 +551,26 @@ export default function Transactions({ initialArchivedFilter = 'active', isArchi
         </div>
       </div>
 
+      {selectedTransactions.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-center justify-between">
+          <span className="text-sm font-medium text-blue-900">
+            {selectedTransactions.length} transaction{selectedTransactions.length !== 1 ? 's' : ''} selected
+          </span>
+          <button
+            onClick={() => setSelectedTransactions([])}
+            className="text-sm text-blue-600 hover:text-blue-800 underline"
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
+
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                   <input
                     type="checkbox"
                     checked={
@@ -535,8 +588,8 @@ export default function Transactions({ initialArchivedFilter = 'active', isArchi
                     className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                   />
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <div className="flex items-center space-x-1">
+                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <div className="flex items-center gap-1">
                     <span>Date</span>
                     <div className="flex flex-col">
                       <button
@@ -544,7 +597,7 @@ export default function Transactions({ initialArchivedFilter = 'active', isArchi
                           setFilters({ ...filters, sort_by: 'tran_date', sort_order: 'asc' })
                           setPage(1)
                         }}
-                        className={`text-xs ${filters.sort_by === 'tran_date' && filters.sort_order === 'asc' ? 'text-indigo-600' : 'text-gray-400'}`}
+                        className={`text-xs leading-none ${filters.sort_by === 'tran_date' && filters.sort_order === 'asc' ? 'text-indigo-600' : 'text-gray-400'}`}
                         title="Sort: Oldest to Newest"
                       >
                         ↑
@@ -554,7 +607,7 @@ export default function Transactions({ initialArchivedFilter = 'active', isArchi
                           setFilters({ ...filters, sort_by: 'tran_date', sort_order: 'desc' })
                           setPage(1)
                         }}
-                        className={`text-xs ${filters.sort_by === 'tran_date' && filters.sort_order === 'desc' ? 'text-indigo-600' : 'text-gray-400'}`}
+                        className={`text-xs leading-none ${filters.sort_by === 'tran_date' && filters.sort_order === 'desc' ? 'text-indigo-600' : 'text-gray-400'}`}
                         title="Sort: Newest to Oldest"
                       >
                         ↓
@@ -562,12 +615,12 @@ export default function Transactions({ initialArchivedFilter = 'active', isArchi
                     </div>
                   </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Particulars</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statement</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <div className="flex items-center space-x-1">
+                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Type</th>
+                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Code</th>
+                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Particulars</th>
+                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden xl:table-cell">Statement</th>
+                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                  <div className="flex items-center gap-1">
                     <span>Amount</span>
                     <div className="flex flex-col">
                       <button
@@ -575,7 +628,7 @@ export default function Transactions({ initialArchivedFilter = 'active', isArchi
                           setFilters({ ...filters, sort_by: 'credit', sort_order: 'asc' })
                           setPage(1)
                         }}
-                        className={`text-xs ${filters.sort_by === 'credit' && filters.sort_order === 'asc' ? 'text-indigo-600' : 'text-gray-400'}`}
+                        className={`text-xs leading-none ${filters.sort_by === 'credit' && filters.sort_order === 'asc' ? 'text-indigo-600' : 'text-gray-400'}`}
                         title="Sort: Lowest to Highest"
                       >
                         ↑
@@ -585,7 +638,7 @@ export default function Transactions({ initialArchivedFilter = 'active', isArchi
                           setFilters({ ...filters, sort_by: 'credit', sort_order: 'desc' })
                           setPage(1)
                         }}
-                        className={`text-xs ${filters.sort_by === 'credit' && filters.sort_order === 'desc' ? 'text-indigo-600' : 'text-gray-400'}`}
+                        className={`text-xs leading-none ${filters.sort_by === 'credit' && filters.sort_order === 'desc' ? 'text-indigo-600' : 'text-gray-400'}`}
                         title="Sort: Highest to Lowest"
                       >
                         ↓
@@ -593,22 +646,22 @@ export default function Transactions({ initialArchivedFilter = 'active', isArchi
                     </div>
                   </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Member</th>
+                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Status</th>
+                <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {transactions.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-6 py-12 text-center text-sm text-gray-500">
+                  <td colSpan="9" className="px-4 py-12 text-center text-sm text-gray-500">
                     No transactions found. {filters.status || filters.search || filters.member_id ? 'Try adjusting your filters.' : 'Upload a bank statement to get started.'}
                   </td>
                 </tr>
               ) : (
                 transactions.map((tx) => (
-                  <tr key={tx.id} className={tx.is_archived ? 'bg-gray-50 text-gray-500' : ''}>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                  <tr key={tx.id} className={`hover:bg-gray-50 ${tx.is_archived ? 'bg-gray-50 text-gray-500' : ''}`}>
+                    <td className="px-2 py-2">
                       <input
                         type="checkbox"
                         checked={selectedTransactions.includes(tx.id)}
@@ -627,114 +680,128 @@ export default function Transactions({ initialArchivedFilter = 'active', isArchi
                         className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                       />
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(tx.tran_date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    <td className="px-2 py-2 text-sm text-gray-900">
+                      <div className="whitespace-nowrap">
+                        {new Date(tx.tran_date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                    <td className="px-2 py-2 text-sm text-gray-500 hidden md:table-cell">
+                      <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-800">
                         {tx.transaction_type || 'Unknown'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-2 py-2 text-sm text-gray-500 hidden lg:table-cell">
                       {tx.transaction_code || '-'}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 max-w-md">
-                      <div className="break-words" title={tx.particulars}>
+                    <td className="px-2 py-2 text-sm text-gray-900">
+                      <div className="max-w-xs truncate" title={tx.particulars}>
                         {tx.particulars}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {tx.bank_statement ? (
-                        <div>
-                          <p className="font-medium text-gray-900">
-                            {tx.bank_statement.filename || `Statement #${tx.bank_statement.id}`}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            #{tx.bank_statement.id}
-                            {tx.bank_statement.statement_date
-                              ? ` · ${new Date(tx.bank_statement.statement_date).toLocaleDateString('en-GB')}`
-                              : ''}
-                          </p>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-400">Manual / Imported</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(tx.credit || tx.debit || 0)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tx.member?.name || '-'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-2">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          tx.assignment_status === 'auto_assigned' ? 'bg-green-100 text-green-800' :
-                          tx.assignment_status === 'manual_assigned' ? 'bg-blue-100 text-blue-800' :
-                          tx.assignment_status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {tx.assignment_status}
-                        </span>
-                        {tx.is_archived && (
-                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                            Archived
+                      <div className="md:hidden mt-1 flex flex-wrap gap-1">
+                        {tx.transaction_type && (
+                          <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-blue-100 text-blue-800">
+                            {tx.transaction_type}
                           </span>
                         )}
+                        {tx.member?.name && (
+                          <span className="text-xs text-gray-500">{tx.member.name}</span>
+                        )}
                       </div>
-                      {tx.is_archived && tx.archive_reason && (
-                        <div className="mt-1 text-xs text-gray-500">
-                          Reason: {tx.archive_reason}
+                    </td>
+                    <td className="px-2 py-2 text-sm text-gray-500 hidden xl:table-cell">
+                      {tx.bank_statement ? (
+                        <div className="max-w-xs">
+                          <div className="truncate font-medium text-gray-900" title={tx.bank_statement.filename}>
+                            {tx.bank_statement.filename || `Stmt #${tx.bank_statement.id}`}
+                          </div>
+                          <div className="text-xs text-gray-400">#{tx.bank_statement.id}</div>
                         </div>
+                      ) : (
+                        <span className="text-xs text-gray-400">Manual</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        {tx.is_archived ? (
-                          <button
-                            onClick={() => handleUnarchive(tx)}
-                            disabled={unarchiveMutation.isPending && unarchivingId === tx.id}
-                            className="text-green-600 hover:text-green-900 disabled:opacity-50"
-                          >
-                            {unarchiveMutation.isPending && unarchivingId === tx.id ? 'Restoring...' : 'Restore'}
-                          </button>
-                        ) : (
-                          <>
-                            {!tx.member_id ? (
-                              <button
-                                onClick={() => {
-                                  setSelectedTransactions([tx.id])
-                                  setShowAssignModal(true)
-                                }}
-                                className="text-indigo-600 hover:text-indigo-900"
-                              >
-                                Assign
-                              </button>
-                            ) : (
-                              <>
+                    <td className="px-2 py-2 text-sm font-semibold text-gray-900 whitespace-nowrap">
+                      {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(tx.credit || tx.debit || 0)}
+                    </td>
+                    <td className="px-2 py-2 text-sm text-gray-500 hidden md:table-cell">
+                      <div className="max-w-xs truncate" title={tx.member?.name}>
+                        {tx.member?.name || '-'}
+                      </div>
+                    </td>
+                    <td className="px-2 py-2 hidden lg:table-cell">
+                      <span className={`inline-flex px-1.5 py-0.5 text-xs font-semibold rounded-full ${
+                        tx.assignment_status === 'auto_assigned' ? 'bg-green-100 text-green-800' :
+                        tx.assignment_status === 'manual_assigned' ? 'bg-blue-100 text-blue-800' :
+                        tx.assignment_status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
+                        tx.assignment_status === 'duplicate' ? 'bg-orange-100 text-orange-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {tx.assignment_status}
+                      </span>
+                      {tx.is_archived && (
+                        <span className="ml-1 inline-flex px-1.5 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                          Archived
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-2 py-2 text-right">
+                      <div className="relative inline-block" ref={actionMenuRef}>
+                        <button
+                          onClick={() => setActionMenuOpen(actionMenuOpen === tx.id ? null : tx.id)}
+                          className="p-1 text-gray-400 hover:text-gray-600 focus:outline-none"
+                          title="Actions"
+                        >
+                          <HiEllipsisVertical className="h-5 w-5" />
+                        </button>
+                        {actionMenuOpen === tx.id && (
+                          <div className="absolute right-0 mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                            <div className="py-1">
+                              {tx.is_archived ? (
                                 <button
                                   onClick={() => {
-                                    setSelectedTransactions([tx.id])
-                                    setShowAssignModal(true)
+                                    handleUnarchive(tx)
+                                    setActionMenuOpen(null)
                                   }}
-                                  className="text-indigo-600 hover:text-indigo-900"
+                                  disabled={unarchiveMutation.isPending && unarchivingId === tx.id}
+                                  className="block w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-100 disabled:opacity-50"
                                 >
-                                  Reassign
+                                  {unarchiveMutation.isPending && unarchivingId === tx.id ? 'Restoring...' : 'Restore'}
                                 </button>
-                                <button
-                                  onClick={() => handleTransfer(tx)}
-                                  className="text-purple-600 hover:text-purple-900"
-                                >
-                                  Transfer
-                                </button>
-                              </>
-                            )}
-                            <button
-                              onClick={() => handleArchive(tx)}
-                              disabled={archiveMutation.isPending && archivingId === tx.id}
-                              className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                            >
-                              {archiveMutation.isPending && archivingId === tx.id ? 'Archiving...' : 'Archive'}
-                            </button>
-                          </>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedTransactions([tx.id])
+                                      setShowAssignModal(true)
+                                      setActionMenuOpen(null)
+                                    }}
+                                    className="block w-full text-left px-4 py-2 text-sm text-indigo-600 hover:bg-gray-100"
+                                  >
+                                    {tx.member_id ? 'Reassign' : 'Assign'}
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      handleTransfer(tx)
+                                      setActionMenuOpen(null)
+                                    }}
+                                    className="block w-full text-left px-4 py-2 text-sm text-purple-600 hover:bg-gray-100"
+                                  >
+                                    {tx.member_id ? 'Transfer/Share' : 'Assign/Share'}
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      handleArchive(tx)
+                                      setActionMenuOpen(null)
+                                    }}
+                                    disabled={archiveMutation.isPending && archivingId === tx.id}
+                                    className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 disabled:opacity-50"
+                                  >
+                                    {archiveMutation.isPending && archivingId === tx.id ? 'Archiving...' : 'Archive'}
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </div>
                         )}
                       </div>
                     </td>
@@ -745,15 +812,36 @@ export default function Transactions({ initialArchivedFilter = 'active', isArchi
           </table>
         </div>
         {pagination && (pagination.last_page > 1 || pagination.total > 0) && (
-          <Pagination
-            pagination={{
-              current_page: pagination.current_page || data?.current_page || page,
-              last_page: pagination.last_page || data?.last_page || 1,
-              per_page: pagination.per_page || data?.per_page || 20,
-              total: pagination.total || data?.total || 0,
-            }}
-            onPageChange={(newPage) => setPage(newPage)}
-          />
+          <div className="border-t border-gray-200 bg-gray-50 px-4 py-3 sm:px-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-700">Show</span>
+                <select
+                  value={perPage}
+                  onChange={(e) => {
+                    setPerPage(Number(e.target.value))
+                    setPage(1)
+                  }}
+                  className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                >
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={200}>200</option>
+                </select>
+                <span className="text-sm text-gray-700">per page</span>
+              </div>
+              <Pagination
+                pagination={{
+                  current_page: pagination.current_page || data?.current_page || page,
+                  last_page: pagination.last_page || data?.last_page || 1,
+                  per_page: perPage,
+                  total: pagination.total || data?.total || 0,
+                }}
+                onPageChange={(newPage) => setPage(newPage)}
+              />
+            </div>
+          </div>
         )}
       </div>
 
@@ -771,25 +859,37 @@ export default function Transactions({ initialArchivedFilter = 'active', isArchi
               <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="sm:flex sm:items-start">
                   <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">Transfer Transaction</h3>
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">
+                      {selectedTransaction.member_id ? 'Transfer Transaction' : 'Assign Transaction'}
+                    </h3>
                     <p className="mt-1 text-sm text-gray-500">
                       Amount:{' '}
                       {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(selectedTransaction.credit || selectedTransaction.debit || 0)}{' '}
-                      {selectedTransaction.member?.name ? `• Currently assigned to ${selectedTransaction.member.name}` : ''}
+                      {selectedTransaction.member?.name ? `• Currently assigned to ${selectedTransaction.member.name}` : '• Unassigned'}
                     </p>
 
-                    <div className="mt-4 flex items-center gap-2">
-                      <input
-                        id="share-mode"
-                        type="checkbox"
-                        checked={isShareMode}
-                        onChange={(e) => handleShareModeToggle(e.target.checked, selectedTransaction)}
-                        className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
-                      />
-                      <label htmlFor="share-mode" className="text-sm text-gray-700">
-                        Share this deposit among multiple members
-                      </label>
-                    </div>
+                    {selectedTransaction.member_id && (
+                      <div className="mt-4 flex items-center gap-2">
+                        <input
+                          id="share-mode"
+                          type="checkbox"
+                          checked={isShareMode}
+                          onChange={(e) => handleShareModeToggle(e.target.checked, selectedTransaction)}
+                          className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                        />
+                        <label htmlFor="share-mode" className="text-sm text-gray-700">
+                          Share this deposit among multiple members
+                        </label>
+                      </div>
+                    )}
+                    
+                    {!selectedTransaction.member_id && (
+                      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                        <p className="text-sm text-blue-800">
+                          This transaction is unassigned. You can assign it to a single member or share it among multiple members.
+                        </p>
+                      </div>
+                    )}
 
                     {isShareMode ? (
                       <div className="mt-4 space-y-4">
@@ -887,8 +987,8 @@ export default function Transactions({ initialArchivedFilter = 'active', isArchi
                         className="inline-flex justify-center w-full sm:w-auto rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm disabled:opacity-50"
                       >
                         {isShareMode
-                          ? (splitMutation.isPending ? 'Sharing...' : 'Share Deposit')
-                          : (transferMutation.isPending ? 'Transferring...' : 'Transfer')}
+                          ? (transferMutation.isPending ? 'Assigning...' : (selectedTransaction.member_id ? 'Share Deposit' : 'Assign to Members'))
+                          : (transferMutation.isPending ? 'Transferring...' : (selectedTransaction.member_id ? 'Transfer' : 'Assign'))}
                       </button>
                       <button
                         onClick={resetTransferState}

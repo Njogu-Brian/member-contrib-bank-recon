@@ -3,8 +3,11 @@
 namespace App\Jobs;
 
 use App\Models\BankStatement;
+use App\Models\Member;
 use App\Models\StatementDuplicate;
 use App\Models\Transaction;
+use App\Models\TransactionMatchLog;
+use App\Services\MatchingService;
 use App\Services\OcrParserService;
 use App\Services\TransactionParserService;
 use Illuminate\Bus\Queueable;
@@ -12,244 +15,329 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Illuminate\Support\Carbon;
 
 class ProcessBankStatement implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public function __construct(
-        public BankStatement $bankStatement
+        public BankStatement $statement
     ) {}
 
-    public function handle(OcrParserService $ocrParser, TransactionParserService $parser): void
-    {
+    public function handle(
+        OcrParserService $ocrParser,
+        MatchingService $matchingService,
+        TransactionParserService $parser
+    ): void {
+        $this->statement->update(['status' => 'processing']);
+
         try {
-            $this->bankStatement->update(['status' => 'processing']);
-            StatementDuplicate::where('bank_statement_id', $this->bankStatement->id)->delete();
+            // Step 1: Parse PDF using OCR parser
+            $rows = $ocrParser->parsePdf($this->statement->file_path);
 
-            $transactions = $ocrParser->parsePdf($this->bankStatement->file_path);
-
-            $savedCount = 0;
-            $duplicateCount = 0;
-
-            foreach ($transactions as $transactionData) {
-                // Normalize transaction
-                $normalized = $this->normalizeTransaction($transactionData, $parser);
-
-                // Skip transactions with invalid or zero credit amounts
-                if (($normalized['credit'] ?? 0) <= 0) {
-                    continue;
-                }
-
-                // Check duplicate by transaction code
-                if (!empty($normalized['transaction_code'])) {
-                    $existingByCode = Transaction::where('transaction_code', $normalized['transaction_code'])->first();
-                    if ($existingByCode) {
-                        $duplicateCount++;
-                        $this->recordDuplicate('transaction_code', $transactionData, $normalized, $existingByCode);
-                        continue;
-                    }
-                }
-
-                // If no transaction code, check for duplicates using date + amount + particulars
-                if (empty($normalized['transaction_code'])) {
-                    $normalizedParticularsKey = $this->normalizeParticularsForDuplicate($normalized['particulars'] ?? '');
-                    $possibleDuplicate = Transaction::query()
-                        ->whereDate('tran_date', $normalized['tran_date'])
-                        ->where('credit', $normalized['credit'])
-                        ->where('debit', $normalized['debit'])
-                        ->where('bank_statement_id', '!=', $this->bankStatement->id)
-                        ->get()
-                        ->first(function ($existing) use ($normalizedParticularsKey) {
-                            return $this->normalizeParticularsForDuplicate($existing->particulars) === $normalizedParticularsKey;
-                        });
-
-                    if ($possibleDuplicate) {
-                        $duplicateCount++;
-                        $this->recordDuplicate('cross_statement', $transactionData, $normalized, $possibleDuplicate);
-                        continue;
-                    }
-                }
-
-                // Create row hash for duplicate detection
-                $rowHash = $this->createRowHash($normalized);
-
-                // Check for duplicates
-                $existingByHash = Transaction::where('row_hash', $rowHash)->first();
-                if ($existingByHash) {
-                    $duplicateCount++;
-                    $this->recordDuplicate(
-                        $existingByHash->bank_statement_id === $this->bankStatement->id ? 'same_statement' : 'row_hash',
-                        $transactionData,
-                        $normalized,
-                        $existingByHash
-                    );
-                    continue;
-                }
-
-                // Check if transaction should be flagged (large amount)
-                $assignmentStatus = 'unassigned';
-                if (isset($transactionData['flagged']) && $transactionData['flagged']) {
-                    $assignmentStatus = 'flagged';
-                }
-                
-                // Store transaction
-                Transaction::create([
-                    'bank_statement_id' => $this->bankStatement->id,
-                    'tran_date' => $normalized['tran_date'],
-                    'value_date' => $normalized['value_date'] ?? $normalized['tran_date'],
-                    'particulars' => $normalized['particulars'],
-                    'transaction_type' => $normalized['transaction_type'],
-                    'credit' => $normalized['credit'] ?? 0,
-                    'debit' => $normalized['debit'] ?? 0,
-                    'balance' => $normalized['balance'] ?? null,
-                    'transaction_code' => $normalized['transaction_code'],
-                    'phones' => $normalized['phones'],
-                    'row_hash' => $rowHash,
-                    'raw_text' => $normalized['particulars'],
-                    'raw_json' => $transactionData,
-                    'assignment_status' => $assignmentStatus,
-                ]);
-
-                $savedCount++;
+            if (empty($rows)) {
+                throw new \Exception('No transactions extracted from PDF');
             }
 
-            $this->bankStatement->update([
-                'status' => 'completed',
-                'raw_metadata' => [
-                    'transactions_found' => count($transactions),
-                    'transactions_saved' => $savedCount,
-                    'duplicates_skipped' => $duplicateCount,
-                ],
+            // Step 2: Normalize and extract data
+            $transactions = [];
+            $members = Member::where('is_active', true)->get()->toArray();
+            $threshold = (float) config('app.ai_matching_threshold', 0.85);
+
+            foreach ($rows as $row) {
+                $parsed = $parser->parseParticulars($row['particulars'] ?? '');
+
+                // For Paybill, transaction_code comes from Receipt No. column
+                $isPaybillTransaction = isset($row['transaction_code']) && !empty($row['transaction_code']);
+
+                if ($isPaybillTransaction) {
+                    $transactionType = 'M-Pesa Paybill';
+                    $transactionCode = $row['transaction_code'];
+                } else {
+                    $transactionCode = $parsed['transaction_code'] ?? null;
+                    $transactionType = $parsed['transaction_type'] ?? null;
+                }
+
+                $phones = $parsed['phone_numbers'] ?? [];
+
+                // Skip debit-only transactions
+                if (($row['debit'] ?? 0) > 0 && ($row['credit'] ?? 0) == 0) {
+                    continue;
+                }
+
+                // Only process rows with credit value
+                if (($row['credit'] ?? 0) == 0) {
+                    continue;
+                }
+
+                // Create row hash for duplicate detection (date + description + amount)
+                $rowHash = $this->fingerprintTransactionRow($row);
+
+                $transactions[] = [
+                    'bank_statement_id' => $this->statement->id,
+                    'tran_date' => $row['tran_date'] ?? now(),
+                    'value_date' => $row['value_date'] ?? null,
+                    'particulars' => $row['particulars'] ?? '',
+                    'transaction_type' => $transactionType,
+                    'credit' => (float) ($row['credit'] ?? 0),
+                    'debit' => (float) ($row['debit'] ?? 0),
+                    'balance' => isset($row['balance']) ? (float) $row['balance'] : null,
+                    'transaction_code' => $transactionCode,
+                    'phones' => $phones,
+                    'row_hash' => $rowHash,
+                    'raw_text' => $row['particulars'] ?? '',
+                    'raw_json' => array_merge($row, [
+                        'fingerprint' => $rowHash,
+                    ]),
+                    'assignment_status' => 'unassigned',
+                ];
+            }
+
+            Log::info('Normalized transactions prepared', [
+                'statement_id' => $this->statement->id,
+                'count' => count($transactions),
             ]);
 
-            Log::info("Bank statement processed successfully", [
-                'statement_id' => $this->bankStatement->id,
-                'saved' => $savedCount,
-                'duplicates' => $duplicateCount,
-            ]);
+            // Step 3: Batch match transactions
+            if (!empty($transactions) && !empty($members)) {
+                $matchData = array_map(function ($tran, $idx) {
+                    return [
+                        'client_tran_id' => 't_' . $idx,
+                        'tran_date' => is_string($tran['tran_date']) ? $tran['tran_date'] : $tran['tran_date']->format('Y-m-d'),
+                        'particulars' => $tran['particulars'],
+                        'credit' => $tran['credit'],
+                        'transaction_code' => $tran['transaction_code'],
+                        'phones' => $tran['phones'] ?? [],
+                    ];
+                }, $transactions, array_keys($transactions));
 
+                $matches = $matchingService->matchBatch($matchData, $members);
+
+                $matchMap = [];
+                foreach ($matches as $match) {
+                    $tranId = str_replace('t_', '', $match['client_tran_id']);
+                    $matchMap[$tranId] = $match;
+                }
+
+                DB::beginTransaction();
+                try {
+                    foreach ($transactions as $idx => $tranData) {
+                        $match = $matchMap[$idx] ?? null;
+
+                        if ($match && $match['confidence'] >= $threshold && $match['candidate_member_id']) {
+                            $tranData['member_id'] = $match['candidate_member_id'];
+                            $tranData['assignment_status'] = 'auto_assigned';
+                            $tranData['match_confidence'] = $match['confidence'];
+                        }
+
+                        $transaction = Transaction::create($tranData);
+
+                        if ($match) {
+                            TransactionMatchLog::create([
+                                'transaction_id' => $transaction->id,
+                                'member_id' => $match['candidate_member_id'] ?? null,
+                                'confidence' => $match['confidence'],
+                                'match_tokens' => $match['match_tokens'] ?? [],
+                                'match_reason' => $match['match_reason'] ?? '',
+                                'source' => 'ai',
+                            ]);
+                        }
+                    }
+
+                    DB::commit();
+                } catch (\Exception $e) {
+                    DB::rollBack();
+                    throw $e;
+                }
+            } else {
+                $this->insertTransactionsWithoutMatching($transactions);
+            }
+
+            $this->flagCrossStatementDuplicates();
+            $this->flagIntraStatementDuplicates();
+
+            $this->statement->update(['status' => 'completed']);
+
+            Log::info('Statement processing complete', [
+                'statement_id' => $this->statement->id,
+                'transactions_persisted' => Transaction::where('bank_statement_id', $this->statement->id)->count(),
+            ]);
         } catch (\Exception $e) {
-            $this->bankStatement->update([
-                'status' => 'failed',
-                'error_message' => $e->getMessage(),
-            ]);
-
-            Log::error("Bank statement processing failed", [
-                'statement_id' => $this->bankStatement->id,
+            Log::error('Failed to process bank statement', [
+                'statement_id' => $this->statement->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
+            ]);
+
+            $this->statement->update([
+                'status' => 'failed',
+                'error_message' => $e->getMessage(),
             ]);
 
             throw $e;
         }
     }
 
-    protected function normalizeTransaction(array $data, TransactionParserService $parser): array
+    protected function extractTransactionCode(string $text): ?string
     {
-        $particulars = $data['particulars'] ?? '';
-        $parsed = $parser->parseParticulars($particulars);
-
-        // Validate and sanitize credit amount
-        $credit = floatval($data['credit'] ?? 0);
-        // Max value for decimal(15,2) is 999999999999999.99
-        // But be more conservative - reject anything over 1 billion
-        if ($credit > 1000000000 || $credit < 0) {
-            Log::warning("Invalid credit amount detected", [
-                'credit' => $credit,
-                'particulars' => $particulars,
-                'raw_data' => $data,
-            ]);
-            $credit = 0;
+        if (preg_match('/\b([A-Z0-9]{6,12})\b/', $text, $matches)) {
+            return $matches[1];
         }
 
-        // Validate and sanitize debit amount
-        $debit = floatval($data['debit'] ?? 0);
-        if ($debit > 1000000000 || $debit < 0) {
-            Log::warning("Invalid debit amount detected", [
-                'debit' => $debit,
-                'particulars' => $particulars,
-                'raw_data' => $data,
-            ]);
-            $debit = 0;
-        }
+        return null;
+    }
 
-        // Validate balance
-        $balance = null;
-        if (isset($data['balance'])) {
-            $balance = floatval($data['balance']);
-            if ($balance > 1000000000 || $balance < -1000000000) {
-                $balance = null;
+    protected function extractPhones(string $text): array
+    {
+        $phones = [];
+
+        if (preg_match_all('/(?:\+?254|0)?(?:7[0-9]|1[0-9])[0-9]{7}/', $text, $matches)) {
+            foreach ($matches[0] as $phone) {
+                $phone = preg_replace('/^0/', '+254', $phone);
+                $phone = preg_replace('/^254/', '+254', $phone);
+                if (!str_starts_with($phone, '+')) {
+                    $phone = '+254' . $phone;
+                }
+                $phones[] = $phone;
             }
         }
 
-        return [
-            'tran_date' => $data['tran_date'] ?? now()->toDateString(),
-            'value_date' => $data['value_date'] ?? $data['tran_date'] ?? now()->toDateString(),
-            'particulars' => $particulars,
-            'transaction_type' => $parsed['transaction_type'],
-            'credit' => $credit,
-            'debit' => $debit,
-            'balance' => $balance,
-            'transaction_code' => $parsed['transaction_code'] ?? $data['transaction_code'] ?? null,
-            'phones' => $parsed['phones'],
-        ];
+        return array_unique($phones);
     }
 
-    protected function createRowHash(array $transaction): string
+    protected function insertTransactionsWithoutMatching(array $transactions): void
     {
-        $normalizedParticulars = $this->normalizeParticularsForDuplicate($transaction['particulars'] ?? '');
+        $bulkPayload = array_map(function (array $tran) {
+            if (isset($tran['phones']) && is_array($tran['phones'])) {
+                $tran['phones'] = json_encode(array_values($tran['phones']));
+            }
 
-        $hashString = sprintf(
-            '%s|%s|%s|%s|%s',
-            $transaction['tran_date'],
-            $normalizedParticulars,
-            $transaction['credit'],
-            $transaction['debit'],
-            $transaction['transaction_code'] ?? ''
-        );
+            if (isset($tran['raw_json']) && is_array($tran['raw_json'])) {
+                $tran['raw_json'] = json_encode($tran['raw_json']);
+            }
 
-        return hash('sha256', $hashString);
+            return $tran;
+        }, $transactions);
+
+        Transaction::insert($bulkPayload);
     }
 
-    protected function recordDuplicate(string $reason, array $transactionData, array $normalized, ?Transaction $existing = null): void
+    protected function flagCrossStatementDuplicates(): void
     {
-        try {
-            $pageNumber = $transactionData['page_number'] ?? $transactionData['page'] ?? null;
+        $duplicates = Transaction::where('bank_statement_id', $this->statement->id)
+            ->whereExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('transactions as prior')
+                    ->whereColumn('prior.row_hash', 'transactions.row_hash')
+                    ->where('prior.bank_statement_id', '!=', DB::raw('transactions.bank_statement_id'))
+                    ->where('prior.id', '<', DB::raw('transactions.id'));
+            })
+            ->get();
 
-            StatementDuplicate::create([
-                'bank_statement_id' => $this->bankStatement->id,
-                'transaction_id' => $existing?->id,
-                'page_number' => $pageNumber,
-                'transaction_code' => $normalized['transaction_code'] ?? null,
-                'tran_date' => $normalized['tran_date'] ?? null,
-                'credit' => $normalized['credit'] ?? null,
-                'debit' => $normalized['debit'] ?? null,
-                'duplicate_reason' => $reason,
-                'particulars_snapshot' => $normalized['particulars'] ?? null,
-                'metadata' => [
-                    'existing_transaction_id' => $existing?->id,
-                    'existing_statement_id' => $existing?->bank_statement_id,
-                    'existing_assignment_status' => $existing?->assignment_status,
-                    'source_row_hash' => $existing?->row_hash,
-                    'raw_transaction' => $transactionData,
+        foreach ($duplicates as $transaction) {
+            $existing = Transaction::where('row_hash', $transaction->row_hash)
+                ->where('bank_statement_id', '!=', $this->statement->id)
+                ->orderBy('tran_date')
+                ->first();
+
+            if (! $existing) {
+                continue;
+            }
+
+            if ($transaction->assignment_status !== 'duplicate') {
+                $transaction->assignment_status = 'duplicate';
+                $transaction->save();
+            }
+
+            StatementDuplicate::updateOrCreate(
+                [
+                    'bank_statement_id' => $this->statement->id,
+                    'transaction_id' => $existing->id,
+                    'tran_date' => $transaction->tran_date,
+                    'transaction_code' => $transaction->transaction_code,
                 ],
-            ]);
-        } catch (\Throwable $e) {
-            Log::warning('Failed to record duplicate transaction', [
-                'statement_id' => $this->bankStatement->id,
-                'reason' => $reason,
-                'error' => $e->getMessage(),
-            ]);
+                [
+                    'credit' => $transaction->credit,
+                    'duplicate_reason' => 'cross_statement',
+                    'particulars_snapshot' => $transaction->particulars,
+                    'metadata' => [
+                        'duplicate_transaction_id' => $transaction->id,
+                        'existing_statement_id' => $existing->bank_statement_id,
+                    ],
+                ]
+            );
         }
     }
 
-    protected function normalizeParticularsForDuplicate(?string $value): string
+    protected function flagIntraStatementDuplicates(): void
     {
-        $value = $value ?? '';
-        $value = preg_replace("/\s+/u", ' ', trim($value));
-        return mb_strtolower($value);
+        $duplicateHashes = Transaction::select('row_hash')
+            ->where('bank_statement_id', $this->statement->id)
+            ->groupBy('row_hash')
+            ->havingRaw('COUNT(*) > 1')
+            ->pluck('row_hash');
+
+        foreach ($duplicateHashes as $rowHash) {
+            $transactions = Transaction::where('bank_statement_id', $this->statement->id)
+                ->where('row_hash', $rowHash)
+                ->orderBy('id')
+                ->get();
+
+            if ($transactions->count() < 2) {
+                continue;
+            }
+
+            $primary = $transactions->shift();
+
+            foreach ($transactions as $duplicate) {
+                if ($duplicate->assignment_status !== 'duplicate') {
+                    $duplicate->assignment_status = 'duplicate';
+                    $duplicate->save();
+                }
+
+                StatementDuplicate::updateOrCreate(
+                    [
+                        'bank_statement_id' => $this->statement->id,
+                        'transaction_id' => $primary->id,
+                        'tran_date' => $duplicate->tran_date,
+                        'transaction_code' => $duplicate->transaction_code,
+                    ],
+                    [
+                        'credit' => $duplicate->credit,
+                    'duplicate_reason' => 'intra_statement',
+                        'particulars_snapshot' => $duplicate->particulars,
+                        'metadata' => [
+                            'duplicate_transaction_id' => $duplicate->id,
+                            'existing_statement_id' => $primary->bank_statement_id,
+                        ],
+                    ]
+                );
+            }
+        }
+
+    }
+
+    protected function fingerprintTransactionRow(array $row): string
+    {
+        $date = isset($row['tran_date']) && $row['tran_date']
+            ? Carbon::parse($row['tran_date'])->toDateString()
+            : '';
+
+        $particulars = $this->normalizeParticulars($row['particulars'] ?? '');
+        $amount = number_format((float) ($row['credit'] ?? 0), 2, '.', '');
+
+        return sha1(implode('|', [$date, $particulars, $amount]));
+    }
+
+    protected function normalizeParticulars(string $value): string
+    {
+        $normalized = preg_replace('/\s+/', ' ', trim($value));
+        return Str::upper($normalized);
     }
 }
 

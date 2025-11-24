@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getMember, updateMember, getMemberStatement, exportMemberStatement } from '../api/members'
@@ -6,6 +6,7 @@ import { getMemberAuditResults } from '../api/audit'
 import MemberSearchModal from '../components/MemberSearchModal'
 import { transferTransaction, splitTransaction, bulkAssign } from '../api/transactions'
 import Pagination from '../components/Pagination'
+import { HiEllipsisVertical } from 'react-icons/hi2'
 
 const buildStatusBadgeStyle = (hex) => {
   if (!hex) return {}
@@ -33,6 +34,7 @@ export default function MemberProfile() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(25)
   const [showEditModal, setShowEditModal] = useState(false)
   const [activeTab, setActiveTab] = useState('statement')
   const [formData, setFormData] = useState({})
@@ -48,7 +50,20 @@ export default function MemberProfile() {
   const [activeShareIndex, setActiveShareIndex] = useState(null)
   const [selectedMonthDetail, setSelectedMonthDetail] = useState(null)
   const [exportingFormat, setExportingFormat] = useState(null)
+  const [actionMenuOpen, setActionMenuOpen] = useState(null)
+  const actionMenuRef = useRef(null)
   const queryClient = useQueryClient()
+
+  // Close action menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (actionMenuRef.current && !actionMenuRef.current.contains(event.target)) {
+        setActionMenuOpen(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const { data: member, isLoading } = useQuery({
     queryKey: ['member', id],
@@ -57,8 +72,8 @@ export default function MemberProfile() {
   })
 
   const { data: statementData, isLoading: isStatementLoading } = useQuery({
-    queryKey: ['member-statement', id, page],
-    queryFn: () => getMemberStatement(id, { page }),
+    queryKey: ['member-statement', id, page, perPage],
+    queryFn: () => getMemberStatement(id, { page, per_page: perPage }),
     enabled: !!id,
   })
 
@@ -554,23 +569,23 @@ export default function MemberProfile() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Statement</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                      <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                      <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                      <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                      <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Statement</th>
+                      <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Reference</th>
+                      <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                      <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {statementEntries.map((item, idx) => (
-                      <tr key={idx}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <tr key={idx} className="hover:bg-gray-50">
+                        <td className="px-2 py-2 text-sm text-gray-500 whitespace-nowrap">
                           {new Date(item.date).toLocaleDateString('en-GB')}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        <td className="px-2 py-2 text-sm text-gray-500">
+                          <span className={`inline-flex px-1.5 py-0.5 text-xs font-semibold rounded-full ${
                             item.type === 'contribution'
                               ? 'bg-green-100 text-green-800'
                               : item.type === 'shared_contribution'
@@ -588,45 +603,76 @@ export default function MemberProfile() {
                               : 'Manual'}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-900">{item.description}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-2 py-2 text-sm text-gray-900">
+                          <div className="max-w-xs truncate" title={item.description}>
+                            {item.description}
+                          </div>
+                          <div className="md:hidden mt-1 text-xs text-gray-500">
+                            {item.reference && <span>Ref: {item.reference}</span>}
+                          </div>
+                        </td>
+                        <td className="px-2 py-2 text-sm text-gray-500 hidden lg:table-cell">
                           {item.statement_id ? (
                             <button
                               type="button"
                               onClick={() => navigate(`/statements/${item.statement_id}`)}
-                              className="text-indigo-600 hover:text-indigo-900 underline"
+                              className="text-indigo-600 hover:text-indigo-900 underline text-xs max-w-xs truncate block"
+                              title={item.statement_name || `Statement #${item.statement_id}`}
                             >
-                              {item.statement_name || `Statement #${item.statement_id}`}
+                              {item.statement_name || `Stmt #${item.statement_id}`}
                             </button>
                           ) : (
                             <span className="text-gray-400">-</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.reference || '-'}</td>
-                        <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium text-right ${
+                        <td className="px-2 py-2 text-sm text-gray-500 hidden md:table-cell">
+                          <div className="max-w-xs truncate" title={item.reference}>
+                            {item.reference || '-'}
+                          </div>
+                        </td>
+                        <td className={`px-2 py-2 text-sm font-semibold text-right whitespace-nowrap ${
                           item.amount >= 0 ? 'text-green-600' : 'text-red-600'
                         }`}>
-                          {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(item.amount)}
+                          {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(item.amount)}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                        <td className="px-2 py-2 text-right">
                           {item.transaction_id && !item.is_split ? (
-                            <div className="flex justify-end space-x-2">
+                            <div className="relative inline-block" ref={actionMenuRef}>
                               <button
-                                onClick={() => handleTransactionReassign(item)}
-                                className="text-indigo-600 hover:text-indigo-900"
+                                onClick={() => setActionMenuOpen(actionMenuOpen === idx ? null : idx)}
+                                className="p-1 text-gray-400 hover:text-gray-600 focus:outline-none"
+                                title="Actions"
                               >
-                                Reassign
+                                <HiEllipsisVertical className="h-5 w-5" />
                               </button>
-                              <button
-                                onClick={() => handleTransactionTransfer(item)}
-                                className="text-purple-600 hover:text-purple-900"
-                              >
-                                Transfer
-                              </button>
+                              {actionMenuOpen === idx && (
+                                <div className="absolute right-0 mt-1 w-40 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                                  <div className="py-1">
+                                    <button
+                                      onClick={() => {
+                                        handleTransactionReassign(item)
+                                        setActionMenuOpen(null)
+                                      }}
+                                      className="block w-full text-left px-4 py-2 text-sm text-indigo-600 hover:bg-gray-100"
+                                    >
+                                      Reassign
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        handleTransactionTransfer(item)
+                                        setActionMenuOpen(null)
+                                      }}
+                                      className="block w-full text-left px-4 py-2 text-sm text-purple-600 hover:bg-gray-100"
+                                    >
+                                      Transfer
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <span className="text-xs text-gray-400">
-                              {item.is_split ? 'Shared allocation' : 'Manual'}
+                              {item.is_split ? 'Shared' : 'Manual'}
                             </span>
                           )}
                         </td>
@@ -638,20 +684,39 @@ export default function MemberProfile() {
             </div>
           </div>
           {(pagination?.last_page || 1) > 1 && (
-            <div className="mt-6">
-              <Pagination
-                pagination={{
-                  current_page: pagination?.current_page || page,
-                  last_page: pagination?.last_page || 1,
-                  per_page: pagination?.per_page || statementData?.pagination?.per_page || 25,
-                  total: pagination?.total ?? statementData?.pagination?.total ?? statementEntries.length,
-                }}
-                onPageChange={(newPage) => {
-                  if (newPage >= 1 && newPage <= (pagination?.last_page || 1)) {
-                    setPage(newPage)
-                  }
-                }}
-              />
+            <div className="mt-6 border-t border-gray-200 bg-gray-50 px-4 py-3 sm:px-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-gray-700">Show</span>
+                  <select
+                    value={perPage}
+                    onChange={(e) => {
+                      setPerPage(Number(e.target.value))
+                      setPage(1)
+                    }}
+                    className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                  >
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={200}>200</option>
+                  </select>
+                  <span className="text-sm text-gray-700">per page</span>
+                </div>
+                <Pagination
+                  pagination={{
+                    current_page: pagination?.current_page || page,
+                    last_page: pagination?.last_page || 1,
+                    per_page: perPage,
+                    total: pagination?.total ?? statementData?.pagination?.total ?? statementEntries.length,
+                  }}
+                  onPageChange={(newPage) => {
+                    if (newPage >= 1 && newPage <= (pagination?.last_page || 1)) {
+                      setPage(newPage)
+                    }
+                  }}
+                />
+              </div>
             </div>
           )}
           {statementEntries.some((item) => item.type === 'expense') && (

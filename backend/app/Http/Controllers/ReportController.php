@@ -19,8 +19,9 @@ class ReportController extends Controller
         $startDate = $request->get('start_date');
         $endDate = $request->get('end_date');
         
-        // Total contributions
+        // Total contributions - exclude duplicates and archived
         $totalContributions = Transaction::where('assignment_status', '!=', 'unassigned')
+            ->where('assignment_status', '!=', 'duplicate')
             ->where('is_archived', false)
             ->when($startDate, fn($q) => $q->where('tran_date', '>=', $startDate))
             ->when($endDate, fn($q) => $q->where('tran_date', '<=', $endDate))
@@ -31,9 +32,10 @@ class ReportController extends Controller
             ->when($endDate, fn($q) => $q->where('contribution_date', '<=', $endDate))
             ->sum('amount');
         
-        // Transaction status counts
+        // Transaction status counts - exclude duplicates and archived
         $transactionStats = Transaction::query()
             ->where('is_archived', false)
+            ->where('assignment_status', '!=', 'duplicate')
             ->when($startDate, fn($q) => $q->where('tran_date', '>=', $startDate))
             ->when($endDate, fn($q) => $q->where('tran_date', '<=', $endDate))
             ->selectRaw('assignment_status, COUNT(*) as count')
@@ -96,6 +98,7 @@ class ReportController extends Controller
         $period = $request->get('period', 'weekly'); // weekly, monthly, yearly
         
         $query = Transaction::where('assignment_status', '!=', 'unassigned')
+            ->where('assignment_status', '!=', 'duplicate')
             ->where('is_archived', false)
             ->selectRaw('DATE(tran_date) as date, SUM(credit) as total');
         
@@ -126,6 +129,7 @@ class ReportController extends Controller
     public function deposits(Request $request)
     {
         $baseQuery = Transaction::where('assignment_status', '!=', 'unassigned')
+            ->where('assignment_status', '!=', 'duplicate')
             ->where('is_archived', false);
 
         $now = Carbon::now();

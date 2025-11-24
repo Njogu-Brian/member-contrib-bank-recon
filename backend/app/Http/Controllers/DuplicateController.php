@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\StatementDuplicate;
+use App\Models\Transaction;
+use App\Models\BankStatement;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 
 class DuplicateController extends Controller
 {
@@ -12,6 +15,7 @@ class DuplicateController extends Controller
         $perPage = (int) $request->input('per_page', 25);
         $perPage = max(1, min(100, $perPage));
 
+        // Get duplicates from statement_duplicates table
         $query = StatementDuplicate::with(['statement', 'transaction.member'])
             ->orderByDesc('id');
 
@@ -45,6 +49,7 @@ class DuplicateController extends Controller
                     'uploaded_at' => optional($duplicate->statement->created_at)->toDateTimeString(),
                 ] : null,
                 'duplicate' => [
+                    'transaction_id' => $duplicate->metadata['duplicate_transaction_id'] ?? null,
                     'tran_date' => optional($duplicate->tran_date)->toDateString(),
                     'credit' => $duplicate->credit,
                     'debit' => $duplicate->debit,
@@ -72,6 +77,29 @@ class DuplicateController extends Controller
         });
 
         return response()->json($duplicates);
+    }
+
+    public function reanalyze(Request $request)
+    {
+        $statementId = $request->input('statement_id');
+
+        try {
+            Artisan::call('evimeria:reanalyze-duplicates', [
+                '--statement-id' => $statementId,
+            ]);
+
+            $output = Artisan::output();
+
+            return response()->json([
+                'message' => 'Duplicate reanalysis completed successfully',
+                'output' => $output,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to reanalyze duplicates',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 }
 
