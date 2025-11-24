@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Jobs\ProcessBankStatement;
 use App\Models\BankStatement;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 
 class StatementController extends Controller
@@ -14,7 +14,10 @@ class StatementController extends Controller
     public function index(Request $request)
     {
         try {
-            $query = BankStatement::query()->withCount('transactions');
+            $query = BankStatement::query()
+                ->withCount('transactions')
+                ->withSum('transactions as total_credit', 'credit')
+                ->withSum('transactions as total_debit', 'debit');
 
             if ($request->filled('status')) {
                 $query->where('status', $request->status);
@@ -31,6 +34,10 @@ class StatementController extends Controller
                     // If there's an error, set it to null
                     $statement->setAttribute('raw_metadata', null);
                 }
+
+                $statement->total_credit = (float) ($statement->total_credit ?? 0);
+                $statement->total_debit = (float) ($statement->total_debit ?? 0);
+
                 return $statement;
             });
             
@@ -46,13 +53,50 @@ class StatementController extends Controller
 
     public function show(BankStatement $statement)
     {
-        $statement->load('transactions');
-        return response()->json($statement);
+        $transactionsQuery = $statement->transactions();
+
+        $aggregate = (clone $transactionsQuery)
+            ->selectRaw('COUNT(*) as total_transactions, SUM(credit) as total_credit, SUM(debit) as total_debit, MIN(tran_date) as first_tran_date, MAX(tran_date) as last_tran_date')
+            ->first();
+
+        $assignmentBreakdown = (clone $transactionsQuery)
+            ->selectRaw("COALESCE(assignment_status, 'unassigned') as status, COUNT(*) as count")
+            ->groupBy('status')
+            ->pluck('count', 'status')
+            ->map(fn ($count) => (int) $count)
+            ->toArray();
+
+        $archivedCount = (clone $transactionsQuery)->where('is_archived', true)->count();
+        $unassignedMembers = (clone $transactionsQuery)->whereNull('member_id')->count();
+        $duplicateCount = $statement->duplicates()->count();
+
+        return response()->json(array_merge($statement->toArray(), [
+            'metrics' => [
+                'total_transactions' => (int) ($aggregate->total_transactions ?? 0),
+                'total_credit' => (float) ($aggregate->total_credit ?? 0),
+                'total_debit' => (float) ($aggregate->total_debit ?? 0),
+                'first_transaction_date' => $aggregate->first_tran_date ? \Illuminate\Support\Carbon::parse($aggregate->first_tran_date)->toDateString() : null,
+                'last_transaction_date' => $aggregate->last_tran_date ? \Illuminate\Support\Carbon::parse($aggregate->last_tran_date)->toDateString() : null,
+                'assignment_breakdown' => array_merge([
+                    'auto_assigned' => 0,
+                    'manual_assigned' => 0,
+                    'draft' => 0,
+                    'unassigned' => 0,
+                    'duplicate' => 0,
+                    'transferred' => 0,
+                ], $assignmentBreakdown),
+                'archived_transactions' => $archivedCount,
+                'unassigned_members' => $unassignedMembers,
+                'duplicates' => $duplicateCount,
+            ],
+        ]));
     }
 
     public function documentMetadata(BankStatement $statement)
     {
         $statement->load(['transactions.member', 'duplicates.transaction']);
+        $transactionsCollection = $statement->transactions;
+        $duplicatesCollection = $statement->duplicates;
 
         $transactions = $statement->transactions->map(function ($transaction) {
             return [
@@ -98,6 +142,46 @@ class StatementController extends Controller
             ];
         });
 
+        $totalCredit = $transactionsCollection->sum(function ($transaction) {
+            return (float) $transaction->credit;
+        });
+
+        $totalDebit = $transactionsCollection->sum(function ($transaction) {
+            return (float) $transaction->debit;
+        });
+
+        $firstTransaction = $transactionsCollection->sortBy('tran_date')->first();
+        $lastTransaction = $transactionsCollection->sortByDesc('tran_date')->first();
+
+        $assignmentBreakdown = $transactionsCollection
+            ->groupBy(function ($transaction) {
+                return $transaction->assignment_status ?? 'unassigned';
+            })
+            ->map(function ($group) {
+                return $group->count();
+            })
+            ->map(fn ($count) => (int) $count)
+            ->toArray();
+
+        $metrics = [
+            'total_transactions' => $transactionsCollection->count(),
+            'total_credit' => $totalCredit,
+            'total_debit' => $totalDebit,
+            'first_transaction_date' => optional($firstTransaction?->tran_date)->toDateString(),
+            'last_transaction_date' => optional($lastTransaction?->tran_date)->toDateString(),
+            'assignment_breakdown' => array_merge([
+                'auto_assigned' => 0,
+                'manual_assigned' => 0,
+                'draft' => 0,
+                'unassigned' => 0,
+                'duplicate' => 0,
+                'transferred' => 0,
+            ], $assignmentBreakdown),
+            'archived_transactions' => $transactionsCollection->where('is_archived', true)->count(),
+            'unassigned_members' => $transactionsCollection->whereNull('member_id')->count(),
+            'duplicates' => $duplicatesCollection->count(),
+        ];
+
         return response()->json([
             'statement' => [
                 'id' => $statement->id,
@@ -111,6 +195,7 @@ class StatementController extends Controller
             ],
             'transactions' => $transactions,
             'duplicates' => $duplicates,
+            'metrics' => $metrics,
         ]);
     }
 
@@ -137,7 +222,7 @@ class StatementController extends Controller
 
         $file = $request->file('file');
         $filename = time() . '_' . $file->getClientOriginalName();
-        $filePath = $file->storeAs('statements', $filename, 'statements');
+        $filePath = $file->storeAs('', $filename, 'statements');
         $fileHash = hash_file('sha256', Storage::disk('statements')->path($filePath));
 
         // Check for duplicates

@@ -45,78 +45,91 @@ export default function MemberSearchModal({ isOpen, onClose, onSelect, title = '
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" onClick={onClose}>
-      <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white" onClick={(e) => e.stopPropagation()}>
-        <div className="mt-3">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">{title}</h3>
-          
-          {/* Search Input */}
-          <div className="mb-4">
-            <input
-              type="text"
-              placeholder="Search by name or phone number..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-              autoFocus
-            />
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/70 px-4 py-10 md:items-center"
+      onClick={onClose}
+    >
+      <div
+        className="glass w-full max-w-3xl rounded-3xl border border-white/40 p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-slate-400">Quick switch</p>
+            <h3 className="text-xl font-semibold text-slate-900">{title}</h3>
           </div>
+          <button
+            onClick={onClose}
+            className="rounded-full border border-slate-200 px-3 py-1 text-sm text-slate-500"
+          >
+            Esc
+          </button>
+        </div>
 
-          {/* Members List */}
-          <div className="mb-4 max-h-96 overflow-y-auto border border-gray-200 rounded-md">
-            {isLoading ? (
-              <div className="p-4 text-center text-gray-500">Loading members...</div>
-            ) : filteredMembers.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">No members found</div>
-            ) : (
-              <div className="divide-y divide-gray-200">
-                {filteredMembers.map((member) => (
-                  <div
+        <div className="mt-6">
+          <input
+            type="text"
+            placeholder="Search by name, phone, code…"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+            autoFocus
+          />
+        </div>
+
+        <div className="mt-4 max-h-96 overflow-y-auto rounded-3xl border border-slate-200">
+          {isLoading ? (
+            <div className="p-6 text-center text-slate-500">Searching members…</div>
+          ) : filteredMembers.length === 0 ? (
+            <div className="p-6 text-center text-slate-500">No members match “{searchTerm}”.</div>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {filteredMembers.map((member) => {
+                const isSelected = selectedMemberId === member.id.toString()
+                return (
+                  <li
                     key={member.id}
                     onClick={() => setSelectedMemberId(member.id.toString())}
-                    className={`p-3 cursor-pointer hover:bg-gray-50 ${
-                      selectedMemberId === member.id.toString() ? 'bg-indigo-50 border-l-4 border-indigo-500' : ''
+                    className={`cursor-pointer px-5 py-4 transition ${
+                      isSelected ? 'bg-brand-50 border-l-4 border-brand-500' : 'hover:bg-slate-50'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="font-medium text-gray-900">{member.name}</div>
-                        {member.phone && (
-                          <div className="text-sm text-gray-500">Phone: {member.phone}</div>
-                        )}
-                        {member.email && (
-                          <div className="text-sm text-gray-500">Email: {member.email}</div>
-                        )}
-                        {member.member_code && (
-                          <div className="text-sm text-gray-500">Code: {member.member_code}</div>
-                        )}
+                        <p className="text-sm font-semibold text-slate-900">{member.name}</p>
+                        <div className="text-xs text-slate-500">
+                          {[member.phone, member.email, member.member_code]
+                            .filter(Boolean)
+                            .join(' • ')}
+                        </div>
                       </div>
-                      {selectedMemberId === member.id.toString() && (
-                        <div className="text-indigo-600">✓</div>
+                      {isSelected && (
+                        <span className="rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold text-brand-700">
+                          Selected
+                        </span>
                       )}
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
 
-          {/* Actions */}
-          <div className="flex justify-end space-x-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSelect}
-              disabled={!selectedMemberId}
-              className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Select
-            </button>
-          </div>
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSelect}
+            disabled={!selectedMemberId}
+            className="rounded-2xl bg-brand-600 px-5 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            View statement
+          </button>
         </div>
       </div>
     </div>

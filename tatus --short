@@ -1,0 +1,32 @@
+[33me23efba[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m)[m feat: Add bulk SMS functionality with placeholders and transaction management enhancements
+ backend/app/Console/Commands/PurgeMemberData.php   |  75 [32m+++[m
+ .../app/Console/Commands/ReanalyzeDuplicates.php   | 131 [32m+++++[m
+ .../Console/Commands/ResetStatementsAndMembers.php |  94 [32m+++[m
+ .../app/Http/Controllers/DuplicateController.php   |  28 [32m+[m
+ backend/app/Http/Controllers/ReportController.php  |   8 [32m+[m[31m-[m
+ backend/app/Http/Controllers/SmsController.php     | 234 [32m++++++++[m
+ .../app/Http/Controllers/TransactionController.php | 186 [32m+++++[m[31m-[m
+ backend/app/Jobs/ProcessBankStatement.php          | 454 [32m+++++++++[m[31m------[m
+ backend/app/Models/Member.php                      |   4 [32m+[m[31m-[m
+ backend/app/Models/SmsLog.php                      |  39 [32m++[m
+ backend/app/Models/Transaction.php                 |   5 [32m+[m
+ backend/app/Models/TransactionTransfer.php         |  48 [32m++[m
+ backend/app/Services/SmsService.php                | 258 [32m+++++++++[m
+ backend/config/services.php                        |  41 [32m++[m
+ ...4_000001_update_transactions_row_hash_index.php |  31 [32m+[m
+ ...relax_row_hash_and_extend_assignment_status.php |  63 [32m+++[m
+ ...2025_11_24_000003_add_transaction_transfers.php |  67 [32m+++[m
+ .../2025_11_25_000001_create_sms_logs_table.php    |  35 [32m++[m
+ backend/routes/api.php                             | 298 [32m+++++[m[31m-----[m
+ docs/IMPLEMENTATION_STATUS.md                      | 137 [32m+++++[m
+ docs/PHASE_IMPLEMENTATION_PLAN.md                  |  33 [32m++[m
+ frontend/src/App.jsx                               |  79 [32m++[m[31m-[m
+ frontend/src/api/sms.js                            |  55 [32m++[m
+ frontend/src/components/Layout.jsx                 | 398 [32m++++++++++[m[31m---[m
+ frontend/src/config/navigation.js                  | 137 [32m+++++[m
+ frontend/src/pages/BulkSms.jsx                     | 627 [32m+++++++++++++++++++++[m
+ frontend/src/pages/DuplicateTransactions.jsx       |  45 [32m+[m[31m-[m
+ frontend/src/pages/MemberProfile.jsx               | 159 [32m++++[m[31m--[m
+ frontend/src/pages/StatementTransactions.jsx       | 261 [32m++++++[m[31m---[m
+ frontend/src/pages/Transactions.jsx                | 438 [32m++++++++[m[31m------[m
+ 30 files changed, 3721 insertions(+), 747 deletions(-)

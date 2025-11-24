@@ -1,10 +1,10 @@
-import api from './axios'
+import { adminApi } from './axios'
 
 export const getAttendanceUploads = async (params = {}) => {
   const cleanParams = Object.fromEntries(
     Object.entries(params).filter(([_, value]) => value !== '' && value !== null && value !== undefined)
   )
-  const response = await api.get('/attendance-uploads', { params: cleanParams })
+  const response = await adminApi.get('/attendance-uploads', { params: cleanParams })
   return response.data
 }
 
@@ -18,22 +18,21 @@ export const uploadAttendance = async ({ file, meeting_date, notes }) => {
     formData.append('notes', notes)
   }
 
-  const response = await api.post('/attendance-uploads', formData, {
+  const response = await adminApi.post('/attendance-uploads', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
   return response.data
 }
 
 export const deleteAttendanceUpload = async (id) => {
-  const response = await api.delete(`/attendance-uploads/${id}`)
+  const response = await adminApi.delete(`/attendance-uploads/${id}`)
   return response.data
 }
 
 export const downloadAttendanceUpload = async (id) => {
-  const response = await api.get(`/attendance-uploads/${id}/download`, {
+  const response = await adminApi.get(`/attendance-uploads/${id}/download`, {
     responseType: 'blob',
   })
   return response
 }
-
 

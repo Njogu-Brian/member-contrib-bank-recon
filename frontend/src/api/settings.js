@@ -1,10 +1,10 @@
-import axios from './axios'
+import { adminApi } from './axios'
 
 export const getSettings = () => {
-  return axios.get('/settings')
+  return adminApi.get('/settings')
 }
 
 export const updateSettings = (data) => {
-  return axios.put('/settings', data)
+  return adminApi.put('/settings', data)
 }
 

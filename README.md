@@ -87,12 +87,53 @@ npm install
 npm start
 ```
 
-### 4. Frontend Setup
+### 4. Frontend Setup (React admin)
 
 ```bash
 cd frontend
 npm install
 npm run dev
+```
+
+### 5. Flutter Mobile/Web App (`evimeria_app`)
+
+```bash
+cd evimeria_app
+flutter pub get
+cp env/.env.example env/.env
+```
+
+Configure the `.env` file with:
+
+```
+API_BASE_URL=http://127.0.0.1:8000/api
+LOCAL_ENCRYPTION_KEY=32-char-secret-key
+FCM_PROJECT_ID=evimeria-demo
+```
+
+For Firebase Cloud Messaging, update `lib/firebase_options.dart` plus the platform configs (`android/app/google-services.json`, `ios/Runner/GoogleService-Info.plist`) with production keys.
+
+Build targets:
+
+```bash
+flutter test
+flutter analyze
+flutter build web
+flutter build apk --release
+```
+
+### 6. Deployment Scripts
+
+Reusable scripts live in `scripts/`:
+
+- `deploy_backend.ps1`: installs composer deps, runs migrations with `--force`, warms caches, and restarts queue workers.
+- `deploy_frontend.ps1`: builds the Flutter web bundle and Android APK, syncing artifacts to `build/`.
+
+Run them from the project root:
+
+```powershell
+pwsh ./scripts/deploy_backend.ps1 -Env production
+pwsh ./scripts/deploy_frontend.ps1
 ```
 
 ## Usage
@@ -114,7 +155,10 @@ npm run dev
 - **Member Management**: CRUD operations and bulk CSV upload
 - **Expense Tracking**: Track and categorize expenses
 - **Manual Contributions**: Record contributions not in bank statements
-- **Dashboard**: Statistics, charts, and recent activity
+- **Dashboard & Analytics**: Statistics, charts, PDF/CSV/XLSX exports, mobile-first Flutter interface
+- **Meetings & Voting**: Schedule agendas, capture motions, and track weighted votes
+- **Budgets & Expenses**: Monthly breakdown with alerts for overruns
+- **Security Center**: MFA enforcement, AES-256 encrypted secrets, audit viewer, and GDPR toggles
 
 ## API Endpoints
 
@@ -136,6 +180,13 @@ Backend tests:
 ```bash
 cd backend
 php artisan test
+```
+
+Flutter tests:
+
+```bash
+cd evimeria_app
+flutter test
 ```
 
 ## License

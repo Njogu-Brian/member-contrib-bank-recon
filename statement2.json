@@ -1,0 +1,122 @@
+[
+  {
+    "tran_date": "2025-10-02",
+    "value_date": "2025-10-02",
+    "particulars": "MPS 254723487641 TJ2IE6DG5V CHARLES OWA",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": 114196.0,
+    "transaction_code": null,
+    "page_number": 1,
+    "row_index": 16,
+    "source": "text"
+  },
+  {
+    "tran_date": "2025-10-06",
+    "value_date": "2025-10-06",
+    "particulars": "MPS 254717341348 TJ5JT6K2WB BENJAMIN MA",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": 115196.0,
+    "transaction_code": null,
+    "page_number": 1,
+    "row_index": 19,
+    "source": "text"
+  },
+  {
+    "tran_date": "2025-10-09",
+    "value_date": "2025-10-09",
+    "particulars": "MPS 254723487641 TJ9IE71G2L CHARLES OWA",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": 1081.0,
+    "transaction_code": null,
+    "page_number": 1,
+    "row_index": 25,
+    "source": "text"
+  },
+  {
+    "tran_date": "2025-10-16",
+    "value_date": "2025-10-16",
+    "particulars": "MPS 254723487641 TJGIE7N44E CHARLES OWA",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": 2081.0,
+    "transaction_code": null,
+    "page_number": 1,
+    "row_index": 27,
+    "source": "text"
+  },
+  {
+    "tran_date": "2025-10-18",
+    "value_date": "2025-10-18",
+    "particulars": "MPS 254717341348 TJIJT7OPVM BENJAMIN MA",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": 4081.0,
+    "transaction_code": null,
+    "page_number": 1,
+    "row_index": 30,
+    "source": "text"
+  },
+  {
+    "tran_date": "2025-10-23",
+    "value_date": "2025-10-23",
+    "particulars": "MPS 254723487641 TJNIE892QU CHARLES OWA",
+    "credit": 1000.0,
+    "debit": 0.0,
+    "balance": 5081.0,
+    "transaction_code": null,
+    "page_number": 1,
+    "row_index": 33,
+    "source": "text"
+  },
+  {
+    "tran_date": "2025-10-27",
+    "value_date": "2025-10-27",
+    "particulars": "MPS 254729280054 TJR7M8FYGF WILSON IRUN _",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": 7081.0,
+    "transaction_code": null,
+    "page_number": 1,
+    "row_index": 36,
+    "source": "text"
+  },
+  {
+    "tran_date": "2025-10-27",
+    "value_date": "2025-10-27",
+    "particulars": "MPS 254714082283 TJR6P8F7PF Denzel Mura",
+    "credit": 4000.0,
+    "debit": 0.0,
+    "balance": 11081.0,
+    "transaction_code": null,
+    "page_number": 2,
+    "row_index": 8,
+    "source": "text"
+  },
+  {
+    "tran_date": "2025-10-28",
+    "value_date": "2025-10-28",
+    "particulars": "MPS 254703116858 TJSAL8IUQS EPHANTUS M",
+    "credit": 2000.0,
+    "debit": 0.0,
+    "balance": 13081.0,
+    "transaction_code": null,
+    "page_number": 2,
+    "row_index": 11,
+    "source": "text"
+  },
+  {
+    "tran_date": "2025-10-29",
+    "value_date": "2025-10-29",
+    "particulars": "APP/IRENE CHESEBE/ EVIMERIA OCT",
+    "credit": 5000.0,
+    "debit": 0.0,
+    "balance": 18081.0,
+    "transaction_code": null,
+    "page_number": 2,
+    "row_index": 14,
+    "source": "text"
+  }
+]

@@ -10,6 +10,15 @@ export default function Statements() {
   const [page, setPage] = useState(1)
   const queryClient = useQueryClient()
 
+  const formatCurrency = (value) => {
+    const numeric = Number(value ?? 0)
+    return numeric.toLocaleString('en-KE', {
+      style: 'currency',
+      currency: 'KES',
+      minimumFractionDigits: 2,
+    })
+  }
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['statements', page],
     queryFn: () => getStatements({ page }),
@@ -116,6 +125,7 @@ export default function Statements() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filename</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transactions</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Credit</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uploaded</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
@@ -142,6 +152,9 @@ export default function Statements() {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{statement.transactions_count || 0}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
+                  {formatCurrency(statement.total_credit)}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {new Date(statement.created_at).toLocaleDateString()}
                 </td>
@@ -151,6 +164,12 @@ export default function Statements() {
                       Error
                     </span>
                   )}
+                  <button
+                    onClick={() => navigate(`/statements/${statement.id}`)}
+                    className="text-slate-600 hover:text-slate-900"
+                  >
+                    Open Viewer
+                  </button>
                   <button
                     onClick={() => navigate(`/statements/${statement.id}/transactions`)}
                     className="text-indigo-600 hover:text-indigo-900"

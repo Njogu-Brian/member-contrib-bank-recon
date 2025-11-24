@@ -1,38 +1,28 @@
 import api from './axios'
 
-export const login = async (email, password) => {
-  try {
-    const response = await api.post('/login', { email, password })
-    if (response.data.token) {
-      localStorage.setItem('token', response.data.token)
-    }
-    return response.data
-  } catch (error) {
-    console.error('Login error:', error)
-    throw error
-  }
-}
+const AUTH_BASE = '/auth'
 
-export const register = async (name, email, password, password_confirmation) => {
-  try {
-    const response = await api.post('/register', { name, email, password, password_confirmation })
-    if (response.data.token) {
-      localStorage.setItem('token', response.data.token)
-    }
-    return response.data
-  } catch (error) {
-    console.error('Register error:', error)
-    throw error
+export const login = async (email, password) => {
+  const response = await api.post(`${AUTH_BASE}/login`, { email, password })
+  const token = response.data?.token
+  if (token) {
+    localStorage.setItem('token', token)
   }
+  return response.data
 }
 
 export const logout = async () => {
-  await api.post('/logout')
+  await api.post(`${AUTH_BASE}/logout`)
   localStorage.removeItem('token')
 }
 
-export const getUser = async () => {
-  const response = await api.get('/user')
+export const getCurrentUser = async () => {
+  const response = await api.get(`${AUTH_BASE}/me`)
+  return response.data
+}
+
+export const fetch2faStatus = async () => {
+  const response = await api.get(`${AUTH_BASE}/2fa`)
   return response.data
 }
 

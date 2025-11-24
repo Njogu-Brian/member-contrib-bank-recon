@@ -5,15 +5,20 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
+import 'encryption_service.dart';
+
 class ApiService {
   ApiService({
     http.Client? client,
     FlutterSecureStorage? storage,
+    EncryptionService? encryptionService,
   })  : _client = client ?? http.Client(),
-        _storage = storage ?? const FlutterSecureStorage();
+        _storage = storage ?? const FlutterSecureStorage(),
+        _encryption = encryptionService ?? EncryptionService();
 
   final http.Client _client;
   final FlutterSecureStorage _storage;
+  final EncryptionService _encryption;
   String? _token;
 
   String get _baseUrl =>
@@ -22,7 +27,9 @@ class ApiService {
           .replaceFirst(RegExp(r'/*$'), '');
 
   Future<void> bootstrap() async {
-    _token ??= await _storage.read(key: _tokenKey);
+    if (_token != null && _token!.isNotEmpty) return;
+    final stored = await _storage.read(key: _tokenKey);
+    _token = _encryption.decryptString(stored);
   }
 
   static const _tokenKey = 'auth_token';
@@ -32,7 +39,8 @@ class ApiService {
     if (token == null || token.isEmpty) {
       await _storage.delete(key: _tokenKey);
     } else {
-      await _storage.write(key: _tokenKey, value: token);
+      final encrypted = _encryption.encryptString(token);
+      await _storage.write(key: _tokenKey, value: encrypted);
     }
   }
 

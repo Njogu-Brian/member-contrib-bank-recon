@@ -1,17 +1,39 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
+import 'providers/push_provider.dart';
 import 'screens/auth/login_screen.dart';
-import 'screens/dashboard/dashboard_screen.dart';
+import 'screens/home/home_shell.dart';
 import 'screens/kyc/kyc_wizard_screen.dart';
+import 'services/push_notification_service.dart';
 import 'utils/constants.dart';
+
+Future<void> _backgroundHandler(RemoteMessage message) async {
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  }
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: 'env/.env');
-  runApp(const ProviderScope(child: EvimeriaApp()));
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  FirebaseMessaging.onBackgroundMessage(_backgroundHandler);
+  final pushService = PushNotificationService();
+  await pushService.initialize();
+  runApp(
+    ProviderScope(
+      overrides: [
+        pushNotificationProvider.overrideWithValue(pushService),
+      ],
+      child: const EvimeriaApp(),
+    ),
+  );
 }
 
 class EvimeriaApp extends ConsumerWidget {
@@ -48,10 +70,6 @@ class AuthGate extends ConsumerWidget {
       );
     }
 
-    if (authState.isAuthenticated) {
-      return const DashboardScreen();
-    }
-
-    return const LoginScreen();
+    return authState.isAuthenticated ? const HomeShell() : const LoginScreen();
   }
 }

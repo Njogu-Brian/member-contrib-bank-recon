@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/auth_payload.dart';
@@ -8,9 +9,18 @@ import '../models/user.dart';
 import '../services/api/auth_api_service.dart';
 import '../services/api/kyc_api_service.dart';
 import '../services/api_service.dart';
+import '../services/encryption_service.dart';
+
+final encryptionServiceProvider = Provider<EncryptionService>((ref) {
+  final secret =
+      dotenv.isInitialized ? dotenv.maybeGet('LOCAL_ENCRYPTION_KEY') : null;
+  return EncryptionService(secret: secret);
+});
 
 final apiServiceProvider = Provider<ApiService>((ref) {
-  final api = ApiService();
+  final api = ApiService(
+    encryptionService: ref.watch(encryptionServiceProvider),
+  );
   api.bootstrap();
   return api;
 });

@@ -25,12 +25,13 @@ class DashboardController extends Controller
             ->count();
         
         // Calculate total contributions from ALL transactions (including unassigned)
-        $allTransactionContributions = Transaction::where('credit', '>', 0)
-            ->where('is_archived', false)
-            ->sum('credit');
+        $allTransactionContributions = $this->excludeDuplicateTransactions(
+            Transaction::where('credit', '>', 0)
+                ->where('is_archived', false)
+        )->sum('credit');
         
         // Calculate assigned contributions (for display)
-        $assignedContributions = Transaction::whereIn('assignment_status', ['auto_assigned', 'manual_assigned', 'draft'])
+        $assignedContributions = Transaction::whereIn('assignment_status', ['auto_assigned', 'manual_assigned', 'draft', 'transferred'])
             ->where('credit', '>', 0)
             ->where('is_archived', false)
             ->sum('credit');
@@ -50,8 +51,9 @@ class DashboardController extends Controller
         $monthsData = $this->getContributionsByMonth();
 
         // Recent transactions
-        $recentTransactions = Transaction::with('member')
-            ->where('is_archived', false)
+        $recentTransactions = $this->excludeDuplicateTransactions(
+            Transaction::with('member')->where('is_archived', false)
+        )
             ->orderBy('tran_date', 'desc')
             ->limit(10)
             ->get();
@@ -86,11 +88,12 @@ class DashboardController extends Controller
             $startDate = now()->subWeeks($i)->startOfWeek();
             $endDate = now()->subWeeks($i)->endOfWeek();
             
-            $transactionTotal = Transaction::whereIn('assignment_status', ['auto_assigned', 'manual_assigned', 'draft'])
-                ->where('credit', '>', 0)
-            ->where('is_archived', false)
-                ->whereBetween('tran_date', [$startDate, $endDate])
-                ->sum('credit');
+            $transactionTotal = $this->excludeDuplicateTransactions(
+                Transaction::whereIn('assignment_status', ['auto_assigned', 'manual_assigned', 'draft', 'transferred'])
+                    ->where('credit', '>', 0)
+                    ->where('is_archived', false)
+                    ->whereBetween('tran_date', [$startDate, $endDate])
+            )->sum('credit');
             
             $manualTotal = ManualContribution::whereBetween('contribution_date', [$startDate, $endDate])
                 ->sum('amount');
@@ -136,11 +139,12 @@ class DashboardController extends Controller
             $startDate = $month->copy()->startOfMonth();
             $endDate = $month->copy()->endOfMonth();
             
-            $transactionTotal = Transaction::whereIn('assignment_status', ['auto_assigned', 'manual_assigned', 'draft'])
-                ->where('credit', '>', 0)
-            ->where('is_archived', false)
-                ->whereBetween('tran_date', [$startDate, $endDate])
-                ->sum('credit');
+            $transactionTotal = $this->excludeDuplicateTransactions(
+                Transaction::whereIn('assignment_status', ['auto_assigned', 'manual_assigned', 'draft', 'transferred'])
+                    ->where('credit', '>', 0)
+                    ->where('is_archived', false)
+                    ->whereBetween('tran_date', [$startDate, $endDate])
+            )->sum('credit');
             
             $manualTotal = ManualContribution::whereBetween('contribution_date', [$startDate, $endDate])
                 ->sum('amount');
@@ -155,6 +159,13 @@ class DashboardController extends Controller
         }
         
         return $months;
+    }
+    protected function excludeDuplicateTransactions($query)
+    {
+        return $query->where(function ($subQuery) {
+            $subQuery->whereNull('assignment_status')
+                ->orWhere('assignment_status', '!=', 'duplicate');
+        });
     }
 }
 

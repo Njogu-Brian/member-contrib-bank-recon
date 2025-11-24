@@ -8,8 +8,15 @@ class MemberService {
   final ApiService _api;
 
   Future<List<Member>> fetchMembers() async {
-    final response = await _api.get(AppConstants.membersPath);
-    final data = response['data'] as List<dynamic>? ?? [];
+    final dynamic response = await _api.get(AppConstants.membersPath);
+    final List<dynamic> data;
+    if (response is List<dynamic>) {
+      data = response;
+    } else if (response is Map<String, dynamic>) {
+      data = response['data'] as List<dynamic>? ?? [];
+    } else {
+      data = const [];
+    }
     return data
         .map((json) => Member.fromJson(json as Map<String, dynamic>))
         .toList();

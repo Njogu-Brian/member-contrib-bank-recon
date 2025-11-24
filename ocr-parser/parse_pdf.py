@@ -468,6 +468,24 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
                 )
                 continue
             
+            # Detect and skip rows that clearly describe debit/withdrawal activity even if the amount
+            # ends up in the credit column due to extraction noise (e.g., "Cash Withdrawal" lines).
+            debit_keywords = [
+                "WITHDRAW",      # covers WITHDRAW / WITHDRAWAL
+                "WITHDRAWL",     # common misspelling seen in some PDFs
+                "CASH WITHDRAW",
+                "ATM WITHDRAW",
+            ]
+            if any(keyword in row_str for keyword in debit_keywords):
+                log_bank_skip(
+                    "debit_keyword_detected",
+                    row,
+                    page_number=page_number,
+                    row_offset=row_offset,
+                    table_index=table_index,
+                )
+                continue
+            
             # Also check particulars column specifically for "Grand Total"
             if particulars_col is not None and particulars_col < len(row):
                 particulars_cell = str(row[particulars_col]).strip().upper() if row[particulars_col] else ""

@@ -9,15 +9,22 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.20.0",
+    "@headlessui/react": "^1.7.18",
     "@tanstack/react-query": "^5.12.0",
     "axios": "^1.6.2",
+    "clsx": "^2.1.0",
+    "dayjs": "^1.11.11",
     "pdfjs-dist": "^3.11.174",
-    "react-pdf": "^7.7.1"
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-icons": "^4.12.0",
+    "react-pdf": "^7.7.1",
+    "react-router-dom": "^6.20.0",
+    "zustand": "^4.4.7"
   },
   "devDependencies": {
+    "@tailwindcss/forms": "^0.5.7",
+    "@tailwindcss/typography": "^0.5.12",
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
     "@vitejs/plugin-react": "^4.2.0",

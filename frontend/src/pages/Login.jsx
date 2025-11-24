@@ -1,19 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
-import { login, register } from '../api/auth'
+import { login } from '../api/auth'
 
 export default function Login() {
-  const [isRegister, setIsRegister] = useState(false)
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    password_confirmation: '',
-  })
-  const navigate = useNavigate()
-
+  const [formData, setFormData] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
+  const navigate = useNavigate()
 
   const loginMutation = useMutation({
     mutationFn: () => login(formData.email, formData.password),
@@ -21,142 +14,117 @@ export default function Login() {
       setError('')
       navigate('/')
     },
-    onError: (error) => {
-      setError(error.response?.data?.message || error.message || 'Login failed. Please check your credentials.')
+    onError: (err) => {
+      setError(err.response?.data?.message ?? 'Invalid credentials. Please try again.')
     },
   })
 
-  const registerMutation = useMutation({
-    mutationFn: () => register(formData.name, formData.email, formData.password, formData.password_confirmation),
-    onSuccess: () => {
-      setError('')
-      navigate('/')
-    },
-    onError: (error) => {
-      const errorMessage = error.response?.data?.message || 
-                          (error.response?.data?.errors ? JSON.stringify(error.response.data.errors) : null) ||
-                          error.message || 
-                          'Registration failed. Please try again.'
-      setError(errorMessage)
-    },
-  })
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    if (isRegister) {
-      registerMutation.mutate()
-    } else {
-      loginMutation.mutate()
-    }
+  const handleSubmit = (event) => {
+    event.preventDefault()
+    loginMutation.mutate()
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            {isRegister ? 'Create an account' : 'Sign in to your account'}
-          </h2>
+    <div className="min-h-screen bg-slate-950 text-white">
+      <div className="grid min-h-screen gap-0 lg:grid-cols-2">
+        <div className="relative hidden flex-col justify-between bg-gradient-to-br from-brand-600 via-indigo-700 to-slate-900 px-10 py-12 lg:flex">
+          <div>
+            <p className="text-sm uppercase tracking-widest text-white/60">Evimeria Group</p>
+            <h1 className="mt-4 text-4xl font-semibold leading-tight">
+              Finance & governance portal for modern chamas.
+            </h1>
+            <p className="mt-4 text-white/80">
+              Reconcile statements, approve payouts, and keep your members informed in real time.
+            </p>
+          </div>
+          <div className="rounded-3xl bg-white/10 p-6 backdrop-blur">
+            <p className="text-sm uppercase tracking-widest text-white/70">Live snapshot</p>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div>
+                <p className="text-xs text-white/60">Pending approvals</p>
+                <p className="text-2xl font-semibold">8</p>
+              </div>
+              <div>
+                <p className="text-xs text-white/60">Today’s inflow</p>
+                <p className="text-2xl font-semibold">KES 1.2M</p>
+              </div>
+            </div>
+          </div>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
-          {isRegister && (
+
+        <div className="flex flex-col justify-center px-6 py-12 sm:px-12 lg:px-16">
+          <div className="mx-auto w-full max-w-md space-y-8">
             <div>
-              <label htmlFor="name" className="sr-only">
-                Name
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                required
-                className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
+              <p className="text-sm font-semibold uppercase tracking-wide text-brand-600">
+                Staff access
+              </p>
+              <h2 className="mt-2 text-3xl font-semibold text-slate-900">
+                Sign in to Evimeria Portal
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Enter the administrator credentials assigned to you. Need help? Contact Super Admin.
+              </p>
             </div>
-          )}
-          <div>
-            <label htmlFor="email" className="sr-only">
-              Email address
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-              placeholder="Email address"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            />
+
+            <form onSubmit={handleSubmit} className="glass space-y-5 rounded-3xl border px-6 py-8">
+              {error && (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">
+                  {error}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label htmlFor="email" className="text-sm font-medium text-slate-700">
+                  Work email
+                </label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                  placeholder="you@evimeria.africa"
+                  value={formData.email}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="password" className="text-sm font-medium text-slate-700">
+                  Password
+                </label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-sm text-slate-500">
+                <span>Protected with MFA</span>
+                <button type="button" className="font-medium text-brand-600 hover:text-brand-700">
+                  Forgot access?
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loginMutation.isPending}
+                className="w-full rounded-2xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-600/30 transition hover:bg-brand-700 disabled:opacity-60"
+              >
+                {loginMutation.isPending ? 'Signing in…' : 'Sign in'}
+              </button>
+            </form>
           </div>
-          <div>
-            <label htmlFor="password" className="sr-only">
-              Password
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-              placeholder="Password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-            />
-          </div>
-          {isRegister && (
-            <div>
-              <label htmlFor="password_confirmation" className="sr-only">
-                Confirm Password
-              </label>
-              <input
-                id="password_confirmation"
-                name="password_confirmation"
-                type="password"
-                required
-                className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Confirm Password"
-                value={formData.password_confirmation}
-                onChange={(e) => setFormData({ ...formData, password_confirmation: e.target.value })}
-              />
-            </div>
-          )}
-          <div>
-            <button
-              type="submit"
-              disabled={loginMutation.isPending || registerMutation.isPending}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-            >
-              {loginMutation.isPending || registerMutation.isPending
-                ? 'Loading...'
-                : isRegister
-                ? 'Register'
-                : 'Sign in'}
-            </button>
-          </div>
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => setIsRegister(!isRegister)}
-              className="text-sm text-indigo-600 hover:text-indigo-500"
-            >
-              {isRegister
-                ? 'Already have an account? Sign in'
-                : "Don't have an account? Register"}
-            </button>
-          </div>
-        </form>
+        </div>
       </div>
     </div>
   )
 }
-

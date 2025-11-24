@@ -5,9 +5,19 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
+    /**
+     * Map backend role slugs to the names expected by the frontend RBAC layer.
+     */
+    protected array $roleSlugMap = [
+        'admin' => 'super_admin',
+        'treasurer' => 'treasurer',
+        'member' => 'member',
+    ];
+
     public function register(Request $request)
     {
         $request->validate([
@@ -25,7 +35,7 @@ class AuthController extends Controller
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
-            'user' => $user,
+            'user' => $this->formatUserResponse($user),
             'token' => $token,
         ], 201);
     }
@@ -40,16 +50,7 @@ class AuthController extends Controller
 
             $user = User::where('email', $request->email)->first();
 
-            if (!$user) {
-                return response()->json([
-                    'message' => 'The provided credentials are incorrect.',
-                    'errors' => [
-                        'email' => ['The provided credentials are incorrect.'],
-                    ],
-                ], 422);
-            }
-
-            if (!Hash::check($request->password, $user->password)) {
+            if (! $user || ! Hash::check($request->password, $user->password)) {
                 return response()->json([
                     'message' => 'The provided credentials are incorrect.',
                     'errors' => [
@@ -61,14 +62,14 @@ class AuthController extends Controller
             $token = $user->createToken('auth_token')->plainTextToken;
 
             return response()->json([
-                'user' => $user,
+                'user' => $this->formatUserResponse($user),
                 'token' => $token,
             ]);
         } catch (\Exception $e) {
-            \Log::error('Login error: ' . $e->getMessage(), [
+            Log::error('Login error: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
             ]);
-            
+
             return response()->json([
                 'message' => 'An error occurred during login.',
                 'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
@@ -85,7 +86,25 @@ class AuthController extends Controller
 
     public function user(Request $request)
     {
-        return response()->json($request->user());
+        return response()->json([
+            'user' => $this->formatUserResponse($request->user()),
+        ]);
+    }
+
+    protected function formatUserResponse(User $user): array
+    {
+        $user->loadMissing('roles');
+
+        $roleSlugs = $user->roles
+            ->pluck('slug')
+            ->map(fn (string $slug) => $this->roleSlugMap[$slug] ?? $slug)
+            ->unique()
+            ->values()
+            ->all();
+
+        return array_merge($user->toArray(), [
+            'roles' => $roleSlugs,
+        ]);
     }
 }
 

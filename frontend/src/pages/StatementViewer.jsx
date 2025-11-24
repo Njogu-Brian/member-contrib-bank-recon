@@ -50,6 +50,23 @@ const STATUS_META = {
 
 const STATUS_ORDER = ['auto_assigned', 'manual_assigned', 'draft', 'unassigned', 'archived', 'duplicate']
 
+const formatCurrency = (value) =>
+  Number(value ?? 0).toLocaleString('en-KE', {
+    style: 'currency',
+    currency: 'KES',
+    minimumFractionDigits: 2,
+  })
+
+function SummaryCard({ label, value, helper }) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</p>
+      <p className="mt-2 text-2xl font-bold text-gray-900">{value}</p>
+      {helper && <p className="mt-1 text-xs text-gray-500">{helper}</p>}
+    </div>
+  )
+}
+
 function normalizeText(value) {
   return (value || '').toString().replace(/\s+/g, ' ').trim().toLowerCase()
 }
@@ -318,6 +335,8 @@ export default function StatementViewer() {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
   const [pdfUrl, setPdfUrl] = useState(null)
   const [pdfFetchError, setPdfFetchError] = useState(null)
+  const metrics = data?.metrics || {}
+  const assignmentBreakdown = metrics.assignment_breakdown || {}
 
   useEffect(() => {
     let isActive = true
@@ -570,6 +589,27 @@ export default function StatementViewer() {
         </div>
       </div>
 
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <SummaryCard label="Total Credit" value={formatCurrency(metrics.total_credit)} />
+        <SummaryCard label="Total Debit" value={formatCurrency(metrics.total_debit)} />
+        <SummaryCard
+          label="Transactions"
+          value={metrics.total_transactions ?? data?.transactions?.length ?? 0}
+          helper={
+            metrics.first_transaction_date && metrics.last_transaction_date
+              ? `${new Date(metrics.first_transaction_date).toLocaleDateString()} – ${new Date(
+                  metrics.last_transaction_date
+                ).toLocaleDateString()}`
+              : undefined
+          }
+        />
+        <SummaryCard
+          label="Duplicates"
+          value={metrics.duplicates ?? data?.duplicates?.length ?? 0}
+          helper={`Archived: ${metrics.archived_transactions ?? 0}`}
+        />
+      </div>
+
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div ref={containerRef} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           {pdfUrl ? (
@@ -635,6 +675,18 @@ export default function StatementViewer() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <h2 className="text-lg font-semibold text-gray-900">Assignment Breakdown</h2>
+            <dl className="mt-3 grid grid-cols-2 gap-3 text-sm text-gray-700">
+              {['auto_assigned', 'manual_assigned', 'draft', 'unassigned', 'duplicate'].map((key) => (
+                <div key={key} className="flex items-center justify-between">
+                  <dt className="capitalize">{key.replace('_', ' ')}</dt>
+                  <dd className="font-semibold">{assignmentBreakdown[key] ?? 0}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
 
           <div className="flex-1 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">

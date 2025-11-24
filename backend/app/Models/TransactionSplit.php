@@ -14,6 +14,7 @@ class TransactionSplit extends Model
         'member_id',
         'amount',
         'notes',
+        'transfer_id',
     ];
 
     protected $casts = [
@@ -28,6 +29,11 @@ class TransactionSplit extends Model
     public function member()
     {
         return $this->belongsTo(Member::class);
+    }
+
+    public function transfer()
+    {
+        return $this->belongsTo(TransactionTransfer::class);
     }
 
     protected static function booted(): void
