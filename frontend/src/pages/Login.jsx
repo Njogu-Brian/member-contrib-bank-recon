@@ -1,18 +1,30 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { login } from '../api/auth'
 
 export default function Login() {
   const [formData, setFormData] = useState({ email: '', password: '' })
   const [error, setError] = useState('')
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
   const loginMutation = useMutation({
     mutationFn: () => login(formData.email, formData.password),
-    onSuccess: () => {
+    onSuccess: async (data) => {
       setError('')
-      navigate('/')
+      
+      // Set user data directly in cache for immediate update
+      // This ensures AuthContext immediately recognizes the user as authenticated
+      if (data?.user) {
+        queryClient.setQueryData(['auth', 'user'], { user: data.user })
+      }
+      
+      // Invalidate to trigger a refetch in the background (for consistency)
+      queryClient.invalidateQueries({ queryKey: ['auth', 'user'] })
+      
+      // Navigate immediately - cache is already updated
+      navigate('/', { replace: true })
     },
     onError: (err) => {
       setError(err.response?.data?.message ?? 'Invalid credentials. Please try again.')

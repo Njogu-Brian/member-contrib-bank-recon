@@ -37,10 +37,12 @@ export default function Compliance() {
     },
   })
 
-  const enableMfaMutation = useMutation(enableMfa, {
+  const enableMfaMutation = useMutation({
+    mutationFn: enableMfa,
     onSuccess: () => alert('MFA enabled'),
   })
-  const disableMfaMutation = useMutation(disableMfa, {
+  const disableMfaMutation = useMutation({
+    mutationFn: disableMfa,
     onSuccess: () => alert('MFA disabled'),
   })
 
@@ -86,7 +88,7 @@ export default function Compliance() {
             type="submit"
             className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md shadow hover:bg-indigo-700"
           >
-            {updateProfileMutation.isLoading ? 'Saving…' : 'Save Profile'}
+            {updateProfileMutation.isPending ? 'Saving…' : 'Save Profile'}
           </button>
         </div>
       </form>
@@ -104,7 +106,7 @@ export default function Compliance() {
           disabled={!documentFile}
           className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md shadow hover:bg-indigo-700 disabled:opacity-60"
         >
-          {uploadDocumentMutation.isLoading ? 'Uploading…' : 'Upload'}
+          {uploadDocumentMutation.isPending ? 'Uploading…' : 'Upload'}
         </button>
       </form>
 

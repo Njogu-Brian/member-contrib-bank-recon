@@ -133,5 +133,34 @@ export const NAVIGATION = [
       },
     ],
   },
+  {
+    title: 'Administration',
+    items: [
+      {
+        label: 'Staff Management',
+        icon: HiOutlineUsers,
+        path: '/admin/staff',
+        roles: [ROLES.SUPER_ADMIN],
+      },
+      {
+        label: 'Role Management',
+        icon: HiOutlineShieldExclamation,
+        path: '/admin/roles',
+        roles: [ROLES.SUPER_ADMIN],
+      },
+      {
+        label: 'Activity Logs',
+        icon: HiOutlineDocumentText,
+        path: '/admin/activity-logs',
+        roles: [ROLES.SUPER_ADMIN, ROLES.IT_SUPPORT],
+      },
+      {
+        label: 'Admin Settings',
+        icon: HiOutlineCog6Tooth,
+        path: '/admin/settings',
+        roles: [ROLES.SUPER_ADMIN, ROLES.IT_SUPPORT],
+      },
+    ],
+  },
 ]
 

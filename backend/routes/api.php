@@ -24,6 +24,10 @@ use App\Http\Controllers\SettingController;
 use App\Http\Controllers\SmsController;
 use App\Http\Controllers\StatementController;
 use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\Admin\StaffController;
+use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\PermissionController;
+use App\Http\Controllers\Admin\ActivityLogController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -187,5 +191,40 @@ Route::prefix('v1')->group(function () {
         Route::post('/audits/{auditRun}/reanalyze', [AuditController::class, 'reanalyze']);
         Route::delete('/audits/{auditRun}', [AuditController::class, 'destroy']);
         Route::get('/audits/member/{member}', [AuditController::class, 'memberResults']);
+
+        // Admin Management (under /v1/admin/admin/*)
+        Route::prefix('admin')->group(function () {
+            // Staff Management
+            Route::get('/staff', [StaffController::class, 'index']);
+            Route::post('/staff', [StaffController::class, 'store']);
+            Route::get('/staff/{user}', [StaffController::class, 'show']);
+            Route::put('/staff/{user}', [StaffController::class, 'update']);
+            Route::delete('/staff/{user}', [StaffController::class, 'destroy']);
+            Route::post('/staff/{user}/reset-password', [StaffController::class, 'resetPassword']);
+            Route::post('/staff/{user}/toggle-status', [StaffController::class, 'toggleStatus']);
+
+            // Role Management
+            Route::get('/roles', [RoleController::class, 'index']);
+            Route::post('/roles', [RoleController::class, 'store']);
+            Route::get('/roles/{role}', [RoleController::class, 'show']);
+            Route::put('/roles/{role}', [RoleController::class, 'update']);
+            Route::delete('/roles/{role}', [RoleController::class, 'destroy']);
+
+            // Permission Management
+            Route::get('/permissions', [PermissionController::class, 'index']);
+            Route::post('/permissions', [PermissionController::class, 'store']);
+            Route::get('/permissions/{permission}', [PermissionController::class, 'show']);
+            Route::put('/permissions/{permission}', [PermissionController::class, 'update']);
+            Route::delete('/permissions/{permission}', [PermissionController::class, 'destroy']);
+
+            // Activity Logs
+            Route::get('/activity-logs', [ActivityLogController::class, 'index']);
+            Route::get('/activity-logs/statistics', [ActivityLogController::class, 'statistics']);
+            Route::get('/activity-logs/{activityLog}', [ActivityLogController::class, 'show']);
+
+            // Admin Settings
+            Route::get('/settings', [\App\Http\Controllers\Admin\AdminSettingsController::class, 'index']);
+            Route::put('/settings', [\App\Http\Controllers\Admin\AdminSettingsController::class, 'update']);
+        });
     });
 });

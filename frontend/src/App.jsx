@@ -27,6 +27,10 @@ import Compliance from './pages/Compliance'
 import BulkSms from './pages/BulkSms'
 import Unauthorized from './pages/Unauthorized'
 import UiKit from './pages/UiKit'
+import StaffManagement from './pages/StaffManagement'
+import RoleManagement from './pages/RoleManagement'
+import ActivityLogs from './pages/ActivityLogs'
+import AdminSettings from './pages/AdminSettings'
 import FullScreenLoader from './components/FullScreenLoader'
 import { useAuthContext } from './context/AuthContext'
 import { hasRole, ROLES } from './lib/rbac'
@@ -118,6 +122,40 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="admin">
+          <Route
+            path="staff"
+            element={
+              <ProtectedRoute roles={[ROLES.SUPER_ADMIN]}>
+                <StaffManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="roles"
+            element={
+              <ProtectedRoute roles={[ROLES.SUPER_ADMIN]}>
+                <RoleManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="activity-logs"
+            element={
+              <ProtectedRoute roles={[ROLES.SUPER_ADMIN, ROLES.IT_SUPPORT]}>
+                <ActivityLogs />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="settings"
+            element={
+              <ProtectedRoute roles={[ROLES.SUPER_ADMIN, ROLES.IT_SUPPORT]}>
+                <AdminSettings />
+              </ProtectedRoute>
+            }
+          />
+        </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

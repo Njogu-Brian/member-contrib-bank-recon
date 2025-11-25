@@ -2,8 +2,16 @@ import { adminApi } from './axios'
 
 export const getTransactions = async (params = {}) => {
   // Remove empty string values from params to avoid filtering issues
+  // But keep 0 and false values as they are valid filter values
   const cleanParams = Object.fromEntries(
-    Object.entries(params).filter(([_, value]) => value !== '' && value !== null && value !== undefined)
+    Object.entries(params).filter(([_, value]) => {
+      // Keep 0, false, and numeric values
+      if (value === 0 || value === false || typeof value === 'number') {
+        return true
+      }
+      // Remove empty strings, null, undefined
+      return value !== '' && value !== null && value !== undefined
+    })
   )
   const response = await adminApi.get('/transactions', { params: cleanParams })
   return response.data
@@ -56,10 +64,18 @@ export const transferTransaction = async (id, payload) => {
 }
 
 export const archiveTransaction = async (id, reason = '') => {
-  const response = await adminApi.post(`/transactions/${id}/archive`, {
-    reason: reason || undefined,
-  })
-  return response.data
+  try {
+    console.log('API: Archiving transaction', id, 'with reason:', reason)
+    const response = await adminApi.post(`/transactions/${id}/archive`, {
+      reason: reason || undefined,
+    })
+    console.log('API: Archive response:', response.data)
+    return response.data
+  } catch (error) {
+    console.error('API: Archive error:', error)
+    console.error('API: Archive error response:', error.response)
+    throw error
+  }
 }
 
 export const unarchiveTransaction = async (id) => {

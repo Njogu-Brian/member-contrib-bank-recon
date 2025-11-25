@@ -16,6 +16,10 @@ class User extends Authenticatable
         'email',
         'password',
         'is_active',
+        'member_id',
+        'phone',
+        'last_login_at',
+        'password_reset_at',
     ];
 
     protected $hidden = [
@@ -29,6 +33,8 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'last_login_at' => 'datetime',
+            'password_reset_at' => 'datetime',
         ];
     }
 
@@ -60,6 +66,44 @@ class User extends Authenticatable
     public function hasRole(string $role): bool
     {
         return $this->roles()->where('slug', $role)->exists();
+    }
+
+    public function hasPermission(string $permissionSlug): bool
+    {
+        return $this->roles()
+            ->whereHas('permissions', function ($query) use ($permissionSlug) {
+                $query->where('slug', $permissionSlug);
+            })
+            ->exists();
+    }
+
+    public function hasAnyPermission(array $permissionSlugs): bool
+    {
+        return $this->roles()
+            ->whereHas('permissions', function ($query) use ($permissionSlugs) {
+                $query->whereIn('slug', $permissionSlugs);
+            })
+            ->exists();
+    }
+
+    public function getAllPermissions(): \Illuminate\Support\Collection
+    {
+        return $this->roles()
+            ->with('permissions')
+            ->get()
+            ->pluck('permissions')
+            ->flatten()
+            ->unique('id');
+    }
+
+    public function member()
+    {
+        return $this->belongsTo(Member::class);
+    }
+
+    public function activityLogs()
+    {
+        return $this->hasMany(ActivityLog::class);
     }
 }
 

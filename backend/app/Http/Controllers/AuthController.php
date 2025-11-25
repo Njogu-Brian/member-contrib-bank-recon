@@ -59,6 +59,12 @@ class AuthController extends Controller
                 ], 422);
             }
 
+            // Update last login
+            $user->update(['last_login_at' => now()]);
+
+            // Log activity
+            \App\Helpers\ActivityLogger::log('login', $user, null, "User {$user->name} logged in");
+
             $token = $user->createToken('auth_token')->plainTextToken;
 
             return response()->json([
@@ -93,7 +99,7 @@ class AuthController extends Controller
 
     protected function formatUserResponse(User $user): array
     {
-        $user->loadMissing('roles');
+        $user->loadMissing(['roles', 'roles.permissions']);
 
         $roleSlugs = $user->roles
             ->pluck('slug')
@@ -102,8 +108,11 @@ class AuthController extends Controller
             ->values()
             ->all();
 
+        $permissions = $user->getAllPermissions()->pluck('slug')->unique()->values()->all();
+
         return array_merge($user->toArray(), [
             'roles' => $roleSlugs,
+            'permissions' => $permissions,
         ]);
     }
 }

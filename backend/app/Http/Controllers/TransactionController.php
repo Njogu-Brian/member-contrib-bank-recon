@@ -26,12 +26,23 @@ class TransactionController extends Controller
     {
         $query = Transaction::with(['member', 'bankStatement', 'matchLogs']);
 
-        if ($request->filled('archived')) {
-            $archived = filter_var($request->archived, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-            if ($archived !== null) {
-                $query->where('is_archived', $archived);
+        // Handle archived filter
+        if ($request->has('archived')) {
+            // Accept boolean, string, or numeric representations
+            $archivedValue = $request->archived;
+            if (is_string($archivedValue)) {
+                $archived = in_array(strtolower($archivedValue), ['true', '1', 'yes'], true);
+            } elseif (is_numeric($archivedValue)) {
+                $archived = (int) $archivedValue === 1;
+            } else {
+                $archived = (bool) $archivedValue;
             }
-        } elseif (!$request->boolean('include_archived', false) && !$request->filled('bank_statement_id')) {
+            $query->where('is_archived', $archived ? 1 : 0);
+        } elseif ($request->filled('include_archived') && $request->boolean('include_archived')) {
+            // Include both archived and non-archived
+            // Don't filter by is_archived
+        } elseif (!$request->filled('bank_statement_id')) {
+            // Default: show only non-archived transactions (unless viewing a specific statement)
             $query->where('is_archived', false);
         }
 
@@ -1380,11 +1391,13 @@ class TransactionController extends Controller
             'archive_reason' => $reason,
         ];
 
+        // If transaction is assigned, unassign it when archiving
         if (
             $transaction->member_id ||
             $transaction->assignment_status !== 'unassigned' ||
             !empty($transaction->draft_member_ids)
         ) {
+            // Delete any splits associated with this transaction
             $transaction->splits()->delete();
             $updates = array_merge($updates, [
                 'member_id' => null,
@@ -1394,28 +1407,59 @@ class TransactionController extends Controller
             ]);
         }
 
-        $transaction->update($updates);
+        // Update the transaction
+        $result = $transaction->update($updates);
+        
+        // Refresh the model to ensure we have the latest data
+        $transaction->refresh();
 
-        return true;
+        return $result;
     }
 
     public function archive(Request $request, Transaction $transaction)
     {
-        $request->validate([
-            'reason' => 'nullable|string|max:500',
-        ]);
-
-        if (!$this->archiveTransactionModel($transaction, $request->input('reason'))) {
-            return response()->json([
-                'message' => 'Transaction already archived',
-                'transaction' => $transaction,
+        try {
+            Log::info('Archive request received', [
+                'transaction_id' => $transaction->id,
+                'current_is_archived' => $transaction->is_archived,
+                'reason' => $request->input('reason'),
             ]);
-        }
 
-        return response()->json([
-            'message' => 'Transaction archived successfully',
-            'transaction' => $transaction->fresh(['member', 'bankStatement']),
-        ]);
+            $request->validate([
+                'reason' => 'nullable|string|max:500',
+            ]);
+
+            if (!$this->archiveTransactionModel($transaction, $request->input('reason'))) {
+                Log::warning('Transaction already archived', ['transaction_id' => $transaction->id]);
+                return response()->json([
+                    'message' => 'Transaction already archived',
+                    'transaction' => $transaction->fresh(['member', 'bankStatement']),
+                ], 200);
+            }
+
+            Log::info('Transaction archived successfully', ['transaction_id' => $transaction->id]);
+            return response()->json([
+                'message' => 'Transaction archived successfully',
+                'transaction' => $transaction->fresh(['member', 'bankStatement']),
+            ], 200);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::error('Archive validation error', [
+                'transaction_id' => $transaction->id,
+                'errors' => $e->errors(),
+            ]);
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Archive transaction error: ' . $e->getMessage(), [
+                'transaction_id' => $transaction->id,
+                'error' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'message' => 'Failed to archive transaction: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function unarchive(Transaction $transaction)

@@ -41,12 +41,22 @@ export default function Transactions({
   // Close action menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // Don't close if clicking on a button inside the menu
+      if (event.target.closest('button[type="button"]')) {
+        return
+      }
       if (actionMenuRef.current && !actionMenuRef.current.contains(event.target)) {
         setActionMenuOpen(null)
       }
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    // Use a slight delay to allow button clicks to register first
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside)
+    }, 100)
+    return () => {
+      clearTimeout(timeoutId)
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
   }, [])
 
   useEffect(() => {
@@ -67,11 +77,11 @@ export default function Transactions({
       const params = { ...filters, page, per_page: perPage }
 
       if (archivedFilter === 'archived') {
-        params.archived = true
+        params.archived = 1 // Send as numeric 1 for archived transactions
       } else if (archivedFilter === 'active') {
-        params.archived = false
+        params.archived = 0 // Send as numeric 0 for active transactions
       } else if (archivedFilter === 'all') {
-        params.include_archived = true
+        params.include_archived = 1 // Include both archived and active
       }
 
       return getTransactions(params)
@@ -146,13 +156,28 @@ export default function Transactions({
   })
 
   const archiveMutation = useMutation({
-    mutationFn: ({ id, reason }) => archiveTransaction(id, reason),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['transactions'])
-      alert('Transaction archived')
+    mutationFn: ({ id, reason }) => {
+      console.log('archiveMutation.mutationFn called - Archiving transaction:', id, 'reason:', reason)
+      if (!id) {
+        console.error('No transaction ID provided to archiveMutation')
+        throw new Error('Transaction ID is required')
+      }
+      const result = archiveTransaction(id, reason)
+      console.log('archiveTransaction call initiated, promise:', result)
+      return result
+    },
+    onSuccess: (data) => {
+      console.log('Archive success:', data)
+      // Invalidate all transaction queries to refresh the list
+      queryClient.invalidateQueries({ queryKey: ['transactions'] })
+      alert(data?.message || 'Transaction archived successfully')
     },
     onError: (error) => {
-      alert(error.response?.data?.message || 'Failed to archive transaction')
+      console.error('Archive error:', error)
+      console.error('Archive error response:', error.response)
+      console.error('Archive error message:', error.message)
+      console.error('Archive error stack:', error.stack)
+      alert(error.response?.data?.message || error.message || 'Failed to archive transaction')
     },
   })
 
@@ -346,19 +371,52 @@ export default function Transactions({
   }
 
   const handleArchive = (transaction) => {
+    console.log('=== handleArchive START ===')
+    console.log('handleArchive called with transaction:', transaction)
+    console.log('Transaction ID:', transaction?.id)
+    
     if (archiveMutation.isPending) {
+      console.log('Archive mutation is already pending, skipping')
+      alert('Archive operation already in progress')
       return
     }
 
-    const reason = prompt('Enter a reason for archiving (optional):')?.trim()
-    if (reason === undefined) {
+    if (!transaction) {
+      console.error('No transaction provided')
+      alert('Error: No transaction data')
       return
     }
 
-    archiveMutation.mutate({
-      id: transaction.id,
-      reason: reason || undefined,
-    })
+    if (!transaction.id) {
+      console.error('Invalid transaction - no ID:', transaction)
+      alert('Error: Transaction ID not found')
+      return
+    }
+
+    console.log('Showing prompt for archive reason')
+    const reason = prompt('Enter a reason for archiving (optional):')
+    console.log('Prompt result:', reason, 'Type:', typeof reason)
+    
+    // If user cancels, prompt returns null, so we exit
+    if (reason === null) {
+      console.log('User cancelled archive prompt')
+      return
+    }
+
+    // Trim the reason if provided, otherwise use undefined
+    const trimmedReason = reason ? reason.trim() : undefined
+    const mutationPayload = { id: transaction.id, reason: trimmedReason }
+    console.log('Calling archiveMutation.mutate with:', mutationPayload)
+    console.log('Archive mutation object:', archiveMutation)
+
+    try {
+      archiveMutation.mutate(mutationPayload)
+      console.log('archiveMutation.mutate called successfully')
+    } catch (error) {
+      console.error('Error calling archiveMutation.mutate:', error)
+      alert('Error: ' + (error.message || 'Failed to initiate archive'))
+    }
+    console.log('=== handleArchive END ===')
   }
 
   const handleBulkArchive = () => {
@@ -655,7 +713,11 @@ export default function Transactions({
               {transactions.length === 0 ? (
                 <tr>
                   <td colSpan="9" className="px-4 py-12 text-center text-sm text-gray-500">
-                    No transactions found. {filters.status || filters.search || filters.member_id ? 'Try adjusting your filters.' : 'Upload a bank statement to get started.'}
+                    {isArchivedView 
+                      ? 'No archived transactions found.' 
+                      : filters.status || filters.search || filters.member_id 
+                        ? 'No transactions found. Try adjusting your filters.' 
+                        : 'No transactions found. Upload a bank statement to get started.'}
                   </td>
                 </tr>
               ) : (
@@ -789,9 +851,31 @@ export default function Transactions({
                                     {tx.member_id ? 'Transfer/Share' : 'Assign/Share'}
                                   </button>
                                   <button
-                                    onClick={() => {
-                                      handleArchive(tx)
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      console.log('=== Archive button clicked ===')
+                                      console.log('Event:', e)
+                                      console.log('Transaction:', tx)
+                                      console.log('Transaction ID:', tx.id)
+                                      
+                                      const transactionId = tx.id
+                                      if (!transactionId) {
+                                        console.error('No transaction ID found')
+                                        alert('Error: Transaction ID not found')
+                                        setActionMenuOpen(null)
+                                        return
+                                      }
+                                      
+                                      // Close menu first to prevent click outside handler from interfering
                                       setActionMenuOpen(null)
+                                      
+                                      // Use requestAnimationFrame to ensure menu closes before prompt
+                                      requestAnimationFrame(() => {
+                                        console.log('Calling handleArchive with transaction:', tx)
+                                        handleArchive(tx)
+                                      })
                                     }}
                                     disabled={archiveMutation.isPending && archivingId === tx.id}
                                     className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 disabled:opacity-50"
