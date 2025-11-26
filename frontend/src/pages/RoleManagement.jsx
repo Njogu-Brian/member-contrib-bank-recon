@@ -105,9 +105,33 @@ export default function RoleManagement() {
       .replace(/(^_|_$)/g, '')
   }
 
-  const roles = rolesData?.data || []
-  const permissions = permissionsData?.data?.permissions || []
-  const groupedPermissions = permissionsData?.data?.grouped || {}
+  // Handle roles response 
+  // getRoles() returns axios response object, react-query stores it as-is
+  // So rolesData = axios response = { data: { data: [...] }, status: 200, ... }
+  // Backend returns { data: [...] }
+  // So rolesData.data = { data: [...] }
+  // And rolesData.data.data = [...]
+  const rolesResponse = rolesData?.data
+  let roles = []
+  if (Array.isArray(rolesResponse?.data)) {
+    roles = rolesResponse.data
+  } else if (Array.isArray(rolesResponse)) {
+    roles = rolesResponse
+  } else if (Array.isArray(rolesData)) {
+    roles = rolesData
+  }
+  
+  // Handle permissions response - axios returns { data: { permissions: [...], grouped: {...} } }
+  // permissionsData from react-query is the axios response.data
+  // Backend returns { permissions: [...], grouped: {...} }
+  // So permissionsData is { permissions: [...], grouped: {...} }
+  const permissionsResponse = permissionsData || permissionsData?.data
+  const permissions = Array.isArray(permissionsResponse?.permissions)
+    ? permissionsResponse.permissions
+    : Array.isArray(permissionsResponse?.data?.permissions)
+      ? permissionsResponse.data.permissions
+      : []
+  const groupedPermissions = permissionsResponse?.grouped || permissionsResponse?.data?.grouped || {}
 
   return (
     <div className="p-6">
@@ -146,10 +170,10 @@ export default function RoleManagement() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {roles.length === 0 ? (
+                {!Array.isArray(roles) || roles.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
-                      No roles found
+                      {!Array.isArray(roles) ? 'Loading...' : 'No roles found'}
                     </td>
                   </tr>
                 ) : (

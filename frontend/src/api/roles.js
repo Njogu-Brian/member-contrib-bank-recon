@@ -1,22 +1,23 @@
-import api from './axios'
+import { adminApi } from './axios'
 
-export const getRoles = (params = {}) => {
-  return api.get('/v1/admin/admin/roles', { params })
+export const getRoles = async (params = {}) => {
+  const response = await adminApi.get('/roles', { params })
+  return response
 }
 
 export const getRole = (id) => {
-  return api.get(`/v1/admin/admin/roles/${id}`)
+  return adminApi.get(`/roles/${id}`)
 }
 
 export const createRole = (data) => {
-  return api.post('/v1/admin/admin/roles', data)
+  return adminApi.post('/roles', data)
 }
 
 export const updateRole = (id, data) => {
-  return api.put(`/v1/admin/admin/roles/${id}`, data)
+  return adminApi.put(`/roles/${id}`, data)
 }
 
 export const deleteRole = (id) => {
-  return api.delete(`/v1/admin/admin/roles/${id}`)
+  return adminApi.delete(`/roles/${id}`)
 }
 

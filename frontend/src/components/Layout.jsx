@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useMemo, useState, useEffect } from 'react'
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import { Dialog, Transition } from '@headlessui/react'
 import {
@@ -15,6 +15,8 @@ import { NAVIGATION } from '../config/navigation'
 import { featureFlags } from '../config/featureFlags'
 import { useAuthContext } from '../context/AuthContext'
 import { hasRole, ROLE_LABELS, useRoleBadge } from '../lib/rbac'
+import { useQuery } from '@tanstack/react-query'
+import { getSettings } from '../api/settings'
 
 const quickActions = [
   { label: 'Record contribution', path: '/manual-contributions' },
@@ -29,6 +31,43 @@ export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, roles, logout } = useAuthContext()
+  
+  // Apply branding
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: getSettings,
+    staleTime: 5 * 60 * 1000,
+  })
+  
+  // Normalize logo URL for dev server proxy
+  const normalizeUrl = (url) => {
+    if (!url) return null
+    if (url.startsWith('http://localhost/storage/') || url.startsWith('http://localhost:8000/storage/')) {
+      return url.replace(/^https?:\/\/[^/]+/, '')
+    }
+    return url
+  }
+  
+  const appName = settings?.app_name || 'Evimeria Portal'
+  const logoUrl = normalizeUrl(settings?.logo_url || settings?.Logo_url)
+  
+  useEffect(() => {
+    if (settings) {
+      const root = document.documentElement
+      if (settings.theme_primary_color) {
+        root.style.setProperty('--color-brand-600', settings.theme_primary_color)
+      }
+      if (settings.theme_secondary_color) {
+        root.style.setProperty('--color-brand-500', settings.theme_secondary_color)
+      }
+      if (settings.login_background_color) {
+        root.style.setProperty('--login-bg-color', settings.login_background_color)
+      }
+      if (settings.login_text_color) {
+        root.style.setProperty('--login-text-color', settings.login_text_color)
+      }
+    }
+  }, [settings])
 
   const initials = user?.name
     ? user.name
@@ -168,11 +207,37 @@ export default function Layout() {
               leaveFrom="translate-x-0"
               leaveTo="-translate-x-full"
             >
-              <Dialog.Panel className="relative mr-16 flex w-full max-w-xs flex-1 flex-col bg-slate-900 px-4 pb-6 pt-6 shadow-xl">
+              <Dialog.Panel 
+                className="relative mr-16 flex w-full max-w-xs flex-1 flex-col px-4 pb-6 pt-6 shadow-xl text-white"
+                style={{
+                  backgroundColor: settings?.navbar_background_color || '#1e293b',
+                }}
+              >
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-lg font-semibold text-white">Evimeria Portal</p>
-                    <p className="text-xs text-slate-400">Admin Console</p>
+                  <div className="flex items-center gap-3">
+                    {/* Logo in white container for white background logos */}
+                    <div className="rounded-xl bg-white p-2">
+                      {logoUrl ? (
+                        <img 
+                          src={logoUrl} 
+                          alt={appName}
+                          className="h-7 object-contain max-w-[140px]"
+                          onError={(e) => {
+                            console.error('Failed to load logo:', logoUrl)
+                            e.target.style.display = 'none'
+                          }}
+                          onLoad={() => console.log('Mobile sidebar logo loaded successfully:', logoUrl)}
+                        />
+                      ) : (
+                        <div className="h-7 w-7 rounded bg-brand-600 flex items-center justify-center">
+                          <span className="text-xs font-bold text-white">EV</span>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-lg font-semibold text-white">{appName}</p>
+                      <p className="text-xs text-slate-400">Admin Console</p>
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -194,13 +259,34 @@ export default function Layout() {
 
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:z-30 lg:flex lg:w-72">
-        <div className="flex h-screen w-full flex-col border-r border-slate-800 bg-slate-900 text-white shadow-2xl">
+        <div 
+          className="flex h-screen w-full flex-col border-r border-slate-800 text-white shadow-2xl"
+          style={{
+            backgroundColor: settings?.navbar_background_color || '#1e293b', // Default to slate-900
+          }}
+        >
           <div className="flex h-20 items-center gap-3 border-b border-white/10 px-6">
-            <div className="rounded-2xl bg-white/10 p-3 text-white">
-              <span className="text-xl font-bold">EV</span>
+            {/* Logo in white container for white background logos */}
+            <div className="rounded-xl bg-white p-2">
+              {logoUrl ? (
+                <img 
+                  src={logoUrl} 
+                  alt={appName}
+                  className="h-8 object-contain max-w-[160px]"
+                  onError={(e) => {
+                    console.error('Failed to load logo:', logoUrl)
+                    e.target.style.display = 'none'
+                  }}
+                  onLoad={() => console.log('Sidebar logo loaded successfully:', logoUrl)}
+                />
+              ) : (
+                <div className="h-8 w-8 rounded bg-brand-600 flex items-center justify-center">
+                  <span className="text-sm font-bold text-white">EV</span>
+                </div>
+              )}
             </div>
             <div>
-              <p className="text-sm font-semibold text-white">Evimeria Group</p>
+              <p className="text-sm font-semibold text-white">{appName}</p>
               <p className="text-xs text-slate-300">Management Portal</p>
             </div>
           </div>
@@ -244,10 +330,30 @@ export default function Layout() {
             >
               <HiOutlineBars3 className="h-6 w-6" />
             </button>
-            <div>
-              <p className="text-sm font-semibold text-slate-900">Evimeria Portal</p>
-              <p className="text-xs text-slate-500">Admin Console</p>
+            {/* Logo in white container for mobile header */}
+            <div className="rounded-lg bg-white p-1.5">
+              {logoUrl ? (
+                <img 
+                  src={logoUrl} 
+                  alt={appName}
+                  className="h-7 object-contain max-w-[120px]"
+                  onError={(e) => {
+                    console.error('Failed to load logo:', logoUrl)
+                    e.target.style.display = 'none'
+                  }}
+                />
+              ) : (
+                <div className="h-7 w-7 rounded bg-brand-600 flex items-center justify-center">
+                  <span className="text-xs font-bold text-white">EV</span>
+                </div>
+              )}
             </div>
+            {!logoUrl && (
+              <div>
+                <p className="text-sm font-semibold text-slate-900">{appName}</p>
+                <p className="text-xs text-slate-500">Admin Console</p>
+              </div>
+            )}
           </div>
           <div className="hidden lg:flex items-center gap-3">
             <div className="relative">
@@ -307,22 +413,6 @@ export default function Layout() {
           </div>
         </div>
 
-        {!featureFlags.mpesa || !featureFlags.sms || !featureFlags.fcm ? (
-          <div className="border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 lg:mx-10 lg:rounded-2xl">
-            <p className="font-semibold">Sand-box mode</p>
-            <p>
-              Live integrations disabled:{' '}
-              {[
-                !featureFlags.mpesa && 'MPESA',
-                !featureFlags.sms && 'Bulk SMS',
-                !featureFlags.fcm && 'Push notifications',
-              ]
-                .filter(Boolean)
-                .join(', ')}
-              . Provide credentials in `.env` to unlock full workflow.
-            </p>
-          </div>
-        ) : null}
 
         <main className="px-4 py-6 lg:px-10 lg:py-10">
           <Outlet />

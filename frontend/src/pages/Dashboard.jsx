@@ -1,11 +1,21 @@
 import { useQuery } from '@tanstack/react-query'
 import { getDashboard } from '../api/dashboard'
+import { getSettings } from '../api/settings'
 
 export default function Dashboard() {
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard'],
     queryFn: getDashboard,
   })
+  
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: getSettings,
+    staleTime: 5 * 60 * 1000,
+  })
+  
+  const appName = settings?.app_name || 'Dashboard'
+  const logoUrl = settings?.logo_url
 
   if (isLoading) {
     return <div className="text-center py-12">Loading...</div>
@@ -19,7 +29,18 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          {logoUrl && (
+            <img 
+              src={logoUrl} 
+              alt={appName}
+              className="h-12 object-contain"
+            />
+          )}
+          <h1 className="text-3xl font-bold text-gray-900">{appName}</h1>
+        </div>
+      </div>
 
       {/* Statistics */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">

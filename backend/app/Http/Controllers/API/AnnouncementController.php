@@ -20,6 +20,35 @@ class AnnouncementController extends Controller
         return response()->json($this->announcementService->list());
     }
 
+    /**
+     * Public announcements for login page (no auth required)
+     * Returns only published announcements
+     */
+    public function publicList(): JsonResponse
+    {
+        // Get published announcements (published_at is null or in the past)
+        $announcements = Announcement::where(function ($query) {
+                // Only show announcements that are published (published_at is null or in the past)
+                $query->whereNull('published_at')
+                    ->orWhere('published_at', '<=', now());
+            })
+            ->orderBy('is_pinned', 'desc') // Pinned announcements first
+            ->orderBy('created_at', 'desc')
+            ->limit(5) // Limit to recent 5 for login page
+            ->get()
+            ->map(function ($announcement) {
+                return [
+                    'id' => $announcement->id,
+                    'title' => $announcement->title,
+                    'content' => $announcement->body ?? '',
+                    'created_at' => $announcement->created_at,
+                    'is_pinned' => $announcement->is_pinned ?? false,
+                ];
+            });
+        
+        return response()->json($announcements);
+    }
+
     public function store(AnnouncementRequest $request): JsonResponse
     {
         $announcement = $this->announcementService->create($request->validated(), $request->user()->id);

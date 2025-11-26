@@ -1,30 +1,31 @@
-import api from './axios'
+import { adminApi } from './axios'
 
-export const getStaff = (params = {}) => {
-  return api.get('/v1/admin/admin/staff', { params })
+export const getStaff = async (params = {}) => {
+  const response = await adminApi.get('/staff', { params })
+  return response
 }
 
 export const getStaffMember = (id) => {
-  return api.get(`/v1/admin/admin/staff/${id}`)
+  return adminApi.get(`/staff/${id}`)
 }
 
 export const createStaff = (data) => {
-  return api.post('/v1/admin/admin/staff', data)
+  return adminApi.post('/staff', data)
 }
 
 export const updateStaff = (id, data) => {
-  return api.put(`/v1/admin/admin/staff/${id}`, data)
+  return adminApi.put(`/staff/${id}`, data)
 }
 
 export const deleteStaff = (id) => {
-  return api.delete(`/v1/admin/admin/staff/${id}`)
+  return adminApi.delete(`/staff/${id}`)
 }
 
 export const resetStaffPassword = (id, data) => {
-  return api.post(`/v1/admin/admin/staff/${id}/reset-password`, data)
+  return adminApi.post(`/staff/${id}/reset-password`, data)
 }
 
 export const toggleStaffStatus = (id) => {
-  return api.post(`/v1/admin/admin/staff/${id}/toggle-status`)
+  return adminApi.post(`/staff/${id}/toggle-status`)
 }
 

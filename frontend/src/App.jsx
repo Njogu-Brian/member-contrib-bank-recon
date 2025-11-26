@@ -1,5 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
+import ChangePassword from './pages/ChangePassword'
 import Dashboard from './pages/Dashboard'
 import Members from './pages/Members'
 import Statements from './pages/Statements'
@@ -30,7 +33,7 @@ import UiKit from './pages/UiKit'
 import StaffManagement from './pages/StaffManagement'
 import RoleManagement from './pages/RoleManagement'
 import ActivityLogs from './pages/ActivityLogs'
-import AdminSettings from './pages/AdminSettings'
+import MfaSetup from './pages/MfaSetup'
 import FullScreenLoader from './components/FullScreenLoader'
 import { useAuthContext } from './context/AuthContext'
 import { hasRole, ROLES } from './lib/rbac'
@@ -68,6 +71,30 @@ function App() {
           <PublicRoute>
             <Login />
           </PublicRoute>
+        }
+      />
+      <Route
+        path="/forgot-password"
+        element={
+          <PublicRoute>
+            <ForgotPassword />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          <PublicRoute>
+            <ResetPassword />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/change-password"
+        element={
+          <ProtectedRoute>
+            <ChangePassword />
+          </ProtectedRoute>
         }
       />
       <Route path="/unauthorized" element={<Unauthorized />} />
@@ -111,7 +138,14 @@ function App() {
         <Route path="bulk-sms" element={<BulkSms />} />
         <Route path="compliance" element={<Compliance />} />
         <Route path="attendance-uploads" element={<AttendanceUploads />} />
-        <Route path="settings" element={<Settings />} />
+        <Route
+          path="settings"
+          element={
+            <ProtectedRoute roles={[ROLES.SUPER_ADMIN, ROLES.IT_SUPPORT]}>
+              <Settings />
+            </ProtectedRoute>
+          }
+        />
         <Route path="reports" element={<Reports />} />
         <Route path="audit" element={<Audit />} />
         <Route
@@ -151,11 +185,19 @@ function App() {
             path="settings"
             element={
               <ProtectedRoute roles={[ROLES.SUPER_ADMIN, ROLES.IT_SUPPORT]}>
-                <AdminSettings />
+                <Settings />
               </ProtectedRoute>
             }
           />
         </Route>
+        <Route
+          path="mfa-setup"
+          element={
+            <ProtectedRoute>
+              <MfaSetup />
+            </ProtectedRoute>
+          }
+        />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

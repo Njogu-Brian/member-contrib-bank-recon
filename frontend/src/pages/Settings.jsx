@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getSettings, updateSettings } from '../api/settings'
+import { getMfaSetup, enableMfa, disableMfa } from '../api/mfa'
+import { useAuthContext } from '../context/AuthContext'
 import {
   getContributionStatuses,
   createContributionStatus,
@@ -10,94 +12,593 @@ import {
 } from '../api/contributionStatuses'
 
 export default function Settings() {
+  const [activeTab, setActiveTab] = useState('branding')
   const [formData, setFormData] = useState({
     contribution_start_date: '',
     weekly_contribution_amount: 1000,
+    logo: null,
+    favicon: null,
   })
+  const [logoPreview, setLogoPreview] = useState(null)
+  const [faviconPreview, setFaviconPreview] = useState(null)
+  const [mfaCode, setMfaCode] = useState('')
+  const [showMfaSetup, setShowMfaSetup] = useState(false)
   const queryClient = useQueryClient()
+  const { user } = useAuthContext()
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ['settings'],
     queryFn: getSettings,
-    onSuccess: (data) => {
-      setFormData({
-        contribution_start_date: data.contribution_start_date || '',
-        weekly_contribution_amount: parseFloat(data.weekly_contribution_amount) || 1000,
-      })
-    },
   })
+
+  // Helper to normalize storage URLs for dev server
+  const normalizeUrl = (url) => {
+    if (!url) return null
+    // Convert absolute localhost URLs to relative for Vite proxy
+    if (url.startsWith('http://localhost/storage/') || url.startsWith('http://localhost:8000/storage/')) {
+      return url.replace(/^https?:\/\/[^/]+/, '')
+    }
+    return url
+  }
+
+  // Update form when settings load
+  useEffect(() => {
+    if (settings) {
+      setFormData({
+        contribution_start_date: settings.contribution_start_date || '',
+        weekly_contribution_amount: parseFloat(settings.weekly_contribution_amount) || 1000,
+        logo: null,
+        favicon: null,
+      })
+      // Update previews with URLs (try both lowercase and capitalized versions, normalize for dev server)
+      setLogoPreview(normalizeUrl(settings.logo_url || settings.Logo_url))
+      setFaviconPreview(normalizeUrl(settings.favicon_url || settings.Favicon_url))
+    }
+  }, [settings])
+
+  // Favicon is handled by SettingsContext
+
+  const [adminSettings, setAdminSettings] = useState({})
 
   const updateMutation = useMutation({
     mutationFn: updateSettings,
-    onSuccess: () => {
-      queryClient.invalidateQueries(['settings'])
+    onSuccess: (response) => {
+      console.log('Settings saved successfully:', response.data)
+      
+      // Update previews with new URLs from response immediately (normalize for dev server)
+      const logoUrl = response?.data?.logo_url || response?.data?.Logo_url
+      if (logoUrl) {
+        const normalizedLogoUrl = normalizeUrl(logoUrl)
+        console.log('Setting logo preview:', normalizedLogoUrl)
+        setLogoPreview(normalizedLogoUrl)
+      }
+      
+      const faviconUrl = response?.data?.favicon_url || response?.data?.Favicon_url
+      if (faviconUrl) {
+        const normalizedFaviconUrl = normalizeUrl(faviconUrl)
+        console.log('Setting favicon preview:', normalizedFaviconUrl)
+        setFaviconPreview(normalizedFaviconUrl)
+      }
+      
+      // Update admin settings if colors were saved
+      if (response?.data?.theme_primary_color || response?.data?.theme_secondary_color || 
+          response?.data?.login_background_color || response?.data?.login_text_color) {
+        setAdminSettings(prev => ({
+          ...prev,
+          theme_primary_color: response.data.theme_primary_color || prev.theme_primary_color || settings?.theme_primary_color,
+          theme_secondary_color: response.data.theme_secondary_color || prev.theme_secondary_color || settings?.theme_secondary_color,
+          login_background_color: response.data.login_background_color || prev.login_background_color || settings?.login_background_color,
+          login_text_color: response.data.login_text_color || prev.login_text_color || settings?.login_text_color,
+        }))
+        
+        // Immediately update CSS variables
+        const root = document.documentElement
+        if (response.data.theme_primary_color) {
+          root.style.setProperty('--color-brand-600', response.data.theme_primary_color)
+          root.style.setProperty('--color-brand-700', response.data.theme_primary_color)
+        }
+        if (response.data.theme_secondary_color) {
+          root.style.setProperty('--color-brand-500', response.data.theme_secondary_color)
+        }
+        if (response.data.login_background_color) {
+          root.style.setProperty('--login-bg-color', response.data.login_background_color)
+        }
+        if (response.data.login_text_color) {
+          root.style.setProperty('--login-text-color', response.data.login_text_color)
+        }
+        
+        // Update favicon immediately (also normalize URL)
+        const faviconUrl = response?.data?.favicon_url || response?.data?.Favicon_url
+        if (faviconUrl) {
+          let normalizedFaviconUrl = faviconUrl
+          if (faviconUrl.startsWith('http://localhost/storage/') || faviconUrl.startsWith('http://localhost:8000/storage/')) {
+            normalizedFaviconUrl = faviconUrl.replace(/^https?:\/\/[^/]+/, '')
+          }
+          
+          const existingLinks = document.querySelectorAll("link[rel*='icon']")
+          existingLinks.forEach(link => link.remove())
+          const link = document.createElement('link')
+          link.rel = 'icon'
+          link.type = 'image/x-icon'
+          link.href = normalizedFaviconUrl
+          document.head.appendChild(link)
+        }
+      }
+      
+      // Invalidate and refetch settings to update UI immediately
+      queryClient.invalidateQueries({ queryKey: ['settings'] })
+      queryClient.refetchQueries({ queryKey: ['settings'] })
+      
+      // Reset file inputs after successful save
+      setFormData(prev => ({
+        ...prev,
+        logo: null,
+        favicon: null,
+      }))
+      
       alert('Settings saved successfully!')
+    },
+    onError: (error) => {
+      console.error('Settings save error:', error)
+      console.error('Error response:', error?.response)
+      const errorMessage = error?.response?.data?.message || 
+                          error?.response?.data?.error || 
+                          (error?.response?.data?.errors ? JSON.stringify(error.response.data.errors) : null) ||
+                          'Failed to save settings. Please try again.'
+      alert(errorMessage)
     },
   })
 
+  // Update admin settings when settings load
+  useEffect(() => {
+    if (settings && settings.categories) {
+      const adminData = {}
+      Object.keys(settings.categories).forEach(category => {
+        settings.categories[category].forEach(key => {
+          if (settings[key] !== undefined) {
+            adminData[key] = settings[key]
+          }
+        })
+      })
+      setAdminSettings(adminData)
+    }
+  }, [settings])
+
   const handleSubmit = (e) => {
     e.preventDefault()
-    updateMutation.mutate(formData)
+    if (activeTab === 'admin') {
+      // Submit admin settings
+      updateMutation.mutate({ settings: adminSettings })
+    } else {
+      // Submit branding/contribution settings
+      updateMutation.mutate(formData)
+    }
+  }
+
+  const handleAdminSettingChange = (key, value) => {
+    setAdminSettings(prev => ({ ...prev, [key]: value }))
+  }
+
+  const handleLogoChange = (e) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setFormData({ ...formData, logo: file })
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setLogoPreview(reader.result)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleFaviconChange = (e) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setFormData({ ...formData, favicon: file })
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setFaviconPreview(reader.result)
+      }
+      reader.readAsDataURL(file)
+    }
   }
 
   if (isLoading) {
     return <div className="text-center py-12">Loading...</div>
   }
 
+  const categories = settings?.categories || {}
+  const currentAdminSettings = { ...settings, ...adminSettings }
+
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-
-      <div className="bg-white shadow rounded-lg p-6">
-        <h2 className="text-xl font-semibold mb-4">Contribution Settings</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Contribution Start Date *
-            </label>
-            <input
-              type="date"
-              required
-              value={formData.contribution_start_date}
-              onChange={(e) => setFormData({ ...formData, contribution_start_date: e.target.value })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            />
-            <p className="mt-1 text-sm text-gray-500">
-              The date from which weekly contributions will be calculated
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Weekly Contribution Amount (KES) *
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              required
-              value={formData.weekly_contribution_amount}
-              onChange={(e) => setFormData({ ...formData, weekly_contribution_amount: parseFloat(e.target.value) || 0 })}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            />
-            <p className="mt-1 text-sm text-gray-500">
-              The expected weekly contribution amount per member (default: 1000)
-            </p>
-          </div>
-
-          <div className="pt-4">
-            <button
-              type="submit"
-              disabled={updateMutation.isPending}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {updateMutation.isPending ? 'Saving...' : 'Save Settings'}
-            </button>
-          </div>
-        </form>
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+        <p className="text-sm text-gray-600 mt-1">Configure system settings and preferences</p>
       </div>
 
-      <StatusRulesSection />
+      {/* Tabs */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="border-b border-gray-200">
+          <nav className="flex -mb-px px-6">
+            <button
+              onClick={() => setActiveTab('branding')}
+              className={`px-6 py-3 text-sm font-medium border-b-2 ${
+                activeTab === 'branding'
+                  ? 'border-brand-500 text-brand-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Branding
+            </button>
+            <button
+              onClick={() => setActiveTab('contributions')}
+              className={`px-6 py-3 text-sm font-medium border-b-2 ${
+                activeTab === 'contributions'
+                  ? 'border-brand-500 text-brand-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Contributions
+            </button>
+            <button
+              onClick={() => setActiveTab('statuses')}
+              className={`px-6 py-3 text-sm font-medium border-b-2 ${
+                activeTab === 'statuses'
+                  ? 'border-brand-500 text-brand-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Status Rules
+            </button>
+            {Object.keys(categories).length > 0 && (
+              <>
+                {Object.keys(categories)
+                  .filter(category => category !== 'branding') // Exclude branding - it has its own dedicated tab
+                  .map((category) => (
+                  <button
+                    key={category}
+                    onClick={() => setActiveTab(category)}
+                    className={`px-6 py-3 text-sm font-medium border-b-2 ${
+                      activeTab === category
+                        ? 'border-brand-500 text-brand-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                  </button>
+                ))}
+              </>
+            )}
+          </nav>
+        </div>
+
+        <div className="p-6">
+          {/* Branding Tab */}
+          {activeTab === 'branding' && (
+            <div className="space-y-6">
+              <h2 className="text-xl font-semibold mb-4">Branding</h2>
+              
+              {/* Logo and Favicon */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Logo
+                  </label>
+                  {logoPreview && (
+                    <div className="mb-3">
+                      <img 
+                        src={logoPreview} 
+                        alt="Logo preview" 
+                        className="h-20 object-contain border border-gray-200 rounded p-2 bg-gray-50"
+                      />
+                    </div>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoChange}
+                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">Recommended: PNG, JPG or SVG. Max 2MB</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Favicon
+                  </label>
+                  {faviconPreview && (
+                    <div className="mb-3">
+                      <img 
+                        src={faviconPreview} 
+                        alt="Favicon preview" 
+                        className="h-16 w-16 object-contain border border-gray-200 rounded p-2 bg-gray-50"
+                      />
+                    </div>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*,.ico"
+                    onChange={handleFaviconChange}
+                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">Recommended: ICO, PNG. Max 512KB</p>
+                </div>
+              </div>
+
+                    {/* Branding Colors */}
+                    <div className="border-t pt-6">
+                      <h3 className="text-lg font-medium text-gray-900 mb-4">Branding Colors</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {categories.branding?.map((key) => {
+                          if (key.includes('color') || key.includes('Color')) {
+                            // Set default color based on the setting type
+                            let defaultValue = '#6366f1'
+                            if (key === 'navbar_background_color') {
+                              defaultValue = '#1e293b' // Default dark blue
+                            } else if (key === 'login_background_color') {
+                              defaultValue = '#ffffff'
+                            } else if (key === 'login_text_color') {
+                              defaultValue = '#1e293b'
+                            }
+                            
+                            return (
+                              <div key={key}>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                </label>
+                                <input
+                                  type="color"
+                                  value={adminSettings[key] || settings?.[key] || defaultValue}
+                                  onChange={(e) => handleAdminSettingChange(key, e.target.value)}
+                                  className="h-12 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-brand-500 cursor-pointer"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">
+                                  {key === 'navbar_background_color' && 'Background color for the sidebar/navbar'}
+                                  {key === 'theme_primary_color' && 'Primary brand color (buttons, links)'}
+                                  {key === 'theme_secondary_color' && 'Secondary brand color'}
+                                  {key === 'login_background_color' && 'Login page background color'}
+                                  {key === 'login_text_color' && 'Login page text color'}
+                                </p>
+                              </div>
+                            )
+                          }
+                          return null
+                        })}
+                      </div>
+                    </div>
+
+              <div className="flex gap-3 pt-6 mt-6 border-t border-gray-200">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    console.log('Save Branding clicked', {
+                      formData,
+                      logo: formData.logo instanceof File ? formData.logo.name : formData.logo,
+                      favicon: formData.favicon instanceof File ? formData.favicon.name : formData.favicon,
+                      adminSettings,
+                    })
+                    // Include both files and branding colors
+                    const brandingData = {
+                      ...formData,
+                      // Include all branding color settings
+                      theme_primary_color: adminSettings.theme_primary_color || settings?.theme_primary_color || null,
+                      theme_secondary_color: adminSettings.theme_secondary_color || settings?.theme_secondary_color || null,
+                      login_background_color: adminSettings.login_background_color || settings?.login_background_color || null,
+                      login_text_color: adminSettings.login_text_color || settings?.login_text_color || null,
+                      navbar_background_color: adminSettings.navbar_background_color || settings?.navbar_background_color || null,
+                    }
+                    // Remove null values to avoid sending them
+                    Object.keys(brandingData).forEach(key => {
+                      if (brandingData[key] === null) {
+                        delete brandingData[key]
+                      }
+                    })
+                    updateMutation.mutate(brandingData)
+                  }}
+                  disabled={updateMutation.isPending}
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {updateMutation.isPending ? 'Saving...' : 'Save Branding'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Contributions Tab */}
+          {activeTab === 'contributions' && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold mb-4">Contribution Settings</h2>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Contribution Start Date *
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.contribution_start_date}
+                    onChange={(e) => setFormData({ ...formData, contribution_start_date: e.target.value })}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  />
+                  <p className="mt-1 text-sm text-gray-500">
+                    The date from which weekly contributions will be calculated
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Weekly Contribution Amount (KES) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    value={formData.weekly_contribution_amount}
+                    onChange={(e) => setFormData({ ...formData, weekly_contribution_amount: parseFloat(e.target.value) || 0 })}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  />
+                  <p className="mt-1 text-sm text-gray-500">
+                    The expected weekly contribution amount per member (default: 1000)
+                  </p>
+                </div>
+
+                <div className="pt-4 border-t">
+                  <button
+                    type="submit"
+                    disabled={updateMutation.isPending}
+                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    {updateMutation.isPending ? 'Saving...' : 'Save Settings'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* Status Rules Tab */}
+          {activeTab === 'statuses' && (
+            <div>
+              <StatusRulesSection />
+            </div>
+          )}
+
+          {/* Admin Settings Tabs */}
+          {Object.keys(categories)
+            .filter(category => category !== 'branding') // Exclude branding - it has its own dedicated tab
+            .map((category) => {
+            if (activeTab === category) {
+              return (
+                <form key={category} onSubmit={handleSubmit} className="space-y-6">
+                  <h2 className="text-xl font-semibold mb-4">
+                    {category.charAt(0).toUpperCase() + category.slice(1)} Settings
+                  </h2>
+                  {categories[category]?.map((key) => {
+                    // Special handling for specific fields
+                    if (category === 'general') {
+                      if (key === 'currency' || key === 'default_currency') {
+                        return (
+                          <div key={key}>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              {key === 'default_currency' ? 'Default Currency' : 'Currency'}
+                            </label>
+                            <select
+                              value={currentAdminSettings[key] || 'KES'}
+                              onChange={(e) => handleAdminSettingChange(key, e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500"
+                            >
+                              <option value="KES">KES - Kenyan Shilling</option>
+                              <option value="USD">USD - US Dollar</option>
+                              <option value="EUR">EUR - Euro</option>
+                              <option value="GBP">GBP - British Pound</option>
+                              <option value="UGX">UGX - Ugandan Shilling</option>
+                              <option value="TZS">TZS - Tanzanian Shilling</option>
+                            </select>
+                          </div>
+                        )
+                      }
+                      if (key === 'date_format') {
+                        return (
+                          <div key={key}>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Date Format
+                            </label>
+                            <select
+                              value={currentAdminSettings[key] || 'Y-m-d'}
+                              onChange={(e) => handleAdminSettingChange(key, e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500"
+                            >
+                              <option value="Y-m-d">YYYY-MM-DD (2024-12-25)</option>
+                              <option value="d/m/Y">DD/MM/YYYY (25/12/2024)</option>
+                              <option value="m/d/Y">MM/DD/YYYY (12/25/2024)</option>
+                              <option value="d-M-Y">DD-MMM-YYYY (25-Dec-2024)</option>
+                              <option value="F j, Y">Month DD, YYYY (December 25, 2024)</option>
+                            </select>
+                          </div>
+                        )
+                      }
+                      if (key === 'timezone') {
+                        return (
+                          <div key={key}>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Timezone
+                            </label>
+                            <select
+                              value={currentAdminSettings[key] || 'Africa/Nairobi'}
+                              onChange={(e) => handleAdminSettingChange(key, e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500"
+                            >
+                              <option value="Africa/Nairobi">Africa/Nairobi (EAT)</option>
+                              <option value="Africa/Kampala">Africa/Kampala (EAT)</option>
+                              <option value="Africa/Dar_es_Salaam">Africa/Dar_es_Salaam (EAT)</option>
+                              <option value="UTC">UTC</option>
+                            </select>
+                          </div>
+                        )
+                      }
+                    }
+                    
+                    if (category === 'branding' && (key.includes('color') || key.includes('Color'))) {
+                      return (
+                        <div key={key}>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          </label>
+                          <input
+                            type="color"
+                            value={currentAdminSettings[key] || '#6366f1'}
+                            onChange={(e) => handleAdminSettingChange(key, e.target.value)}
+                            className="h-10 w-full rounded-lg border border-gray-300 focus:ring-2 focus:ring-brand-500"
+                          />
+                        </div>
+                      )
+                    }
+                    
+                    // Default handling
+                    return (
+                      <div key={key}>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </label>
+                        {key.includes('enabled') || key.includes('require') || key.includes('multi_currency') ? (
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={currentAdminSettings[key] === '1' || currentAdminSettings[key] === 'true' || currentAdminSettings[key] === true}
+                              onChange={(e) => handleAdminSettingChange(key, e.target.checked ? '1' : '0')}
+                              className="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                            />
+                            <span className="text-sm text-gray-700">Enable</span>
+                          </label>
+                        ) : (
+                          <input
+                            type="text"
+                            value={currentAdminSettings[key] || ''}
+                            onChange={(e) => handleAdminSettingChange(key, e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500"
+                          />
+                        )}
+                      </div>
+                    )
+                  })}
+                  <div className="flex gap-3 pt-6 mt-6 border-t border-gray-200">
+                    <button
+                      type="submit"
+                      disabled={updateMutation.isPending}
+                      className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      {updateMutation.isPending ? 'Saving...' : 'Save Settings'}
+                    </button>
+                  </div>
+                </form>
+              )
+            }
+            return null
+          })}
+        </div>
+      </div>
     </div>
   )
 }

@@ -1,7 +1,7 @@
-import { adminApi } from './axios'
+import api from './axios'
 
 export const getDashboard = async () => {
-  const response = await adminApi.get('/dashboard')
+  const response = await api.get('/admin/dashboard')
   return response.data
 }
 

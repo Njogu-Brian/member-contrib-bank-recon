@@ -92,6 +92,8 @@ class StaffController extends Controller
                 'phone' => $validated['phone'] ?? null,
                 'member_id' => $validated['member_id'] ?? null,
                 'is_active' => $validated['is_active'] ?? true,
+                'must_change_password' => true, // Force password change on first login
+                'password_changed_at' => null,
             ]);
 
             $user->roles()->attach($validated['roles']);
@@ -181,8 +183,13 @@ class StaffController extends Controller
 
         $user->update([
             'password' => Hash::make($validated['password']),
-            'password_reset_at' => $validated['require_change'] ?? false ? now() : null,
+            'password_reset_at' => now(),
+            'must_change_password' => $validated['require_change'] ?? true,
+            'password_changed_at' => $validated['require_change'] ?? true ? null : now(),
         ]);
+
+        // Invalidate all existing tokens
+        $user->tokens()->delete();
 
         ActivityLog::create([
             'user_id' => $request->user()->id,

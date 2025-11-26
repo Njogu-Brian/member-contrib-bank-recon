@@ -93,9 +93,32 @@ class Member extends Model
         }
 
         $start = Carbon::parse($startDate)->startOfWeek();
-        $now = Carbon::now()->startOfWeek();
+        $now = Carbon::now();
+        $endOfFirstWeek = $start->copy()->endOfWeek();
+        
+        // If current date is before the end of the first week, no contributions are expected yet
+        // We need to wait for a full week to complete before expecting any contribution
+        if ($now->lt($endOfFirstWeek)) {
+            return 0;
+        }
 
-        $weeks = max(0, $start->diffInWeeks($now));
+        // Count only full weeks that have completely passed
+        // Start counting from the Monday after the first week ends
+        // So if start date is Monday, first week ends Sunday, contributions start counting from next Monday
+        $firstContributionWeekStart = $endOfFirstWeek->copy()->addDay()->startOfWeek();
+        
+        // If we haven't reached the start of the first contribution week, return 0
+        if ($now->lt($firstContributionWeekStart)) {
+            return 0;
+        }
+
+        // Count full weeks from the first contribution week start
+        // diffInWeeks with false parameter means don't round up
+        $weeks = max(0, floor($firstContributionWeekStart->diffInDays($now) / 7));
+        
+        // Add 1 week because the first week should count after it completes
+        // If we're in week 1 after start, we expect 1 week's contribution
+        $weeks += 1;
 
         return $weeks * $weeklyAmount;
     }

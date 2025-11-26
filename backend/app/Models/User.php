@@ -20,6 +20,10 @@ class User extends Authenticatable
         'phone',
         'last_login_at',
         'password_reset_at',
+        'must_change_password',
+        'password_changed_at',
+        'password_reset_token',
+        'password_reset_expires_at',
     ];
 
     protected $hidden = [
@@ -35,6 +39,9 @@ class User extends Authenticatable
             'is_active' => 'boolean',
             'last_login_at' => 'datetime',
             'password_reset_at' => 'datetime',
+            'must_change_password' => 'boolean',
+            'password_changed_at' => 'datetime',
+            'password_reset_expires_at' => 'datetime',
         ];
     }
 

@@ -16,10 +16,12 @@ class SmsService
 
     public function __construct()
     {
-        $this->userId = config('services.sms.userid', 'evimeria');
-        $this->password = config('services.sms.password', '');
-        $this->senderId = config('services.sms.senderid', 'EVIMERIA');
-        $this->enabled = config('services.sms.enabled', false);
+        // Check settings first, fall back to config
+        $this->userId = \App\Models\Setting::get('sms_userid', config('services.sms.userid', 'evimeria'));
+        $this->password = \App\Models\Setting::get('sms_password', config('services.sms.password', ''));
+        $this->senderId = \App\Models\Setting::get('sms_senderid', config('services.sms.senderid', 'EVIMERIA'));
+        $smsEnabled = \App\Models\Setting::get('sms_enabled', '0');
+        $this->enabled = ($smsEnabled === '1' || $smsEnabled === 'true') || config('services.sms.enabled', false);
         $this->baseUrl = config('services.sms.base_url', 'https://smsportal.hostpinnacle.co.ke/SMSApi/send');
     }
 
@@ -252,7 +254,11 @@ class SmsService
      */
     public function isEnabled(): bool
     {
-        return $this->enabled && !empty($this->password);
+        // Check settings dynamically (may have changed)
+        $smsEnabled = \App\Models\Setting::get('sms_enabled', '0');
+        $settingsEnabled = ($smsEnabled === '1' || $smsEnabled === 'true');
+        
+        return ($this->enabled || $settingsEnabled) && !empty($this->password);
     }
 }
 

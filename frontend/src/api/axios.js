@@ -5,8 +5,8 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
     Accept: 'application/json',
+    // Don't set Content-Type by default - let axios set it based on data type
   },
   withCredentials: true,
 })
@@ -16,6 +16,20 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  
+  // If data is FormData, don't set Content-Type - let browser set it with boundary
+  // This MUST be done to ensure proper multipart/form-data encoding
+  if (config.data instanceof FormData) {
+    // Remove Content-Type completely - axios will set it correctly for FormData
+    delete config.headers['Content-Type']
+    delete config.headers.common?.['Content-Type']
+    delete config.headers.post?.['Content-Type']
+    delete config.headers.put?.['Content-Type']
+    
+    // Log to verify FormData is being sent
+    console.log('Sending FormData, Content-Type removed')
+  }
+  
   return config
 })
 
@@ -34,9 +48,13 @@ api.interceptors.response.use(
 )
 
 const withAdminPrefix = (path = '') => {
-  if (path.startsWith('/admin/')) return path
-  if (path === '/admin') return path
-  return `/admin${path}`
+  // Remove leading slash for consistency
+  const cleanPath = path.startsWith('/') ? path.slice(1) : path
+  
+  // Routes under /v1/admin/admin/* need double admin prefix
+  // So 'roles' becomes '/admin/admin/roles'
+  // So 'staff' becomes '/admin/admin/staff'
+  return `/admin/admin/${cleanPath}`
 }
 
 export const adminApi = {

@@ -1,4 +1,6 @@
-import { adminApi } from './axios'
+import api from './axios'
+
+const adminBase = '/admin'
 
 export const getTransactions = async (params = {}) => {
   // Remove empty string values from params to avoid filtering issues
@@ -13,22 +15,22 @@ export const getTransactions = async (params = {}) => {
       return value !== '' && value !== null && value !== undefined
     })
   )
-  const response = await adminApi.get('/transactions', { params: cleanParams })
+  const response = await api.get('/admin/transactions', { params: cleanParams })
   return response.data
 }
 
 export const getTransaction = async (id) => {
-  const response = await adminApi.get(`/transactions/${id}`)
+  const response = await api.get(`/admin/transactions/${id}`)
   return response.data
 }
 
 export const assignTransaction = async (id, memberId) => {
-  const response = await adminApi.post(`/transactions/${id}/assign`, { member_id: memberId })
+  const response = await api.post(`${adminBase}/transactions/${id}/assign`, { member_id: memberId })
   return response.data
 }
 
 export const splitTransaction = async (id, payload) => {
-  const response = await adminApi.post(`/transactions/${id}/split`, {
+  const response = await api.post(`${adminBase}/transactions/${id}/split`, {
     splits: payload?.splits ?? [],
     notes: payload?.notes,
   })
@@ -36,12 +38,12 @@ export const splitTransaction = async (id, payload) => {
 }
 
 export const autoAssign = async () => {
-  const response = await adminApi.post('/transactions/auto-assign')
+  const response = await api.post(`${adminBase}/transactions/auto-assign`)
   return response.data
 }
 
 export const bulkAssign = async (transactionIds, memberId) => {
-  const response = await adminApi.post('/transactions/bulk-assign', {
+  const response = await api.post(`${adminBase}/transactions/bulk-assign`, {
     transactions: transactionIds,
     member_id: memberId,
   })
@@ -49,7 +51,7 @@ export const bulkAssign = async (transactionIds, memberId) => {
 }
 
 export const askAi = async (id) => {
-  const response = await adminApi.post(`/transactions/${id}/ask-ai`)
+  const response = await api.post(`${adminBase}/transactions/${id}/ask-ai`)
   return response.data
 }
 
@@ -59,14 +61,14 @@ export const transferTransaction = async (id, payload) => {
     ? { recipients: payload.recipients, notes: payload.notes || '' }
     : { to_member_id: payload.toMemberId, notes: payload.notes || '' }
   
-  const response = await adminApi.post(`/transactions/${id}/transfer`, requestBody)
+  const response = await api.post(`${adminBase}/transactions/${id}/transfer`, requestBody)
   return response.data
 }
 
 export const archiveTransaction = async (id, reason = '') => {
   try {
     console.log('API: Archiving transaction', id, 'with reason:', reason)
-    const response = await adminApi.post(`/transactions/${id}/archive`, {
+    const response = await api.post(`${adminBase}/transactions/${id}/archive`, {
       reason: reason || undefined,
     })
     console.log('API: Archive response:', response.data)
@@ -79,12 +81,12 @@ export const archiveTransaction = async (id, reason = '') => {
 }
 
 export const unarchiveTransaction = async (id) => {
-  const response = await adminApi.delete(`/transactions/${id}/archive`)
+  const response = await api.delete(`${adminBase}/transactions/${id}/archive`)
   return response.data
 }
 
 export const bulkArchiveTransactions = async (transactionIds, reason = '') => {
-  const response = await adminApi.post('/transactions/archive-bulk', {
+  const response = await api.post(`${adminBase}/transactions/archive-bulk`, {
     transaction_ids: transactionIds,
     reason: reason || undefined,
   })

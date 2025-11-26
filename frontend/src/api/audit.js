@@ -1,4 +1,4 @@
-import { adminApi } from './axios'
+import api from './axios'
 
 export const uploadAuditWorkbook = async (file, year) => {
   const formData = new FormData()
@@ -7,7 +7,7 @@ export const uploadAuditWorkbook = async (file, year) => {
     formData.append('year', year)
   }
 
-  const response = await adminApi.post('/audits/contributions', formData, {
+  const response = await api.post('/admin/audits/contributions', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 
@@ -15,26 +15,26 @@ export const uploadAuditWorkbook = async (file, year) => {
 }
 
 export const getAuditRuns = async (params = {}) => {
-  const response = await adminApi.get('/audits', { params })
+  const response = await api.get('/admin/audits', { params })
   return response.data
 }
 
 export const getAuditRun = async (id, params = {}) => {
-  const response = await adminApi.get(`/audits/${id}`, { params })
+  const response = await api.get(`/admin/audits/${id}`, { params })
   return response.data
 }
 
 export const reanalyzeAuditRun = async (id) => {
-  const response = await adminApi.post(`/audits/${id}/reanalyze`)
+  const response = await api.post(`/admin/audits/${id}/reanalyze`)
   return response.data
 }
 
 export const deleteAuditRun = async (id) => {
-  const response = await adminApi.delete(`/audits/${id}`)
+  const response = await api.delete(`/admin/audits/${id}`)
   return response.data
 }
 
 export const getMemberAuditResults = async (memberId, params = {}) => {
-  const response = await adminApi.get(`/audits/member/${memberId}`, { params })
+  const response = await api.get(`/admin/audits/member/${memberId}`, { params })
   return response.data
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getStaff,
@@ -12,7 +12,19 @@ import { getRoles } from '../api/roles'
 import { getMembers } from '../api/members'
 import Pagination from '../components/Pagination'
 import useDebounce from '../hooks/useDebounce'
-import { HiOutlinePlus, HiOutlineMagnifyingGlass, HiEllipsisVertical } from 'react-icons/hi2'
+import { 
+  HiOutlinePlus, 
+  HiOutlineMagnifyingGlass, 
+  HiEllipsisVertical,
+  HiOutlineUserGroup,
+  HiOutlineCheckCircle,
+  HiOutlineXCircle,
+  HiOutlineShieldCheck,
+  HiOutlinePencil,
+  HiOutlineLockClosed,
+  HiOutlineUserMinus,
+  HiOutlineTrash
+} from 'react-icons/hi2'
 import { ROLES, ROLE_LABELS, useRoleBadge } from '../lib/rbac'
 
 // Fix useRoleBadge if not exported
@@ -48,6 +60,8 @@ export default function StaffManagement() {
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [showActionsMenu, setShowActionsMenu] = useState(null)
   const [editingStaff, setEditingStaff] = useState(null)
+  const actionButtonRefs = useRef({})
+  const dropdownRefs = useRef({})
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -63,17 +77,30 @@ export default function StaffManagement() {
     setPage(1)
   }, [debouncedSearch, roleFilter, statusFilter])
 
-  const { data: staffData, isLoading } = useQuery({
+  // Position dropdown menus when they open
+  useEffect(() => {
+    if (showActionsMenu) {
+      const buttonEl = actionButtonRefs.current[showActionsMenu]
+      const dropdownEl = dropdownRefs.current[showActionsMenu]
+      if (buttonEl && dropdownEl) {
+        const rect = buttonEl.getBoundingClientRect()
+        dropdownEl.style.top = `${rect.bottom + 4}px`
+        dropdownEl.style.left = `${rect.right - 224}px` // 224px = dropdown width (w-56 = 14rem = 224px)
+      }
+    }
+  }, [showActionsMenu])
+
+  const { data: staffData, isLoading, error: staffError } = useQuery({
     queryKey: ['staff', { search: debouncedSearch, role: roleFilter, status: statusFilter, page, per_page: perPage }],
     queryFn: () => getStaff({ search: debouncedSearch, role: roleFilter, status: statusFilter, page, per_page: perPage }),
   })
 
-  const { data: rolesData } = useQuery({
+  const { data: rolesData, error: rolesError } = useQuery({
     queryKey: ['roles'],
     queryFn: () => getRoles(),
   })
 
-  const { data: membersData } = useQuery({
+  const { data: membersData, error: membersError } = useQuery({
     queryKey: ['members', { search: '' }],
     queryFn: () => getMembers({ search: '', per_page: 1000 }),
   })
@@ -84,6 +111,12 @@ export default function StaffManagement() {
       queryClient.invalidateQueries(['staff'])
       setShowModal(false)
       resetForm()
+      alert('Staff member created successfully!')
+    },
+    onError: (error) => {
+      console.error('Error creating staff:', error)
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to create staff member'
+      alert(`Error: ${errorMessage}`)
     },
   })
 
@@ -94,6 +127,12 @@ export default function StaffManagement() {
       setShowModal(false)
       setEditingStaff(null)
       resetForm()
+      alert('Staff member updated successfully!')
+    },
+    onError: (error) => {
+      console.error('Error updating staff:', error)
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to update staff member'
+      alert(`Error: ${errorMessage}`)
     },
   })
 
@@ -149,10 +188,34 @@ export default function StaffManagement() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    const submitData = { ...formData }
+    
+    // Validate required fields
+    if (!formData.name || !formData.email) {
+      alert('Please fill in all required fields (Name, Email)')
+      return
+    }
+    
+    if (!editingStaff && !formData.password) {
+      alert('Password is required for new staff members')
+      return
+    }
+    
+    if (!formData.roles || formData.roles.length === 0) {
+      alert('Please select at least one role')
+      return
+    }
+    
+    const submitData = { 
+      ...formData,
+      member_id: formData.member_id && formData.member_id !== '' ? parseInt(formData.member_id) : null,
+    }
+    
     if (editingStaff && !submitData.password) {
       delete submitData.password
     }
+    
+    console.log('Submitting staff data:', submitData)
+    
     if (editingStaff) {
       updateMutation.mutate({ id: editingStaff.id, data: submitData })
     } else {
@@ -171,16 +234,67 @@ export default function StaffManagement() {
     }
   }
 
-  const staff = staffData?.data || []
-  const roles = rolesData?.data || []
-  const members = membersData?.data || []
+  // Handle paginated staff response - axios returns { data: { data: [...], ...pagination } }
+  const staffResponse = staffData?.data || staffData
+  const staff = Array.isArray(staffResponse?.data) 
+    ? staffResponse.data 
+    : Array.isArray(staffResponse) 
+      ? staffResponse 
+      : []
+  
+  // Handle roles response - axios returns { data: { data: [...] } }
+  const rolesResponse = rolesData?.data || rolesData
+  const roles = Array.isArray(rolesResponse?.data) 
+    ? rolesResponse.data 
+    : Array.isArray(rolesResponse) 
+      ? rolesResponse 
+      : []
+  
+  // Handle members response - could be paginated or direct array
+  const membersResponse = membersData?.data || membersData
+  const members = Array.isArray(membersResponse?.data) 
+    ? membersResponse.data 
+    : Array.isArray(membersResponse) 
+      ? membersResponse 
+      : []
+  
+  // Log errors for debugging
+  if (staffError) {
+    console.error('Staff API Error:', staffError)
+    console.error('Staff Error Response:', staffError?.response)
+  }
+  if (rolesError) {
+    console.error('Roles API Error:', rolesError)
+    console.error('Roles Error Response:', rolesError?.response)
+  }
+  if (membersError) {
+    console.error('Members API Error:', membersError)
+    console.error('Members Error Response:', membersError?.response)
+  }
+
+  // Calculate statistics
+  const totalStaff = staff.length || 0
+  const activeStaff = staff.filter(s => s.is_active).length
+  const inactiveStaff = staff.filter(s => !s.is_active).length
+  const linkedMembers = staff.filter(s => s.member_id).length
+
+  // Get user initials for avatar
+  const getInitials = (name) => {
+    return name
+      ?.split(' ')
+      .slice(0, 2)
+      .map(n => n[0])
+      .join('')
+      .toUpperCase() || '?'
+  }
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Staff Management</h1>
-          <p className="text-sm text-gray-600 mt-1">Manage staff accounts and permissions</p>
+          <h1 className="text-3xl font-bold text-gray-900">Staff Management</h1>
+          <p className="text-sm text-gray-600 mt-1">Manage staff accounts, roles, and permissions</p>
         </div>
         <button
           onClick={() => {
@@ -188,29 +302,81 @@ export default function StaffManagement() {
             resetForm()
             setShowModal(true)
           }}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 text-white rounded-xl hover:bg-brand-700 transition-colors shadow-sm hover:shadow-md font-medium"
         >
           <HiOutlinePlus className="w-5 h-5" />
           Add Staff
         </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row gap-4">
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Staff</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{totalStaff}</p>
+            </div>
+            <div className="p-3 bg-brand-100 rounded-xl">
+              <HiOutlineUserGroup className="w-6 h-6 text-brand-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Active</p>
+              <p className="text-2xl font-bold text-emerald-600 mt-1">{activeStaff}</p>
+            </div>
+            <div className="p-3 bg-emerald-100 rounded-xl">
+              <HiOutlineCheckCircle className="w-6 h-6 text-emerald-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Inactive</p>
+              <p className="text-2xl font-bold text-red-600 mt-1">{inactiveStaff}</p>
+            </div>
+            <div className="p-3 bg-red-100 rounded-xl">
+              <HiOutlineXCircle className="w-6 h-6 text-red-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Linked Members</p>
+              <p className="text-2xl font-bold text-blue-600 mt-1">{linkedMembers}</p>
+            </div>
+            <div className="p-3 bg-blue-100 rounded-xl">
+              <HiOutlineShieldCheck className="w-6 h-6 text-blue-600" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filters and Search */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className="flex flex-col lg:flex-row gap-3">
           <div className="flex-1 relative">
             <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search staff..."
+              placeholder="Search by name, email, or phone..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
             />
           </div>
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500"
+            className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors bg-white"
           >
             <option value="">All Roles</option>
             {roles.map((role) => (
@@ -222,115 +388,201 @@ export default function StaffManagement() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500"
+            className="px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors bg-white"
           >
             <option value="">All Status</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
         </div>
+      </div>
+
+      {/* Staff Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-visible">
 
         {isLoading ? (
-          <div className="p-8 text-center text-gray-500">Loading...</div>
+          <div className="p-12 text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
+            <p className="mt-4 text-sm text-gray-500">Loading staff members...</p>
+          </div>
         ) : (
           <>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50">
+                <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Roles</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Staff Member</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Contact</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Linked Member</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Roles</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="bg-white divide-y divide-gray-200">
                   {staff.length === 0 ? (
                     <tr>
-                      <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
-                        No staff members found
+                      <td colSpan="6" className="px-6 py-12 text-center">
+                        <div className="flex flex-col items-center justify-center">
+                          <HiOutlineUserGroup className="w-12 h-12 text-gray-400 mb-3" />
+                          <p className="text-sm font-medium text-gray-900 mb-1">No staff members found</p>
+                          <p className="text-xs text-gray-500 mb-4">Get started by adding your first staff member</p>
+                          <button
+                            onClick={() => {
+                              setEditingStaff(null)
+                              resetForm()
+                              setShowModal(true)
+                            }}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 text-sm font-medium"
+                          >
+                            <HiOutlinePlus className="w-4 h-4" />
+                            Add Staff Member
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ) : (
                     staff.map((member) => (
-                      <tr key={member.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{member.name}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{member.email}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{member.phone || '-'}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-1">
+                      <tr key={member.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-3">
+                            <div className="flex-shrink-0">
+                              <div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center">
+                                <span className="text-sm font-semibold text-brand-700">
+                                  {getInitials(member.name)}
+                                </span>
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-sm font-semibold text-gray-900">{member.name}</div>
+                              <div className="text-xs text-gray-500">{member.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">{member.phone || <span className="text-gray-400">—</span>}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {member.member ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                              <HiOutlineShieldCheck className="w-3.5 h-3.5" />
+                              {member.member.name}
+                              {member.member.member_code && (
+                                <span className="text-blue-600">({member.member.member_code})</span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-400">Not linked</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-wrap gap-1.5">
                             {member.roles?.map((role) => (
                               <span
                                 key={role.id}
-                                className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getRoleBadgeClass(role.slug)}`}
+                                className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${getRoleBadgeClass(role.slug)}`}
                               >
                                 {role.name}
                               </span>
-                            ))}
+                            )) || <span className="text-xs text-gray-400">No roles</span>}
                           </div>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <span
-                            className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${
                               member.is_active
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-red-100 text-red-700'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : 'bg-red-50 text-red-700 border border-red-200'
                             }`}
                           >
-                            {member.is_active ? 'Active' : 'Inactive'}
+                            {member.is_active ? (
+                              <>
+                                <HiOutlineCheckCircle className="w-3.5 h-3.5" />
+                                Active
+                              </>
+                            ) : (
+                              <>
+                                <HiOutlineXCircle className="w-3.5 h-3.5" />
+                                Inactive
+                              </>
+                            )}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="relative">
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <div className="relative inline-block">
                             <button
-                              onClick={() => setShowActionsMenu(showActionsMenu === member.id ? null : member.id)}
-                              className="p-1 hover:bg-gray-100 rounded"
+                              ref={(el) => {
+                                if (el) actionButtonRefs.current[member.id] = el
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setShowActionsMenu(showActionsMenu === member.id ? null : member.id)
+                              }}
+                              className="p-2 hover:bg-gray-100 rounded-lg transition-colors relative z-10"
+                              title="More options"
+                              aria-label="Actions menu"
                             >
                               <HiEllipsisVertical className="w-5 h-5 text-gray-600" />
                             </button>
                             {showActionsMenu === member.id && (
-                              <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
-                                <button
-                                  onClick={() => {
-                                    handleEdit(member)
-                                    setShowActionsMenu(null)
+                              <>
+                                <div 
+                                  className="fixed inset-0 z-[90]" 
+                                  onClick={() => setShowActionsMenu(null)}
+                                ></div>
+                                <div 
+                                  ref={(el) => {
+                                    if (el) dropdownRefs.current[member.id] = el
                                   }}
-                                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                  className="fixed w-56 bg-white rounded-xl shadow-2xl border border-gray-200 z-[100] overflow-hidden"
                                 >
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setEditingStaff(member)
-                                    setFormData({ ...formData, password: '' })
-                                    setShowPasswordModal(true)
-                                    setShowActionsMenu(null)
-                                  }}
-                                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                >
-                                  Reset Password
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    toggleStatusMutation.mutate(member.id)
-                                  }}
-                                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                >
-                                  {member.is_active ? 'Deactivate' : 'Activate'}
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    if (window.confirm('Are you sure you want to delete this staff member?')) {
-                                      deleteMutation.mutate(member.id)
-                                    }
-                                  }}
-                                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                                >
-                                  Delete
-                                </button>
-                              </div>
+                                  <button
+                                    onClick={() => {
+                                      handleEdit(member)
+                                      setShowActionsMenu(null)
+                                    }}
+                                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                                  >
+                                    <HiOutlinePencil className="w-4 h-4" />
+                                    Edit Staff Member
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEditingStaff(member)
+                                      setFormData({ ...formData, password: '' })
+                                      setShowPasswordModal(true)
+                                      setShowActionsMenu(null)
+                                    }}
+                                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                                  >
+                                    <HiOutlineLockClosed className="w-4 h-4" />
+                                    Reset Password
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      toggleStatusMutation.mutate(member.id)
+                                      setShowActionsMenu(null)
+                                    }}
+                                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                                  >
+                                    <HiOutlineUserMinus className="w-4 h-4" />
+                                    {member.is_active ? 'Deactivate Account' : 'Activate Account'}
+                                  </button>
+                                  <div className="border-t border-gray-200 my-1"></div>
+                                  <button
+                                    onClick={() => {
+                                      if (window.confirm(`Are you sure you want to delete ${member.name}? This action cannot be undone.`)) {
+                                        deleteMutation.mutate(member.id)
+                                        setShowActionsMenu(null)
+                                      }
+                                    }}
+                                    className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                                  >
+                                    <HiOutlineTrash className="w-4 h-4" />
+                                    Delete Staff Member
+                                  </button>
+                                </div>
+                              </>
                             )}
                           </div>
                         </td>
@@ -340,30 +592,46 @@ export default function StaffManagement() {
                 </tbody>
               </table>
             </div>
-            {staffData && (
-              <div className="px-4 py-3 border-t border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600">Show</span>
-                  <select
-                    value={perPage}
-                    onChange={(e) => {
-                      setPerPage(Number(e.target.value))
-                      setPage(1)
-                    }}
-                    className="px-2 py-1 border border-gray-300 rounded text-sm"
-                  >
-                    <option value={25}>25</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                    <option value={200}>200</option>
-                  </select>
-                  <span className="text-sm text-gray-600">entries</span>
+            {staffData?.data && staffResponse && (
+              <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <span>Showing</span>
+                  <span className="font-medium text-gray-900">
+                    {((staffResponse.current_page - 1) * perPage) + 1}
+                  </span>
+                  <span>to</span>
+                  <span className="font-medium text-gray-900">
+                    {Math.min(staffResponse.current_page * perPage, staffResponse.total || 0)}
+                  </span>
+                  <span>of</span>
+                  <span className="font-medium text-gray-900">{staffResponse.total || 0}</span>
+                  <span>entries</span>
                 </div>
-                <Pagination
-                  currentPage={staffData.current_page}
-                  totalPages={staffData.last_page}
-                  onPageChange={setPage}
-                />
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">Show:</span>
+                    <select
+                      value={perPage}
+                      onChange={(e) => {
+                        setPerPage(Number(e.target.value))
+                        setPage(1)
+                      }}
+                      className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-white"
+                    >
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                      <option value={200}>200</option>
+                    </select>
+                  </div>
+                  {staffResponse.last_page > 1 && (
+                    <Pagination
+                      currentPage={staffResponse.current_page || 1}
+                      totalPages={staffResponse.last_page || 1}
+                      onPageChange={setPage}
+                    />
+                  )}
+                </div>
               </div>
             )}
           </>
@@ -372,75 +640,111 @@ export default function StaffManagement() {
 
       {/* Create/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">
-                {editingStaff ? 'Edit Staff Member' : 'Add Staff Member'}
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden shadow-2xl flex flex-col modal-form-container">
+            <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-brand-50 to-indigo-50">
+              <h2 className="text-2xl font-bold text-gray-900">
+                {editingStaff ? 'Edit Staff Member' : 'Add New Staff Member'}
               </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                {editingStaff ? 'Update staff member information and permissions' : 'Create a new staff account with roles and permissions'}
+              </p>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500"
-                />
+            <div className="overflow-y-auto flex-1 p-6">
+              <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
+                    placeholder="John Doe"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
+                    placeholder="john@example.com"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                <input
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500"
-                />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Password {editingStaff ? <span className="text-gray-500 font-normal">(leave blank to keep current)</span> : <span className="text-red-500">*</span>}
+                  </label>
+                  <input
+                    type="password"
+                    required={!editingStaff}
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
+                    placeholder={editingStaff ? "Enter new password" : "Minimum 8 characters"}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Phone Number
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
+                    placeholder="+254 700 000 000"
+                  />
+                </div>
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Password {editingStaff ? '(leave blank to keep current)' : '*'}
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Link to Member Account <span className="text-gray-500 font-normal">(Optional)</span>
                 </label>
-                <input
-                  type="password"
-                  required={!editingStaff}
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                <input
-                  type="text"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Link to Member (Optional)</label>
                 <select
-                  value={formData.member_id}
-                  onChange={(e) => setFormData({ ...formData, member_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500"
+                  value={formData.member_id || ''}
+                  onChange={(e) => setFormData({ ...formData, member_id: e.target.value || null })}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors bg-white"
                 >
-                  <option value="">None</option>
+                  <option value="">None - Staff only account</option>
                   {members.map((member) => (
                     <option key={member.id} value={member.id}>
-                      {member.name} ({member.member_code})
+                      {member.name} {member.member_code ? `(${member.member_code})` : ''}
                     </option>
                   ))}
                 </select>
+                <p className="mt-2 text-xs text-gray-500 flex items-start gap-1">
+                  <HiOutlineShieldCheck className="w-3.5 h-3.5 mt-0.5 text-gray-400" />
+                  <span>Link this staff account to a member so they can use the same login credentials for both accounts.</span>
+                </p>
               </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Roles *</label>
-                <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Assign Roles <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4 border border-gray-200 rounded-xl bg-gray-50 max-h-48 overflow-y-auto">
                   {roles.map((role) => (
-                    <label key={role.id} className="flex items-center gap-2">
+                    <label 
+                      key={role.id} 
+                      className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
+                        formData.roles.includes(role.id) 
+                          ? 'bg-brand-50 border-2 border-brand-300' 
+                          : 'bg-white border-2 border-gray-200 hover:border-brand-200'
+                      }`}
+                    >
                       <input
                         type="checkbox"
                         checked={formData.roles.includes(role.id)}
@@ -453,71 +757,90 @@ export default function StaffManagement() {
                         }}
                         className="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                       />
-                      <span className="text-sm text-gray-700">{role.name}</span>
+                      <span className="text-sm font-medium text-gray-700">{role.name}</span>
                     </label>
                   ))}
                 </div>
+                {formData.roles.length === 0 && (
+                  <p className="mt-2 text-xs text-red-500">Please select at least one role</p>
+                )}
               </div>
-              <div>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.is_active}
-                    onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                    className="rounded border-gray-300 text-brand-600 focus:ring-brand-500"
-                  />
-                  <span className="text-sm text-gray-700">Active</span>
+
+              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <input
+                  type="checkbox"
+                  id="is_active"
+                  checked={formData.is_active}
+                  onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                  className="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                />
+                <label htmlFor="is_active" className="text-sm font-medium text-gray-700 cursor-pointer">
+                  Account is active (user can login)
                 </label>
               </div>
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700"
-                >
-                  {editingStaff ? 'Update' : 'Create'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowModal(false)
-                    setEditingStaff(null)
-                    resetForm()
-                  }}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-              </div>
             </form>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowModal(false)
+                  setEditingStaff(null)
+                  resetForm()
+                }}
+                className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const form = document.querySelector('.modal-form-container form')
+                  if (form) {
+                    form.requestSubmit()
+                  }
+                }}
+                disabled={createMutation.isPending || updateMutation.isPending || formData.roles.length === 0}
+                className="flex-1 px-5 py-2.5 bg-brand-600 text-white rounded-xl hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors shadow-sm hover:shadow-md"
+              >
+                {createMutation.isPending || updateMutation.isPending 
+                  ? 'Saving...' 
+                  : editingStaff ? 'Update Staff Member' : 'Create Staff Member'}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* Password Reset Modal */}
       {showPasswordModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full">
-            <div className="p-6 border-b border-gray-200">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
+            <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-brand-50 to-indigo-50">
               <h2 className="text-xl font-bold text-gray-900">Reset Password</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Set a new password for {editingStaff?.name || 'this staff member'}
+              </p>
             </div>
             <form onSubmit={handleResetPassword} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">New Password *</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  New Password <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="password"
                   required
+                  minLength={8}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
+                  placeholder="Minimum 8 characters"
                 />
+                <p className="mt-2 text-xs text-gray-500">
+                  Password must be at least 8 characters long
+                </p>
               </div>
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700"
-                >
-                  Reset Password
-                </button>
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -525,9 +848,15 @@ export default function StaffManagement() {
                     setEditingStaff(null)
                     setFormData({ ...formData, password: '' })
                   }}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium transition-colors"
                 >
                   Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-5 py-2.5 bg-brand-600 text-white rounded-xl hover:bg-brand-700 font-medium transition-colors shadow-sm hover:shadow-md"
+                >
+                  Reset Password
                 </button>
               </div>
             </form>

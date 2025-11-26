@@ -1,21 +1,21 @@
-import { adminApi } from './axios'
+import api from './axios'
 
 export const getAnnouncements = async () => {
-  const { data } = await adminApi.get('/announcements')
+  const { data } = await api.get('/admin/announcements')
   return data
 }
 
 export const createAnnouncement = async (payload) => {
-  const { data } = await adminApi.post('/announcements', payload)
+  const { data } = await api.post('/admin/announcements', payload)
   return data
 }
 
 export const updateAnnouncement = async ({ id, payload }) => {
-  const { data } = await adminApi.put(`/announcements/${id}`, payload)
+  const { data } = await api.put(`/admin/announcements/${id}`, payload)
   return data
 }
 
 export const deleteAnnouncement = async (id) => {
-  await adminApi.delete(`/announcements/${id}`)
+  await api.delete(`/admin/announcements/${id}`)
 }
 

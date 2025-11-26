@@ -42,6 +42,15 @@ Route::prefix('v1')->group(function () {
         Route::get('/test', function () {
             return response()->json(['message' => 'API is working']);
         });
+        
+        // Public settings for login page (logo, favicon, branding)
+        Route::get('/settings', [SettingController::class, 'publicIndex']);
+        
+        // Public dashboard snapshot for login page
+        Route::get('/dashboard/snapshot', [DashboardController::class, 'publicSnapshot']);
+        
+        // Public announcements for login page
+        Route::get('/announcements', [AnnouncementController::class, 'publicList']);
     });
 
     Route::prefix('webhooks')->group(function () {
@@ -69,10 +78,18 @@ Route::prefix('v1')->group(function () {
     Route::prefix('auth')->group(function () {
         Route::post('/login', [AuthController::class, 'login']);
         Route::post('/register', [AuthController::class, 'register']);
+        Route::post('/password/reset-request', [AuthController::class, 'sendPasswordReset']);
+        Route::post('/password/reset', [AuthController::class, 'resetPassword']);
 
         Route::middleware('auth:sanctum')->group(function () {
             Route::post('/logout', [AuthController::class, 'logout']);
             Route::get('/me', [AuthController::class, 'user']);
+            Route::post('/password/change', [AuthController::class, 'changePassword']);
+            // MFA routes for web
+            Route::get('/mfa/setup', [AuthController::class, 'getMfaSetup']);
+            Route::post('/mfa/enable', [AuthController::class, 'enableMfa']);
+            Route::post('/mfa/disable', [AuthController::class, 'disableMfa']);
+            Route::post('/mfa/verify', [AuthController::class, 'verifyMfa']);
         });
     });
 
@@ -225,6 +242,7 @@ Route::prefix('v1')->group(function () {
             // Admin Settings
             Route::get('/settings', [\App\Http\Controllers\Admin\AdminSettingsController::class, 'index']);
             Route::put('/settings', [\App\Http\Controllers\Admin\AdminSettingsController::class, 'update']);
+            Route::post('/settings', [\App\Http\Controllers\Admin\AdminSettingsController::class, 'update']); // POST for file uploads
         });
     });
 });

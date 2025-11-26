@@ -7,6 +7,7 @@ use App\Models\Member;
 use App\Models\StatementDuplicate;
 use App\Models\Transaction;
 use App\Models\TransactionMatchLog;
+use App\Models\Setting;
 use App\Services\MatchingService;
 use App\Services\OcrParserService;
 use App\Services\TransactionParserService;
@@ -37,7 +38,12 @@ class ProcessBankStatement implements ShouldQueue
         $this->statement->update(['status' => 'processing']);
 
         try {
-            // Step 1: Parse PDF using OCR parser
+            // Step 1: Parse PDF using OCR parser (check if enabled)
+            $ocrEnabled = Setting::get('ocr_matching_enabled', '1');
+            if ($ocrEnabled !== '1' && $ocrEnabled !== 'true') {
+                throw new \Exception('OCR matching is disabled in settings');
+            }
+            
             $rows = $ocrParser->parsePdf($this->statement->file_path);
 
             if (empty($rows)) {
@@ -103,8 +109,9 @@ class ProcessBankStatement implements ShouldQueue
                 'count' => count($transactions),
             ]);
 
-            // Step 3: Batch match transactions
-            if (!empty($transactions) && !empty($members)) {
+            // Step 3: Batch match transactions (check if bulk matching enabled)
+            $bulkMatchingEnabled = Setting::get('bulk_bank_enabled', '1');
+            if (!empty($transactions) && !empty($members) && ($bulkMatchingEnabled === '1' || $bulkMatchingEnabled === 'true')) {
                 $matchData = array_map(function ($tran, $idx) {
                     return [
                         'client_tran_id' => 't_' . $idx,

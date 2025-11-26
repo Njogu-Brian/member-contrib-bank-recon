@@ -2,13 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Setting;
 use App\Models\User;
+use App\Services\MfaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
+    protected MfaService $mfaService;
+
     /**
      * Map backend role slugs to the names expected by the frontend RBAC layer.
      */
@@ -17,6 +22,11 @@ class AuthController extends Controller
         'treasurer' => 'treasurer',
         'member' => 'member',
     ];
+
+    public function __construct(MfaService $mfaService)
+    {
+        $this->mfaService = $mfaService;
+    }
 
     public function register(Request $request)
     {
@@ -59,6 +69,44 @@ class AuthController extends Controller
                 ], 422);
             }
 
+            if (!$user->is_active) {
+                return response()->json([
+                    'message' => 'Your account has been deactivated.',
+                    'errors' => [
+                        'email' => ['Your account has been deactivated.'],
+                    ],
+                ], 422);
+            }
+
+            // Check if MFA is enabled and required
+            $requireMfa = Setting::get('require_mfa', '0') === '1';
+            $userHasMfa = $this->mfaService->isEnabled($user);
+            
+            // If MFA is required (either globally or per-user), verify code
+            if (($requireMfa || $userHasMfa) && $request->filled('mfa_code')) {
+                if (!$this->mfaService->verify($user, $request->mfa_code)) {
+                    return response()->json([
+                        'message' => 'Invalid MFA code.',
+                        'errors' => [
+                            'mfa_code' => ['Invalid MFA code.'],
+                        ],
+                        'requires_mfa' => true,
+                    ], 422);
+                }
+            } elseif (($requireMfa || $userHasMfa) && !$request->filled('mfa_code')) {
+                // MFA required but code not provided
+                return response()->json([
+                    'message' => 'MFA code required.',
+                    'requires_mfa' => true,
+                    'errors' => [
+                        'mfa_code' => ['MFA code is required.'],
+                    ],
+                ], 422);
+            }
+
+            // Check if password must be changed (first login or admin reset)
+            $mustChangePassword = $user->must_change_password || !$user->password_changed_at;
+
             // Update last login
             $user->update(['last_login_at' => now()]);
 
@@ -70,6 +118,7 @@ class AuthController extends Controller
             return response()->json([
                 'user' => $this->formatUserResponse($user),
                 'token' => $token,
+                'must_change_password' => $mustChangePassword,
             ]);
         } catch (\Exception $e) {
             Log::error('Login error: ' . $e->getMessage(), [
@@ -97,6 +146,212 @@ class AuthController extends Controller
         ]);
     }
 
+    public function sendPasswordReset(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email|exists:users,email',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            // Don't reveal if email exists
+            return response()->json([
+                'message' => 'If that email exists, a password reset link has been sent.',
+            ]);
+        }
+
+        // Generate reset token
+        $token = \Illuminate\Support\Str::random(64);
+        
+        $user->update([
+            'password_reset_token' => $token,
+            'password_reset_expires_at' => now()->addHours(24),
+        ]);
+
+        // Send email
+        try {
+            \Illuminate\Support\Facades\Mail::send('emails.password-reset', [
+                'user' => $user,
+                'token' => $token,
+                'resetUrl' => config('app.frontend_url', env('APP_URL')) . '/reset-password?token=' . $token . '&email=' . urlencode($user->email),
+            ], function ($message) use ($user) {
+                $message->to($user->email)
+                    ->subject('Password Reset Request - ' . config('app.name'));
+            });
+        } catch (\Exception $e) {
+            Log::error('Failed to send password reset email: ' . $e->getMessage());
+            // Continue anyway - token is saved
+        }
+
+        return response()->json([
+            'message' => 'If that email exists, a password reset link has been sent.',
+        ]);
+    }
+
+    public function resetPassword(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'token' => 'required|string',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $user = User::where('email', $request->email)
+            ->where('password_reset_token', $request->token)
+            ->where('password_reset_expires_at', '>', now())
+            ->first();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Invalid or expired reset token.',
+                'errors' => [
+                    'token' => ['Invalid or expired reset token.'],
+                ],
+            ], 422);
+        }
+
+        $user->update([
+            'password' => Hash::make($request->password),
+            'password_reset_token' => null,
+            'password_reset_expires_at' => null,
+            'must_change_password' => false,
+            'password_changed_at' => now(),
+        ]);
+
+        // Invalidate all existing tokens
+        $user->tokens()->delete();
+
+        return response()->json([
+            'message' => 'Password reset successfully. Please login with your new password.',
+        ]);
+    }
+
+    public function changePassword(Request $request)
+    {
+        $request->validate([
+            'current_password' => 'required|string',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $user = $request->user();
+
+        if (!Hash::check($request->current_password, $user->password)) {
+            return response()->json([
+                'message' => 'Current password is incorrect.',
+                'errors' => [
+                    'current_password' => ['Current password is incorrect.'],
+                ],
+            ], 422);
+        }
+
+        $user->update([
+            'password' => Hash::make($request->password),
+            'must_change_password' => false,
+            'password_changed_at' => now(),
+        ]);
+
+        // Invalidate all existing tokens except current
+        $user->tokens()->where('id', '!=', $request->user()->currentAccessToken()->id)->delete();
+
+        return response()->json([
+            'message' => 'Password changed successfully.',
+            'user' => $this->formatUserResponse($user->fresh()),
+        ]);
+    }
+
+    /**
+     * Get MFA setup QR code
+     */
+    public function getMfaSetup(Request $request)
+    {
+        $user = $request->user();
+        $qrCode = $this->mfaService->getQrCode($user);
+        $secret = $this->mfaService->getSecret($user);
+        
+        return response()->json([
+            'qr_code' => $qrCode,
+            'secret' => $secret->secret,
+            'manual_entry_key' => chunk_split($secret->secret, 4, ' '),
+        ]);
+    }
+
+    /**
+     * Enable MFA
+     */
+    public function enableMfa(Request $request)
+    {
+        $request->validate([
+            'code' => 'required|string|size:6',
+        ]);
+
+        $user = $request->user();
+        
+        try {
+            $secret = $this->mfaService->enable($user, $request->code);
+            
+            \App\Helpers\ActivityLogger::log('mfa.enabled', $user, null, "User {$user->name} enabled MFA");
+            
+            return response()->json([
+                'message' => 'MFA enabled successfully',
+                'enabled' => true,
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'message' => 'Invalid MFA code',
+                'errors' => $e->errors(),
+            ], 422);
+        }
+    }
+
+    /**
+     * Disable MFA
+     */
+    public function disableMfa(Request $request)
+    {
+        $request->validate([
+            'code' => 'required|string|size:6',
+        ]);
+
+        $user = $request->user();
+        
+        if (!$this->mfaService->verify($user, $request->code)) {
+            return response()->json([
+                'message' => 'Invalid MFA code',
+                'errors' => [
+                    'code' => ['Invalid MFA code.'],
+                ],
+            ], 422);
+        }
+        
+        $this->mfaService->disable($user);
+        
+        \App\Helpers\ActivityLogger::log('mfa.disabled', $user, null, "User {$user->name} disabled MFA");
+        
+        return response()->json([
+            'message' => 'MFA disabled successfully',
+            'enabled' => false,
+        ]);
+    }
+
+    /**
+     * Verify MFA code (for testing)
+     */
+    public function verifyMfa(Request $request)
+    {
+        $request->validate([
+            'code' => 'required|string|size:6',
+        ]);
+
+        $user = $request->user();
+        $valid = $this->mfaService->verify($user, $request->code);
+        
+        return response()->json([
+            'valid' => $valid,
+            'message' => $valid ? 'Code is valid' : 'Code is invalid',
+        ]);
+    }
+
     protected function formatUserResponse(User $user): array
     {
         $user->loadMissing(['roles', 'roles.permissions']);
@@ -109,10 +364,13 @@ class AuthController extends Controller
             ->all();
 
         $permissions = $user->getAllPermissions()->pluck('slug')->unique()->values()->all();
+        
+        $mfaEnabled = $this->mfaService->isEnabled($user);
 
         return array_merge($user->toArray(), [
             'roles' => $roleSlugs,
             'permissions' => $permissions,
+            'mfa_enabled' => $mfaEnabled,
         ]);
     }
 }

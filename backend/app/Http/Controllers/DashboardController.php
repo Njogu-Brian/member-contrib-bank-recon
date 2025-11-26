@@ -11,6 +11,39 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
+    /**
+     * Public snapshot for login page (no auth required)
+     */
+    public function publicSnapshot()
+    {
+        // Pending approvals = draft assignments that need approval
+        $pendingApprovals = $this->excludeDuplicateTransactions(
+            Transaction::where('assignment_status', 'draft')
+                ->where('is_archived', false)
+        )->count();
+        
+        // Today's inflow = total credits from transactions today (excluding duplicates)
+        $todayStart = now()->startOfDay();
+        $todayEnd = now()->endOfDay();
+        
+        $todayInflow = $this->excludeDuplicateTransactions(
+            Transaction::where('credit', '>', 0)
+                ->where('is_archived', false)
+                ->whereBetween('tran_date', [$todayStart, $todayEnd])
+        )->sum('credit');
+        
+        // Also include manual contributions from today
+        $todayManual = ManualContribution::whereDate('contribution_date', today())
+            ->sum('amount');
+        
+        $todayTotal = $todayInflow + $todayManual;
+        
+        return response()->json([
+            'pending_approvals' => $pendingApprovals,
+            'today_inflow' => round($todayTotal, 2),
+        ]);
+    }
+
     public function index()
     {
         $totalMembers = Member::where('is_active', true)->count();

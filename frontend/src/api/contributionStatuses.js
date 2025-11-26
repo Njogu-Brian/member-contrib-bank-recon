@@ -1,23 +1,23 @@
-import { adminApi } from './axios'
+import api from './axios'
 
 export const getContributionStatuses = async () => {
-  const response = await adminApi.get('/contribution-statuses')
-  return response.data.data
+  const response = await api.get('/admin/contribution-statuses')
+  return response.data.data || response.data
 }
 
 export const createContributionStatus = (payload) => {
-  return adminApi.post('/contribution-statuses', payload)
+  return api.post('/admin/contribution-statuses', payload)
 }
 
 export const updateContributionStatus = (id, payload) => {
-  return adminApi.put(`/contribution-statuses/${id}`, payload)
+  return api.put(`/admin/contribution-statuses/${id}`, payload)
 }
 
 export const deleteContributionStatus = (id) => {
-  return adminApi.delete(`/contribution-statuses/${id}`)
+  return api.delete(`/admin/contribution-statuses/${id}`)
 }
 
 export const reorderContributionStatuses = (order) => {
-  return adminApi.post('/contribution-statuses/reorder', { order })
+  return api.post('/admin/contribution-statuses/reorder', { order })
 }
 

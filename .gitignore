@@ -1,0 +1,50 @@
+# Local development scripts (not for production)
+start-services.sh
+stop-services.sh
+start-services.ps1
+stop-services.ps1
+start-services.bat
+stop-services.bat
+logs/
+*.pid
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+dist/
+build/
+*.log
+
+# Dependencies
+node_modules/
+vendor/
+
+# Storage (backend)
+backend/storage/logs/*
+backend/storage/framework/cache/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+!backend/storage/logs/.gitkeep
+!backend/storage/framework/.gitkeep
+!backend/storage/framework/cache/.gitkeep
+!backend/storage/framework/sessions/.gitkeep
+!backend/storage/framework/views/.gitkeep
+
+# Bootstrap cache
+backend/bootstrap/cache/*
+!backend/bootstrap/cache/.gitkeep
+

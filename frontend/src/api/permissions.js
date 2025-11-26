@@ -1,22 +1,22 @@
-import api from './axios'
+import { adminApi } from './axios'
 
 export const getPermissions = (params = {}) => {
-  return api.get('/v1/admin/admin/permissions', { params })
+  return adminApi.get('/permissions', { params })
 }
 
 export const getPermission = (id) => {
-  return api.get(`/v1/admin/admin/permissions/${id}`)
+  return adminApi.get(`/permissions/${id}`)
 }
 
 export const createPermission = (data) => {
-  return api.post('/v1/admin/admin/permissions', data)
+  return adminApi.post('/permissions', data)
 }
 
 export const updatePermission = (id, data) => {
-  return api.put(`/v1/admin/admin/permissions/${id}`, data)
+  return adminApi.put(`/permissions/${id}`, data)
 }
 
 export const deletePermission = (id) => {
-  return api.delete(`/v1/admin/admin/permissions/${id}`)
+  return adminApi.delete(`/permissions/${id}`)
 }
 

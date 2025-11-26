@@ -15,18 +15,29 @@ export default function ActivityLogs() {
   const [perPage, setPerPage] = useState(50)
   const debouncedSearch = useDebounce(searchInput, 400)
 
-  const { data: logsData, isLoading } = useQuery({
+  const { data: logsResponse, isLoading } = useQuery({
     queryKey: ['activityLogs', { action: actionFilter, model_type: modelFilter, date_from: dateFrom, date_to: dateTo, page, per_page: perPage }],
     queryFn: () => getActivityLogs({ action: actionFilter, model_type: modelFilter, date_from: dateFrom, date_to: dateTo, page, per_page: perPage }),
   })
 
-  const { data: statsData } = useQuery({
+  const { data: statsResponse } = useQuery({
     queryKey: ['activityLogStatistics', { date_from: dateFrom, date_to: dateTo }],
     queryFn: () => getActivityLogStatistics({ date_from: dateFrom, date_to: dateTo }),
   })
 
-  const logs = logsData?.data || []
-  const stats = statsData?.data || {}
+  // Extract data from response
+  // getActivityLogs returns response.data, which contains { data: [...], current_page: 1, ... }
+  const logsData = logsResponse?.data || logsResponse
+  
+  // Extract logs array - ensure it's always an array
+  const logs = Array.isArray(logsData?.data) 
+    ? logsData.data 
+    : Array.isArray(logsData) 
+      ? logsData 
+      : []
+  
+  // Statistics are returned directly as an object (response.data is the stats object)
+  const stats = statsResponse?.data || statsResponse || {}
 
   return (
     <div className="p-6">

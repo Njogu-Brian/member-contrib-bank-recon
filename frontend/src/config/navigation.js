@@ -120,12 +120,6 @@ export const NAVIGATION = [
         roles: [ROLES.SUPER_ADMIN, ROLES.ACCOUNTANT, ROLES.GUEST],
       },
       {
-        label: 'Settings',
-        icon: HiOutlineCog6Tooth,
-        path: '/settings',
-        roles: [ROLES.SUPER_ADMIN, ROLES.IT_SUPPORT],
-      },
-      {
         label: 'UI Kit',
         icon: HiOutlineSparkles,
         path: '/ui-kit',
@@ -155,10 +149,10 @@ export const NAVIGATION = [
         roles: [ROLES.SUPER_ADMIN, ROLES.IT_SUPPORT],
       },
       {
-        label: 'Admin Settings',
+        label: 'Settings',
         icon: HiOutlineCog6Tooth,
-        path: '/admin/settings',
-        roles: [ROLES.SUPER_ADMIN, ROLES.IT_SUPPORT],
+        path: '/settings',
+        roles: [ROLES.SUPER_ADMIN],
       },
     ],
   },
