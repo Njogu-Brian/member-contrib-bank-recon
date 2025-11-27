@@ -23,7 +23,12 @@ class AppServiceProvider extends ServiceProvider
     {
         // Set timezone dynamically from settings or use default
         try {
-            $timezone = \App\Models\Setting::get('timezone', config('app.timezone', 'Africa/Nairobi'));
+            // Check if database connection is available
+            if (\Illuminate\Support\Facades\Schema::hasTable('settings')) {
+                $timezone = \App\Models\Setting::get('timezone', config('app.timezone', 'Africa/Nairobi'));
+            } else {
+                $timezone = config('app.timezone', 'Africa/Nairobi');
+            }
             
             // Validate timezone
             if (in_array($timezone, timezone_identifiers_list())) {
