@@ -84,8 +84,9 @@ function App() {
     useInactivityTimeout(sessionTimeoutMinutes)
   }
   
-  // Don't show loading screen for public routes
-  if (isLoading && !isPublicRoute) {
+  // For public routes, never show loading screen - render immediately
+  // For other routes, show loading only if auth is still loading
+  if (!isPublicRoute && isLoading) {
     return <FullScreenLoader />
   }
 
