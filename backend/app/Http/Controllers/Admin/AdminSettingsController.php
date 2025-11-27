@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Config;
+use Carbon\Carbon;
 
 class AdminSettingsController extends Controller
 {
@@ -254,6 +256,14 @@ class AdminSettingsController extends Controller
             if ($value !== null && $value !== '') {
                 Setting::set($field, $value);
                 Log::info("Setting saved: {$field}", ['value' => $value, 'type' => gettype($value)]);
+                
+                // If timezone is updated, clear config cache and update PHP timezone
+                if ($field === 'timezone' && in_array($value, timezone_identifiers_list())) {
+                    \Illuminate\Support\Facades\Config::set('app.timezone', $value);
+                    date_default_timezone_set($value);
+                    \Carbon\Carbon::setToStringFormat('Y-m-d H:i:s');
+                    Cache::forget('config');
+                }
             }
         }
         
