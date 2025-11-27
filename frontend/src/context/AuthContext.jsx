@@ -53,21 +53,22 @@ export function AuthProvider({ children }) {
     return isPublic
   }, [pathname])
 
-  // For public routes, completely skip the auth query
-  // Use a conditional query that only runs for non-public routes
+  // For public statement routes, completely skip the auth query
+  // Login/logout routes still need auth context but don't require authentication
+  // Use a conditional query that only runs for non-public-statement routes
   const authQuery = useQuery({
-    queryKey: ['auth', 'user', isPublicRoute ? 'public' : 'private'],
+    queryKey: ['auth', 'user', isPublicStatementRoute ? 'public' : 'private'],
     queryFn: getCurrentUser,
     retry: false,
     staleTime: 5 * 60 * 1000,
-    enabled: !isPublicRoute, // Don't check auth for public routes
+    enabled: !isPublicStatementRoute, // Don't check auth for public statement routes
     // Ensure query doesn't run if disabled
-    refetchOnMount: !isPublicRoute,
-    refetchOnWindowFocus: !isPublicRoute,
-    // Don't use cached data for public routes
-    gcTime: isPublicRoute ? 0 : 5 * 60 * 1000,
-    // For public routes, return immediately without making the request
-    ...(isPublicRoute && {
+    refetchOnMount: !isPublicStatementRoute,
+    refetchOnWindowFocus: !isPublicStatementRoute,
+    // Don't use cached data for public statement routes
+    gcTime: isPublicStatementRoute ? 0 : 5 * 60 * 1000,
+    // For public statement routes, return immediately without making the request
+    ...(isPublicStatementRoute && {
       queryFn: () => Promise.resolve(null),
       initialData: null,
     }),
