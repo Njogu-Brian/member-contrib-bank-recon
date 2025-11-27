@@ -124,6 +124,7 @@ function App() {
         }
       />
       <Route path="/unauthorized" element={<Unauthorized />} />
+      {/* Public statement route - NO authentication required */}
       <Route path="/s/:token" element={<PublicStatement />} />
       <Route
         path="/"
