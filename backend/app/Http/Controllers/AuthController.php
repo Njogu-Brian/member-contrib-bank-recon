@@ -244,7 +244,8 @@ class AuthController extends Controller
         
         // Validation rules
         $rules = [
-            'password' => 'required|string|min:8|confirmed',
+            'password' => 'required|string|min:8',
+            'password_confirmation' => 'required|string|same:password',
         ];
         
         // Only require current_password if NOT first login
@@ -252,11 +253,11 @@ class AuthController extends Controller
             $rules['current_password'] = 'required|string';
         }
         
-        $request->validate($rules);
+        $validated = $request->validate($rules);
 
         // Only check current password if NOT first login
         if (!$isFirstLogin) {
-            if (!Hash::check($request->current_password, $user->password)) {
+            if (!Hash::check($validated['current_password'], $user->password)) {
                 return response()->json([
                     'message' => 'Current password is incorrect.',
                     'errors' => [
