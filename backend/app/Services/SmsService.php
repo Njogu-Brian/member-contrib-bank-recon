@@ -16,21 +16,13 @@ class SmsService
 
     public function __construct()
     {
-        // Check settings first, fall back to config, then environment
-        $this->userId = \App\Models\Setting::get('sms_userid') 
-            ?: config('services.sms.userid') 
-            ?: env('SMS_USERID', '');
-        $this->password = \App\Models\Setting::get('sms_password') 
-            ?: config('services.sms.password') 
-            ?: env('SMS_PASSWORD', '');
-        $this->senderId = \App\Models\Setting::get('sms_senderid') 
-            ?: config('services.sms.senderid') 
-            ?: env('SMS_SENDERID', '');
-        $smsEnabled = \App\Models\Setting::get('sms_enabled', '0');
-        $this->enabled = ($smsEnabled === '1' || $smsEnabled === 'true') 
-            || config('services.sms.enabled', false) 
-            || env('SMS_ENABLED', false);
-        $this->baseUrl = config('services.sms.base_url', 'https://smsportal.hostpinnacle.co.ke/SMSApi/send');
+        // SMS credentials MUST come from .env file only, NOT from UI settings
+        // This ensures security and prevents accidental exposure
+        $this->userId = env('SMS_USERID', config('services.sms.userid', ''));
+        $this->password = env('SMS_PASSWORD', config('services.sms.password', ''));
+        $this->senderId = env('SMS_SENDERID', config('services.sms.senderid', ''));
+        $this->enabled = env('SMS_ENABLED', config('services.sms.enabled', false));
+        $this->baseUrl = env('SMS_BASE_URL', config('services.sms.base_url', 'https://smsportal.hostpinnacle.co.ke/SMSApi/send'));
     }
 
     /**
@@ -300,11 +292,8 @@ class SmsService
      */
     public function isEnabled(): bool
     {
-        // Check settings dynamically (may have changed)
-        $smsEnabled = \App\Models\Setting::get('sms_enabled', '0');
-        $settingsEnabled = ($smsEnabled === '1' || $smsEnabled === 'true');
-        
-        return ($this->enabled || $settingsEnabled) && !empty($this->password);
+        // SMS enabled status comes from .env only
+        return $this->enabled && !empty($this->password) && !empty($this->userId) && !empty($this->senderId);
     }
 }
 

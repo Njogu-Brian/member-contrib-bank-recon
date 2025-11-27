@@ -60,11 +60,9 @@ class AdminSettingsController extends Controller
             ],
             'integrations' => [
                 'sms_provider',
-                'sms_userid',
-                'sms_password',
-                'sms_senderid',
-                'mpesa_consumer_key',
-                'mpesa_consumer_secret',
+                // SMS and M-Pesa credentials are managed via .env file only for security
+                // 'sms_userid', 'sms_password', 'sms_senderid' - removed (use .env)
+                // 'mpesa_consumer_key', 'mpesa_consumer_secret' - removed (use .env)
             ],
             'security' => [
                 'password_min_length',
@@ -243,10 +241,11 @@ class AdminSettingsController extends Controller
         }
         
                // Also handle direct setting fields (can come from formData or JSON)
+               // Note: SMS and M-Pesa credentials are NOT configurable via UI - they must be in .env file
                $directSettingFields = ['app_name', 'app_description', 'timezone', 'date_format', 'currency', 
-                                       'default_currency', 'sms_provider', 'sms_userid', 'sms_password', 'sms_senderid',
-                                       'mpesa_consumer_key', 'mpesa_consumer_secret', 'password_min_length',
-                                       'session_timeout', 'theme_primary_color', 'theme_secondary_color',
+                                       'default_currency', 'sms_provider',
+                                       'password_min_length', 'session_timeout', 
+                                       'theme_primary_color', 'theme_secondary_color',
                                        'login_background_color', 'login_text_color', 'navbar_background_color'];
         
         foreach ($directSettingFields as $field) {
@@ -259,6 +258,8 @@ class AdminSettingsController extends Controller
         }
         
         // Handle boolean settings (enabled flags)
+        // Note: sms_enabled and mpesa_enabled should be set in .env, but we allow UI toggle for convenience
+        // The actual credentials (userid, password, etc.) MUST be in .env only
         $booleanFields = ['mpesa_enabled', 'sms_enabled', 'fcm_enabled', 'pdf_service_enabled',
                          'bulk_bank_enabled', 'ocr_matching_enabled', 'require_mfa', 'multi_currency_enabled'];
         
@@ -358,11 +359,9 @@ class AdminSettingsController extends Controller
             ],
             'integrations' => [
                 'sms_provider',
-                'sms_userid',
-                'sms_password',
-                'sms_senderid',
-                'mpesa_consumer_key',
-                'mpesa_consumer_secret',
+                // SMS and M-Pesa credentials are managed via .env file only for security
+                // 'sms_userid', 'sms_password', 'sms_senderid' - removed (use .env)
+                // 'mpesa_consumer_key', 'mpesa_consumer_secret' - removed (use .env)
             ],
             'security' => [
                 'password_min_length',
