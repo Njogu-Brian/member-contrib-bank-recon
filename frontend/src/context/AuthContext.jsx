@@ -51,13 +51,14 @@ export function AuthProvider({ children }) {
     () => ({
       user: resolvedUser,
       roles,
-      isLoading: isLoading || isFetching,
+      // For public routes, don't show loading state
+      isLoading: isPublicRoute ? false : (isLoading || isFetching),
       isAuthenticated: Boolean(resolvedUser?.id),
       error,
       logout: handleLogout,
       refetch: refetchUser,
     }),
-    [resolvedUser, roles, isLoading, isFetching, error, refetchUser]
+    [resolvedUser, roles, isLoading, isFetching, error, refetchUser, isPublicRoute]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

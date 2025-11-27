@@ -29,8 +29,17 @@ export default function PublicStatement() {
     queryKey: ['public-statement', token, page, perPage],
     queryFn: async () => {
       const params = new URLSearchParams({ page, per_page: perPage })
-      const response = await api.get(`/public/statement/${token}?${params}`)
-      return response.data
+      try {
+        const response = await api.get(`/public/statement/${token}?${params}`)
+        return response.data
+      } catch (err) {
+        // Don't let axios interceptor redirect for public routes
+        if (err.response?.status === 401 || err.response?.status === 419) {
+          // Return error data instead of letting interceptor handle it
+          throw err
+        }
+        throw err
+      }
     },
     retry: false,
   })
