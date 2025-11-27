@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Login from './pages/Login'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
@@ -63,14 +63,15 @@ function PublicRoute({ children }) {
 function App() {
   const { isLoading } = useAuthContext()
   const { settings } = useSettings()
-  const location = window.location.pathname
+  const location = useLocation()
+  const pathname = location.pathname
   
   // Skip auth loading for public routes
-  const isPublicRoute = location.startsWith('/s/') || 
-                       location.startsWith('/public/') ||
-                       location === '/login' ||
-                       location === '/forgot-password' ||
-                       location === '/reset-password'
+  const isPublicRoute = pathname.startsWith('/s/') || 
+                       pathname.startsWith('/public/') ||
+                       pathname === '/login' ||
+                       pathname === '/forgot-password' ||
+                       pathname === '/reset-password'
   
   // Get session timeout from settings (in minutes), default to 8 hours (480 minutes)
   const sessionTimeoutMinutes = settings?.session_timeout 
