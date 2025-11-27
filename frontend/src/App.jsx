@@ -42,7 +42,7 @@ import { useInactivityTimeout } from './hooks/useInactivityTimeout'
 import { hasRole, ROLES } from './lib/rbac'
 
 function ProtectedRoute({ children, roles = [] }) {
-  const { isAuthenticated, user } = useAuthContext()
+  const { isAuthenticated, user } = useConditionalAuth()
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
   }
@@ -53,7 +53,7 @@ function ProtectedRoute({ children, roles = [] }) {
 }
 
 function PublicRoute({ children }) {
-  const { isAuthenticated } = useAuthContext()
+  const { isAuthenticated } = useConditionalAuth()
   if (isAuthenticated) {
     return <Navigate to="/" replace />
   }
@@ -61,8 +61,6 @@ function PublicRoute({ children }) {
 }
 
 function App() {
-  const { isLoading } = useAuthContext()
-  const { settings } = useSettings()
   const location = useLocation()
   const pathname = location.pathname
   
@@ -73,20 +71,32 @@ function App() {
                        pathname === '/forgot-password' ||
                        pathname === '/reset-password'
   
+  // For public routes, don't use auth context at all
+  if (isPublicRoute) {
+    // Public routes render immediately without any auth checks
+    return (
+      <Routes>
+        <Route path="/s/:token" element={<PublicStatement />} />
+        <Route path="*" element={<Navigate to="/s/invalid" replace />} />
+      </Routes>
+    )
+  }
+  
+  // For protected routes, use auth context
+  const { isLoading } = useConditionalAuth()
+  const { settings } = useConditionalSettings()
+  
   // Get session timeout from settings (in minutes), default to 8 hours (480 minutes)
   const sessionTimeoutMinutes = settings?.session_timeout 
     ? parseInt(settings.session_timeout, 10) 
     : 480
   
   // Enable inactivity timeout - automatically logs out user after period of inactivity
-  // Only enable for authenticated routes
-  if (!isPublicRoute) {
-    useInactivityTimeout(sessionTimeoutMinutes)
-  }
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useInactivityTimeout(sessionTimeoutMinutes)
   
-  // For public routes, never show loading screen - render immediately
-  // For other routes, show loading only if auth is still loading
-  if (!isPublicRoute && isLoading) {
+  // Show loading screen while auth is loading
+  if (isLoading) {
     return <FullScreenLoader />
   }
 

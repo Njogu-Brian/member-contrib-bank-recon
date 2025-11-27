@@ -9,15 +9,26 @@ import { SettingsProvider } from './context/SettingsContext.jsx'
 
 const queryClient = new QueryClient()
 
+// Check if this is a public route BEFORE rendering the app
+const isPublicRoute = typeof window !== 'undefined' && 
+  (window.location.pathname.startsWith('/s/') || 
+   window.location.pathname.startsWith('/public/'))
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <AuthProvider>
-          <SettingsProvider>
-            <App />
-          </SettingsProvider>
-        </AuthProvider>
+        {isPublicRoute ? (
+          // For public routes, render App without AuthProvider to prevent auth checks
+          <App />
+        ) : (
+          // For protected routes, use AuthProvider
+          <AuthProvider>
+            <SettingsProvider>
+              <App />
+            </SettingsProvider>
+          </AuthProvider>
+        )}
       </BrowserRouter>
     </QueryClientProvider>
   </React.StrictMode>
