@@ -11,25 +11,48 @@ import { SettingsProvider } from './context/SettingsContext.jsx'
 const queryClient = new QueryClient()
 
 // Check if this is a public route BEFORE rendering the app
-const isPublicRoute = typeof window !== 'undefined' && 
-  (window.location.pathname.startsWith('/s/') || 
-   window.location.pathname.startsWith('/public/'))
+// Use a function to ensure we get the current pathname at render time
+function getIsPublicRoute() {
+  if (typeof window === 'undefined') return false
+  const pathname = window.location.pathname
+  return pathname.startsWith('/s/') || pathname.startsWith('/public/')
+}
+
+// Store the check result immediately
+const isPublicRoute = getIsPublicRoute()
+
+// Create a wrapper component that re-checks on mount to handle any timing issues
+function RootApp() {
+  const [isPublic, setIsPublic] = React.useState(isPublicRoute)
+  
+  React.useEffect(() => {
+    // Double-check on mount in case pathname changed
+    const check = getIsPublicRoute()
+    if (check !== isPublic) {
+      setIsPublic(check)
+    }
+  }, [isPublic])
+  
+  if (isPublic) {
+    // For public routes, use completely separate PublicApp that has NO auth dependencies
+    return <PublicApp />
+  }
+  
+  // For protected routes, use AuthProvider
+  return (
+    <AuthProvider>
+      <SettingsProvider>
+        <App />
+      </SettingsProvider>
+    </AuthProvider>
+  )
+}
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        {isPublicRoute ? (
-          // For public routes, use completely separate PublicApp that has NO auth dependencies
-          <PublicApp />
-        ) : (
-          // For protected routes, use AuthProvider
-          <AuthProvider>
-            <SettingsProvider>
-              <App />
-            </SettingsProvider>
-          </AuthProvider>
-        )}
+        <RootApp />
       </BrowserRouter>
     </QueryClientProvider>
   </React.StrictMode>

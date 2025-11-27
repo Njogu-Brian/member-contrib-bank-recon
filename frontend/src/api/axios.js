@@ -12,9 +12,17 @@ const api = axios.create({
 })
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  // Check if this is a public route - don't add auth token for public routes
+  const isPublicRoute = typeof window !== 'undefined' && 
+    (window.location.pathname.startsWith('/s/') || 
+     window.location.pathname.startsWith('/public/'))
+  
+  // Only add auth token if NOT a public route
+  if (!isPublicRoute) {
+    const token = localStorage.getItem('token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
   }
   
   // If data is FormData, don't set Content-Type - let browser set it with boundary
