@@ -45,6 +45,23 @@ class PublicMemberStatementController extends Controller
             ], 404);
         }
 
+        // Check if token has expired (if expiration is set)
+        if ($member->public_share_token_expires_at && now()->greaterThan($member->public_share_token_expires_at)) {
+            Log::warning('Expired public statement token accessed', [
+                'member_id' => $member->id,
+                'token' => substr($token, 0, 8) . '...',
+                'ip' => $request->ip(),
+            ]);
+            return response()->json([
+                'error' => 'Expired link',
+                'message' => 'This statement link has expired. Please request a new one.',
+            ], 410); // 410 Gone
+        }
+
+        // Update access tracking
+        $member->increment('public_share_access_count');
+        $member->update(['public_share_last_accessed_at' => now()]);
+
         // Build statement data (same logic as MemberController::statement)
         $validated = $request->validate([
             'start_date' => 'nullable|date',
