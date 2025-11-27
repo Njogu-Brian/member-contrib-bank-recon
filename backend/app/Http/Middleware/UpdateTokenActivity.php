@@ -24,8 +24,23 @@ class UpdateTokenActivity
             return $next($request);
         }
 
+        // Only process token activity if user is authenticated
+        // This prevents errors when checking authentication status on login page
+        try {
+            $user = $request->user();
+            if (!$user) {
+                // No user authenticated, let the auth middleware handle it
+                return $next($request);
+            }
+        } catch (\Exception $e) {
+            // If there's an error getting the user, log it but continue
+            // The auth middleware will handle authentication
+            \Illuminate\Support\Facades\Log::warning('Error getting user in UpdateTokenActivity: ' . $e->getMessage());
+            return $next($request);
+        }
+
         // Check token expiration before processing request
-        if ($request->user() && $request->user()->currentAccessToken()) {
+        if ($user && $user->currentAccessToken()) {
             try {
                 $token = $request->user()->currentAccessToken();
                 
