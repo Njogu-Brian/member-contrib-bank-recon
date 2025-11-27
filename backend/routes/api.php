@@ -21,6 +21,7 @@ use App\Http\Controllers\ManualContributionController;
 use App\Http\Controllers\MeetingAttendanceUploadController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingController;
+use App\Http\Controllers\PublicMemberStatementController;
 use App\Http\Controllers\SmsController;
 use App\Http\Controllers\StatementController;
 use App\Http\Controllers\TransactionController;
@@ -51,6 +52,9 @@ Route::prefix('v1')->group(function () {
         
         // Public announcements for login page
         Route::get('/announcements', [AnnouncementController::class, 'publicList']);
+        
+        // Public member statement view (no authentication required)
+        Route::get('/statement/{token}', [PublicMemberStatementController::class, 'show']);
     });
 
     Route::prefix('webhooks')->group(function () {

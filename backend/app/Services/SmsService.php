@@ -187,7 +187,7 @@ class SmsService
                 ? number_format($data['total_contributions'] - $data['expected_contributions'], 2)
                 : '0.00',
             '{statement_link}' => $baseUrl && isset($data['id'])
-                ? rtrim($baseUrl, '/') . '/members/' . $data['id']
+                ? $this->generatePublicStatementLink($data['id'], $baseUrl)
                 : '',
         ];
 
@@ -283,6 +283,24 @@ class SmsService
 
         // Invalid format
         return null;
+    }
+
+    /**
+     * Generate public statement link for member (no authentication required)
+     *
+     * @param int $memberId
+     * @param string $baseUrl
+     * @return string
+     */
+    protected function generatePublicStatementLink(int $memberId, string $baseUrl): string
+    {
+        $member = \App\Models\Member::find($memberId);
+        if (!$member) {
+            return '';
+        }
+
+        $token = $member->getPublicShareToken();
+        return rtrim($baseUrl, '/') . '/public/statement/' . $token;
     }
 
     /**

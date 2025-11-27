@@ -21,6 +21,7 @@ class Member extends Model
         'date_of_registration',
         'notes',
         'is_active',
+        'public_share_token',
     ];
 
     protected $casts = [
@@ -217,6 +218,31 @@ class Member extends Model
         }
 
         return collect($dates)->sort()->first();
+    }
+
+    /**
+     * Get or generate public share token for this member
+     */
+    public function getPublicShareToken(): string
+    {
+        if (!$this->public_share_token) {
+            $this->public_share_token = $this->generateUniqueToken();
+            $this->saveQuietly();
+        }
+
+        return $this->public_share_token;
+    }
+
+    /**
+     * Generate a unique public share token
+     */
+    protected function generateUniqueToken(): string
+    {
+        do {
+            $token = \Illuminate\Support\Str::random(32);
+        } while (static::where('public_share_token', $token)->exists());
+
+        return $token;
     }
 }
 

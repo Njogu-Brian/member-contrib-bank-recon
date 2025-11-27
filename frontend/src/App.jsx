@@ -29,6 +29,7 @@ import Notifications from './pages/Notifications'
 import Compliance from './pages/Compliance'
 import BulkSms from './pages/BulkSms'
 import Unauthorized from './pages/Unauthorized'
+import PublicStatement from './pages/PublicStatement'
 import UiKit from './pages/UiKit'
 import StaffManagement from './pages/StaffManagement'
 import RoleManagement from './pages/RoleManagement'
@@ -110,6 +111,7 @@ function App() {
         }
       />
       <Route path="/unauthorized" element={<Unauthorized />} />
+      <Route path="/public/statement/:token" element={<PublicStatement />} />
       <Route
         path="/"
         element={
