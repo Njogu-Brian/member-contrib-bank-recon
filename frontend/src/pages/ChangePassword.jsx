@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { changePassword } from '../api/auth'
-import { HiEye, HiEyeOff, HiSparkles } from 'react-icons/hi2'
+import { HiEye, HiEyeSlash } from 'react-icons/hi2'
+import { HiSparkles } from 'react-icons/hi'
 
 // Password generator function
 const generatePassword = (length = 16, includeUppercase = true, includeLowercase = true, includeNumbers = true, includeSymbols = true) => {
