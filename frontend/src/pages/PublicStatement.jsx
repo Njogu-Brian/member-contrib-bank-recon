@@ -25,6 +25,19 @@ export default function PublicStatement() {
   const [page, setPage] = useState(parseInt(searchParams.get('page') || '1', 10))
   const [perPage, setPerPage] = useState(parseInt(searchParams.get('per_page') || '25', 10))
 
+  // Ensure we have a token
+  if (!token) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-6 text-center">
+          <div className="text-red-600 text-5xl mb-4">⚠️</div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Invalid Link</h1>
+          <p className="text-gray-600">No token provided in the link.</p>
+        </div>
+      </div>
+    )
+  }
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['public-statement', token, page, perPage],
     queryFn: async () => {
