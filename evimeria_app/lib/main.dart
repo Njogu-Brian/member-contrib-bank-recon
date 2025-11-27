@@ -12,6 +12,7 @@ import 'screens/home/home_shell.dart';
 import 'screens/kyc/kyc_wizard_screen.dart';
 import 'services/push_notification_service.dart';
 import 'utils/constants.dart';
+import 'widgets/inactivity_timeout_widget.dart';
 
 Future<void> _backgroundHandler(RemoteMessage message) async {
   if (Firebase.apps.isEmpty) {
@@ -70,6 +71,15 @@ class AuthGate extends ConsumerWidget {
       );
     }
 
-    return authState.isAuthenticated ? const HomeShell() : const LoginScreen();
+    if (authState.isAuthenticated) {
+      // Wrap authenticated content with inactivity timeout
+      // Default timeout: 8 hours (480 minutes) - can be configured via settings
+      return const InactivityTimeoutWidget(
+        timeoutMinutes: 480, // TODO: Get from settings API
+        child: HomeShell(),
+      );
+    }
+
+    return const LoginScreen();
   }
 }

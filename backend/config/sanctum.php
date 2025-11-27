@@ -7,7 +7,10 @@ return [
         env('APP_URL') ? ','.parse_url(env('APP_URL'), PHP_URL_HOST) : ''
     ))),
     'guard' => ['web'],
-    'expiration' => null,
+    // Token expiration in minutes (null = never expire, but we handle expiration via middleware)
+    // Default to 8 hours (480 minutes) - can be overridden via SANCTUM_TOKEN_EXPIRATION env var
+    // Or set via session_timeout setting (handled in middleware)
+    'expiration' => env('SANCTUM_TOKEN_EXPIRATION', 480) ? (int) env('SANCTUM_TOKEN_EXPIRATION') * 60 : null,
     'token_prefix' => env('SANCTUM_TOKEN_PREFIX', ''),
     'middleware' => [
         'verify_csrf_token' => App\Http\Middleware\VerifyCsrfToken::class,

@@ -36,6 +36,8 @@ import ActivityLogs from './pages/ActivityLogs'
 import MfaSetup from './pages/MfaSetup'
 import FullScreenLoader from './components/FullScreenLoader'
 import { useAuthContext } from './context/AuthContext'
+import { useSettings } from './context/SettingsContext'
+import { useInactivityTimeout } from './hooks/useInactivityTimeout'
 import { hasRole, ROLES } from './lib/rbac'
 
 function ProtectedRoute({ children, roles = [] }) {
@@ -59,6 +61,16 @@ function PublicRoute({ children }) {
 
 function App() {
   const { isLoading } = useAuthContext()
+  const { settings } = useSettings()
+  
+  // Get session timeout from settings (in minutes), default to 8 hours (480 minutes)
+  const sessionTimeoutMinutes = settings?.session_timeout 
+    ? parseInt(settings.session_timeout, 10) 
+    : 480
+  
+  // Enable inactivity timeout - automatically logs out user after period of inactivity
+  useInactivityTimeout(sessionTimeoutMinutes)
+  
   if (isLoading) {
     return <FullScreenLoader />
   }

@@ -304,20 +304,114 @@ API_BASE_URL=https://evimeria.breysomsolutions.co.ke/api
 
 ## Mobile API Endpoints Reference
 
-The app uses these endpoints (under `/api/v1/mobile/`):
+The app uses endpoints from both `/api/v1/mobile/` (mobile-specific) and `/api/v1/admin/` (admin endpoints that mobile app also uses).
 
-- `POST /auth/login` - User login
-- `POST /auth/register` - User registration
-- `GET /auth/me` - Get current user
-- `POST /auth/logout` - Logout
-- `GET /kyc/profile` - Get KYC profile
-- `PUT /kyc/profile` - Update KYC profile
-- `POST /kyc/documents` - Upload KYC documents
-- `POST /mfa/enable` - Enable MFA
-- `POST /mfa/disable` - Disable MFA
-- `GET /members` - List members
-- `GET /members/{id}` - Get member details
+### Authentication & User Management (Mobile Endpoints)
 
-See `backend/routes/api.php` for complete API documentation.
+- `POST /mobile/auth/login` - User login
+- `POST /mobile/auth/register` - User registration
+- `GET /mobile/auth/me` - Get current user
+- `POST /mobile/auth/logout` - Logout
+- `POST /auth/password/reset-request` - Request password reset
+- `POST /auth/password/reset` - Reset password
+
+### KYC (Know Your Customer) - Mobile Endpoints
+
+- `GET /mobile/kyc/profile` - Get KYC profile
+- `PUT /mobile/kyc/profile` - Update KYC profile
+- `POST /mobile/kyc/documents` - Upload KYC documents
+
+### Multi-Factor Authentication (Mobile Endpoints)
+
+- `POST /mobile/mfa/enable` - Enable MFA
+- `POST /mobile/mfa/disable` - Disable MFA
+
+### Members (Mobile Endpoints)
+
+- `GET /mobile/members` - List members
+- `GET /mobile/members/{id}` - Get member details
+
+### Finance Features (Admin Endpoints)
+
+**Wallets & Contributions:**
+- `GET /admin/wallets` - List wallets
+- `GET /admin/wallets/{id}` - Get wallet details
+- `POST /admin/wallets/{id}/contributions` - Create contribution
+- `GET /admin/members/{id}/penalties` - Get member penalties
+
+**Investments:**
+- `GET /admin/investments` - List investments
+- `POST /admin/investments` - Create investment
+- `GET /admin/investments/{id}` - Get investment details
+- `PUT /admin/investments/{id}` - Update investment
+- `DELETE /admin/investments/{id}` - Delete investment
+
+### Meetings & Motions (Admin Endpoints)
+
+- `GET /admin/meetings` - List meetings
+- `POST /admin/meetings` - Create meeting
+- `POST /admin/meetings/{id}/motions` - Add motion to meeting
+- `POST /admin/motions/{id}/votes` - Vote on motion
+
+### Announcements (Admin Endpoints)
+
+- `GET /admin/announcements` - List announcements
+- `POST /admin/announcements` - Create announcement (admin only)
+- `PUT /admin/announcements/{id}` - Update announcement (admin only)
+- `DELETE /admin/announcements/{id}` - Delete announcement (admin only)
+
+### Budgets & Expenses (Admin Endpoints)
+
+**Budgets:**
+- `GET /admin/budgets` - List budgets
+- `POST /admin/budgets` - Create budget
+- `PUT /admin/budget-months/{id}` - Update budget month
+
+**Expenses:**
+- `GET /admin/expenses` - List expenses
+- `POST /admin/expenses` - Create expense
+- `GET /admin/expenses/{id}` - Get expense details
+- `PUT /admin/expenses/{id}` - Update expense
+- `DELETE /admin/expenses/{id}` - Delete expense
+
+### Notifications (Admin Endpoints)
+
+- `GET /admin/notifications/log` - Get notification log
+- `GET /admin/notification-preferences` - Get notification preferences
+- `PUT /admin/notification-preferences` - Update notification preferences
+
+### Reports (Admin Endpoints)
+
+- `GET /admin/reports/summary` - Get summary report
+- `GET /admin/reports/contributions` - Get contributions report
+- `GET /admin/reports/expenses` - Get expenses report
+- `GET /admin/reports/members` - Get members report
+- `GET /admin/reports/transactions` - Get transactions report
+- `GET /admin/report-exports` - List report exports
+- `POST /admin/report-exports` - Create report export
+
+### Public Endpoints (No Authentication)
+
+- `GET /public/health` - Health check
+- `GET /public/test` - API test endpoint
+- `GET /public/settings` - Public settings (logo, branding)
+- `GET /public/dashboard/snapshot` - Public dashboard snapshot
+- `GET /public/announcements` - Public announcements (published only)
+
+### Authentication
+
+All authenticated endpoints require a Bearer token in the Authorization header:
+```
+Authorization: Bearer {token}
+```
+
+The token is obtained from the login endpoint and stored securely in the app.
+
+### Notes
+
+- Mobile-specific endpoints (`/mobile/*`) are designed for mobile app use
+- Admin endpoints (`/admin/*`) require appropriate permissions
+- Some admin endpoints may require specific roles (e.g., `manage-announcements`, `manage-meetings`)
+- See `backend/routes/api.php` for complete API documentation and route definitions
 
 
