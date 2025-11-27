@@ -2,18 +2,25 @@
   RewriteEngine On
   RewriteBase /
 
-  # Route API calls to Laravel backend (via symlinked index.php)
+  # Route API calls to Laravel backend's index.php
+  # This must come BEFORE the SPA routing rule
   RewriteCond %{REQUEST_URI} ^/api/
-  RewriteRule ^api/(.*)$ index.php [L,QSA]
+  # Route to Laravel's index.php (should be symlinked or accessible)
+  RewriteRule ^api/(.*)$ /index.php [L,QSA]
 
-  # Don't rewrite storage files
+  # Don't rewrite storage files (Laravel storage)
   RewriteCond %{REQUEST_URI} ^/storage/
   RewriteRule ^ - [L]
 
-  # Don't rewrite existing files or directories
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
+  # Don't rewrite existing files (like index.html, assets, etc.)
+  RewriteCond %{REQUEST_FILENAME} -f
+  RewriteRule ^ - [L]
+
+  # Don't rewrite existing directories
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
 
   # Rewrite everything else to index.html for SPA routing
-  RewriteRule . /index.html [L]
+  # This includes /login, /logout, /s/*, and all other frontend routes
+  RewriteRule ^ /index.html [L]
 </IfModule>
