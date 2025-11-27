@@ -76,11 +76,14 @@ export default function Login() {
   // Debug logging
   useEffect(() => {
     if (effectiveSettings) {
-      console.log('Login page settings loaded:', {
-        logo_url: effectiveSettings?.logo_url,
-        favicon_url: effectiveSettings?.favicon_url,
-        normalized_logo: logoUrl,
-      })
+      // Settings loaded - only log in development
+      if (import.meta.env.DEV) {
+        console.log('Login page settings loaded:', {
+          logo_url: effectiveSettings?.logo_url,
+          favicon_url: effectiveSettings?.favicon_url,
+          normalized_logo: logoUrl,
+        })
+      }
     }
   }, [effectiveSettings, logoUrl])
   const primaryColor = effectiveSettings?.theme_primary_color || '#6366f1'
@@ -287,7 +290,12 @@ export default function Login() {
                       // Show fallback instead of hiding
                       e.target.style.display = 'none'
                     }}
-                    onLoad={() => console.log('Logo loaded successfully:', logoUrl)}
+                    onLoad={() => {
+                      // Only log in development
+                      if (import.meta.env.DEV) {
+                        console.log('Logo loaded successfully:', logoUrl)
+                      }
+                    }}
                   />
                 ) : null}
                 {(!logoUrl || !effectiveSettings?.logo_url) && (
