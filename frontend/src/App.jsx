@@ -41,6 +41,24 @@ import { useSettings } from './context/SettingsContext'
 import { useInactivityTimeout } from './hooks/useInactivityTimeout'
 import { hasRole, ROLES } from './lib/rbac'
 
+// Helper hooks to conditionally use AuthContext and SettingsContext
+// This prevents errors when AuthProvider is not rendered
+const useConditionalAuth = () => {
+  try {
+    return useAuthContext()
+  } catch {
+    return { user: null, roles: [], isLoading: false, isAuthenticated: false, error: null, logout: async () => {}, refetch: async () => {} }
+  }
+}
+
+const useConditionalSettings = () => {
+  try {
+    return useSettings()
+  } catch {
+    return { settings: {}, isLoading: false, error: null }
+  }
+}
+
 function ProtectedRoute({ children, roles = [] }) {
   const { isAuthenticated, user } = useConditionalAuth()
   if (!isAuthenticated) {
