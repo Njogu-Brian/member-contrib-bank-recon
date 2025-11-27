@@ -43,8 +43,24 @@ export default function PublicStatement() {
     queryFn: async () => {
       const params = new URLSearchParams({ page, per_page: perPage })
       try {
-        const response = await api.get(`/public/statement/${token}?${params}`)
-        return response.data
+        // Use absolute URL to ensure correct routing
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+        const url = `${baseUrl}/public/statement/${token}?${params}`
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+        })
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+        }
+        
+        return await response.json()
       } catch (err) {
         // Don't let axios interceptor redirect for public routes
         if (err.response?.status === 401 || err.response?.status === 419) {
