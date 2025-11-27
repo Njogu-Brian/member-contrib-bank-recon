@@ -242,6 +242,15 @@ class AuthController extends Controller
         // Check if this is a first login (must_change_password is true)
         $isFirstLogin = $user->must_change_password ?? false;
         
+        // Log incoming request for debugging
+        Log::info('Password change request', [
+            'user_id' => $user->id,
+            'is_first_login' => $isFirstLogin,
+            'has_password' => $request->has('password'),
+            'has_password_confirmation' => $request->has('password_confirmation'),
+            'has_current_password' => $request->has('current_password'),
+        ]);
+        
         // Validation rules
         $rules = [
             'password' => 'required|string|min:8',
@@ -253,7 +262,15 @@ class AuthController extends Controller
             $rules['current_password'] = 'required|string';
         }
         
-        $validated = $request->validate($rules);
+        try {
+            $validated = $request->validate($rules);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::warning('Password change validation failed', [
+                'user_id' => $user->id,
+                'errors' => $e->errors(),
+            ]);
+            throw $e;
+        }
 
         // Only check current password if NOT first login
         if (!$isFirstLogin) {
