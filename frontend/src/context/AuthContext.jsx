@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo } from 'react'
 import PropTypes from 'prop-types'
+import { useLocation } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getCurrentUser, logout as apiLogout } from '../api/auth'
 
@@ -15,14 +16,14 @@ const AuthContext = createContext({
 
 export function AuthProvider({ children }) {
   const queryClient = useQueryClient()
+  const location = useLocation()
 
   // Skip auth check for public routes
-  const isPublicRoute = typeof window !== 'undefined' && 
-    (window.location.pathname.startsWith('/s/') || 
-     window.location.pathname.startsWith('/public/') ||
-     window.location.pathname === '/login' ||
-     window.location.pathname === '/forgot-password' ||
-     window.location.pathname === '/reset-password')
+  const isPublicRoute = location.pathname.startsWith('/s/') || 
+                       location.pathname.startsWith('/public/') ||
+                       location.pathname === '/login' ||
+                       location.pathname === '/forgot-password' ||
+                       location.pathname === '/reset-password'
 
   const {
     data,
