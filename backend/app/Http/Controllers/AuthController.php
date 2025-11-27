@@ -258,8 +258,13 @@ class AuthController extends Controller
         ];
         
         // Only require current_password if NOT first login
+        // For first login, explicitly exclude current_password from validation
         if (!$isFirstLogin) {
             $rules['current_password'] = 'required|string';
+        } else {
+            // For first login, ensure current_password is not validated even if sent
+            // This prevents validation errors if frontend accidentally sends it
+            $rules['current_password'] = 'nullable|string';
         }
         
         try {
@@ -267,7 +272,9 @@ class AuthController extends Controller
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::warning('Password change validation failed', [
                 'user_id' => $user->id,
+                'is_first_login' => $isFirstLogin,
                 'errors' => $e->errors(),
+                'request_data' => $request->only(['password', 'password_confirmation', 'current_password']),
             ]);
             throw $e;
         }
