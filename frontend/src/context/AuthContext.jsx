@@ -54,8 +54,8 @@ export function AuthProvider({ children }) {
     return isPublic
   }, [pathname])
 
-  // Only run auth query if NOT a public route
-  // Use a separate query key for public routes to prevent any caching issues
+  // For public routes, completely skip the auth query
+  // Use a conditional query that only runs for non-public routes
   const authQuery = useQuery({
     queryKey: ['auth', 'user', isPublicRoute ? 'public' : 'private'],
     queryFn: getCurrentUser,
@@ -67,6 +67,11 @@ export function AuthProvider({ children }) {
     refetchOnWindowFocus: !isPublicRoute,
     // Don't use cached data for public routes
     gcTime: isPublicRoute ? 0 : 5 * 60 * 1000,
+    // For public routes, return immediately without making the request
+    ...(isPublicRoute && {
+      queryFn: () => Promise.resolve(null),
+      initialData: null,
+    }),
   })
 
   const {
