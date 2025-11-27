@@ -198,7 +198,7 @@ export default function ChangePassword() {
                   onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                 >
-                  {showCurrentPassword ? <HiEyeOff className="h-5 w-5" /> : <HiEye className="h-5 w-5" />}
+                  {showCurrentPassword ? <HiEyeSlash className="h-5 w-5" /> : <HiEye className="h-5 w-5" />}
                 </button>
               </div>
             </div>
@@ -235,7 +235,7 @@ export default function ChangePassword() {
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
               >
-                {showPassword ? <HiEyeOff className="h-5 w-5" /> : <HiEye className="h-5 w-5" />}
+                {showPassword ? <HiEyeSlash className="h-5 w-5" /> : <HiEye className="h-5 w-5" />}
               </button>
             </div>
             {formData.password && (
@@ -285,7 +285,7 @@ export default function ChangePassword() {
                 onClick={() => setShowPasswordConfirmation(!showPasswordConfirmation)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
               >
-                {showPasswordConfirmation ? <HiEyeOff className="h-5 w-5" /> : <HiEye className="h-5 w-5" />}
+                {showPasswordConfirmation ? <HiEyeSlash className="h-5 w-5" /> : <HiEye className="h-5 w-5" />}
               </button>
             </div>
             {formData.password_confirmation && formData.password !== formData.password_confirmation && (
