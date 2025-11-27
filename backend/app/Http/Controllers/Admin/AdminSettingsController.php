@@ -15,25 +15,52 @@ class AdminSettingsController extends Controller
 {
     public function index()
     {
-        $settings = Setting::all()->pluck('value', 'key');
-        
-        // Add URLs for logo and favicon if they exist
-        $logoUrl = null;
-        $faviconUrl = null;
-        
-        if ($settings->get('logo_path')) {
-            $logoUrl = Storage::disk('public')->url($settings->get('logo_path'));
+        try {
+            $settings = Setting::all()->pluck('value', 'key');
+            
+            // Add URLs for logo and favicon if they exist
+            $logoUrl = null;
+            $faviconUrl = null;
+            
+            try {
+                if ($settings->get('logo_path')) {
+                    $logoPath = $settings->get('logo_path');
+                    if (Storage::disk('public')->exists($logoPath)) {
+                        $logoUrl = Storage::disk('public')->url($logoPath);
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('Error getting logo URL', ['error' => $e->getMessage()]);
+            }
+            
+            try {
+                if ($settings->get('favicon_path')) {
+                    $faviconPath = $settings->get('favicon_path');
+                    if (Storage::disk('public')->exists($faviconPath)) {
+                        $faviconUrl = Storage::disk('public')->url($faviconPath);
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('Error getting favicon URL', ['error' => $e->getMessage()]);
+            }
+            
+            // Return all settings as a flat object (like SettingController)
+            // This makes it easier for the frontend to consume
+            $response = $settings->toArray();
+            $response['logo_url'] = $logoUrl;
+            $response['favicon_url'] = $faviconUrl;
+        } catch (\Exception $e) {
+            Log::error('Error in AdminSettingsController::index', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            // Return empty response with error message
+            return response()->json([
+                'error' => 'Failed to load settings',
+                'message' => config('app.debug') ? $e->getMessage() : 'An error occurred while loading settings',
+            ], 500);
         }
-        
-        if ($settings->get('favicon_path')) {
-            $faviconUrl = Storage::disk('public')->url($settings->get('favicon_path'));
-        }
-        
-        // Return all settings as a flat object (like SettingController)
-        // This makes it easier for the frontend to consume
-        $response = $settings->toArray();
-        $response['logo_url'] = $logoUrl;
-        $response['favicon_url'] = $faviconUrl;
         
         // Also include categories for admin settings UI
         $response['categories'] = [

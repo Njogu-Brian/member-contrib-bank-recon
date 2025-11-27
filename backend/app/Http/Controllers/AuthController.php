@@ -141,17 +141,41 @@ class AuthController extends Controller
 
     public function user(Request $request)
     {
-        $user = $request->user();
-        
-        if (!$user) {
+        try {
+            $user = $request->user();
+            
+            if (!$user) {
+                return response()->json([
+                    'message' => 'Unauthenticated.',
+                ], 401);
+            }
+            
             return response()->json([
-                'message' => 'Unauthenticated.',
-            ], 401);
+                'user' => $this->formatUserResponse($user),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in AuthController::user', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => $request->user()?->id,
+            ]);
+            
+            // Return basic user data if formatting fails
+            $user = $request->user();
+            if ($user) {
+                return response()->json([
+                    'user' => array_merge($user->toArray(), [
+                        'roles' => [],
+                        'permissions' => [],
+                        'mfa_enabled' => false,
+                    ]),
+                ]);
+            }
+            
+            return response()->json([
+                'message' => 'An error occurred while fetching user data.',
+            ], 500);
         }
-        
-        return response()->json([
-            'user' => $this->formatUserResponse($user),
-        ]);
     }
 
     public function sendPasswordReset(Request $request)
