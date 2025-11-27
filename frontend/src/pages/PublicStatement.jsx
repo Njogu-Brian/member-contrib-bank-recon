@@ -295,11 +295,6 @@ export default function PublicStatement() {
           </div>
         )}
 
-        {/* Footer */}
-        <div className="mt-6 text-center text-sm text-gray-500">
-          <p>This is a public view of your contribution statement.</p>
-          <p className="mt-1">For staff access, please log in to the admin portal.</p>
-        </div>
       </div>
     </div>
   )
