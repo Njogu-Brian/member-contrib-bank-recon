@@ -1,7 +1,7 @@
-import { adminApi } from './axios'
+import api from './axios'
 
 export const getSettings = async () => {
-  const response = await adminApi.get('/settings')
+  const response = await api.get('/v1/admin/settings')
   return response.data
 }
 
@@ -77,7 +77,7 @@ export const updateSettings = (data) => {
   // Use POST instead of PUT for file uploads (better compatibility)
   // Don't set Content-Type header - let browser set it with boundary
   // This is critical for multipart/form-data uploads
-  return adminApi.post('/settings', formData, {
+  return api.post('/v1/admin/settings', formData, {
     headers: {
       'Accept': 'application/json',
       // Explicitly don't set Content-Type for FormData
