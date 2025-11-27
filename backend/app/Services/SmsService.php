@@ -16,12 +16,20 @@ class SmsService
 
     public function __construct()
     {
-        // Check settings first, fall back to config
-        $this->userId = \App\Models\Setting::get('sms_userid', config('services.sms.userid', 'evimeria'));
-        $this->password = \App\Models\Setting::get('sms_password', config('services.sms.password', ''));
-        $this->senderId = \App\Models\Setting::get('sms_senderid', config('services.sms.senderid', 'EVIMERIA'));
+        // Check settings first, fall back to config, then environment
+        $this->userId = \App\Models\Setting::get('sms_userid') 
+            ?: config('services.sms.userid') 
+            ?: env('SMS_USERID', '');
+        $this->password = \App\Models\Setting::get('sms_password') 
+            ?: config('services.sms.password') 
+            ?: env('SMS_PASSWORD', '');
+        $this->senderId = \App\Models\Setting::get('sms_senderid') 
+            ?: config('services.sms.senderid') 
+            ?: env('SMS_SENDERID', '');
         $smsEnabled = \App\Models\Setting::get('sms_enabled', '0');
-        $this->enabled = ($smsEnabled === '1' || $smsEnabled === 'true') || config('services.sms.enabled', false);
+        $this->enabled = ($smsEnabled === '1' || $smsEnabled === 'true') 
+            || config('services.sms.enabled', false) 
+            || env('SMS_ENABLED', false);
         $this->baseUrl = config('services.sms.base_url', 'https://smsportal.hostpinnacle.co.ke/SMSApi/send');
     }
 
@@ -48,7 +56,25 @@ class SmsService
             Log::error('SMS password not configured');
             return [
                 'success' => false,
-                'error' => 'SMS credentials not configured',
+                'error' => 'SMS password not configured. Please set SMS credentials in Settings or .env file.',
+                'status' => 'error',
+            ];
+        }
+
+        if (empty($this->userId)) {
+            Log::error('SMS userid not configured');
+            return [
+                'success' => false,
+                'error' => 'SMS userid not configured. Please set SMS credentials in Settings or .env file.',
+                'status' => 'error',
+            ];
+        }
+
+        if (empty($this->senderId)) {
+            Log::error('SMS senderid not configured');
+            return [
+                'success' => false,
+                'error' => 'SMS senderid not configured. Please set SMS credentials in Settings or .env file.',
                 'status' => 'error',
             ];
         }
@@ -90,10 +116,30 @@ class SmsService
                            strtolower($responseData['status']) === 'sent' ||
                            (isset($responseData['error']) && $responseData['error'] === '0'));
 
+                // Check for specific error codes
+                $errorMessage = null;
+                if (!$success) {
+                    if (isset($responseData['statusCode'])) {
+                        switch ($responseData['statusCode']) {
+                            case '203':
+                                $errorMessage = 'Invalid SenderId. Please configure a valid SMS SenderId in Settings.';
+                                break;
+                            case '202':
+                                $errorMessage = 'Invalid credentials. Please check SMS UserID and Password.';
+                                break;
+                            default:
+                                $errorMessage = $responseData['reason'] ?? 'SMS sending failed';
+                        }
+                    } else {
+                        $errorMessage = $responseData['reason'] ?? $responseData['message'] ?? 'SMS sending failed';
+                    }
+                }
+
                 return [
                     'success' => $success,
                     'status' => $success ? 'sent' : 'failed',
                     'response' => $responseData,
+                    'error' => $errorMessage,
                     'mobile' => $mobile,
                     'message' => $message,
                 ];

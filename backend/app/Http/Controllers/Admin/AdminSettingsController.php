@@ -61,6 +61,7 @@ class AdminSettingsController extends Controller
             'integrations' => [
                 'sms_provider',
                 'sms_userid',
+                'sms_password',
                 'sms_senderid',
                 'mpesa_consumer_key',
                 'mpesa_consumer_secret',
@@ -243,7 +244,7 @@ class AdminSettingsController extends Controller
         
                // Also handle direct setting fields (can come from formData or JSON)
                $directSettingFields = ['app_name', 'app_description', 'timezone', 'date_format', 'currency', 
-                                       'default_currency', 'sms_provider', 'sms_userid', 'sms_senderid',
+                                       'default_currency', 'sms_provider', 'sms_userid', 'sms_password', 'sms_senderid',
                                        'mpesa_consumer_key', 'mpesa_consumer_secret', 'password_min_length',
                                        'session_timeout', 'theme_primary_color', 'theme_secondary_color',
                                        'login_background_color', 'login_text_color', 'navbar_background_color'];
@@ -358,6 +359,7 @@ class AdminSettingsController extends Controller
             'integrations' => [
                 'sms_provider',
                 'sms_userid',
+                'sms_password',
                 'sms_senderid',
                 'mpesa_consumer_key',
                 'mpesa_consumer_secret',
