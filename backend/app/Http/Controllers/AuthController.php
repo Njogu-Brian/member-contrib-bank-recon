@@ -237,20 +237,33 @@ class AuthController extends Controller
 
     public function changePassword(Request $request)
     {
-        $request->validate([
-            'current_password' => 'required|string',
-            'password' => 'required|string|min:8|confirmed',
-        ]);
-
         $user = $request->user();
+        
+        // Check if this is a first login (must_change_password is true)
+        $isFirstLogin = $user->must_change_password ?? false;
+        
+        // Validation rules
+        $rules = [
+            'password' => 'required|string|min:8|confirmed',
+        ];
+        
+        // Only require current_password if NOT first login
+        if (!$isFirstLogin) {
+            $rules['current_password'] = 'required|string';
+        }
+        
+        $request->validate($rules);
 
-        if (!Hash::check($request->current_password, $user->password)) {
-            return response()->json([
-                'message' => 'Current password is incorrect.',
-                'errors' => [
-                    'current_password' => ['Current password is incorrect.'],
-                ],
-            ], 422);
+        // Only check current password if NOT first login
+        if (!$isFirstLogin) {
+            if (!Hash::check($request->current_password, $user->password)) {
+                return response()->json([
+                    'message' => 'Current password is incorrect.',
+                    'errors' => [
+                        'current_password' => ['Current password is incorrect.'],
+                    ],
+                ], 422);
+            }
         }
 
         $user->update([

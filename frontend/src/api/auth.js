@@ -32,11 +32,17 @@ export const resetPassword = async (email, token, password, password_confirmatio
 }
 
 export const changePassword = async (currentPassword, password, passwordConfirmation) => {
-  const response = await api.post(`${AUTH_BASE}/password/change`, {
-    current_password: currentPassword,
+  const payload = {
     password,
     password_confirmation: passwordConfirmation,
-  })
+  }
+  
+  // Only include current_password if provided (not first login)
+  if (currentPassword) {
+    payload.current_password = currentPassword
+  }
+  
+  const response = await api.post(`${AUTH_BASE}/password/change`, payload)
   return response.data
 }
 
