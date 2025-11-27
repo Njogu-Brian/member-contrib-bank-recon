@@ -30,7 +30,14 @@ class UpdateTokenActivity
                 $token = $request->user()->currentAccessToken();
                 
                 // Get session timeout from settings (in minutes), default to 8 hours (480 minutes)
-                $sessionTimeoutMinutes = (int) Setting::get('session_timeout', 480);
+                // Wrap in try-catch to handle database connection issues gracefully
+                try {
+                    $sessionTimeoutMinutes = (int) Setting::get('session_timeout', 480);
+                } catch (\Exception $e) {
+                    // If settings table is unavailable, use default timeout
+                    \Illuminate\Support\Facades\Log::warning('Error getting session_timeout from settings: ' . $e->getMessage());
+                    $sessionTimeoutMinutes = 480; // Default to 8 hours
+                }
                 
                 // Check if token has expired due to inactivity
                 if ($sessionTimeoutMinutes > 0) {
