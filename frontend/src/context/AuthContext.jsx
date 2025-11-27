@@ -54,14 +54,10 @@ export function AuthProvider({ children }) {
     return isPublic
   }, [pathname])
 
-  const {
-    data,
-    isLoading,
-    isFetching,
-    error,
-    refetch: refetchUser,
-  } = useQuery({
-    queryKey: ['auth', 'user'],
+  // Only run auth query if NOT a public route
+  // Use a separate query key for public routes to prevent any caching issues
+  const authQuery = useQuery({
+    queryKey: ['auth', 'user', isPublicRoute ? 'public' : 'private'],
     queryFn: getCurrentUser,
     retry: false,
     staleTime: 5 * 60 * 1000,
@@ -72,6 +68,14 @@ export function AuthProvider({ children }) {
     // Don't use cached data for public routes
     gcTime: isPublicRoute ? 0 : 5 * 60 * 1000,
   })
+
+  const {
+    data,
+    isLoading,
+    isFetching,
+    error,
+    refetch: refetchUser,
+  } = authQuery
 
   const resolvedUser = data?.user ?? data ?? null
   const roles = resolvedUser?.roles ?? []
