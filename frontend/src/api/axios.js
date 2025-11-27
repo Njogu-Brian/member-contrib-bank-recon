@@ -34,8 +34,7 @@ api.interceptors.request.use((config) => {
     delete config.headers.post?.['Content-Type']
     delete config.headers.put?.['Content-Type']
     
-    // Log to verify FormData is being sent
-    console.log('Sending FormData, Content-Type removed')
+    // FormData detected - Content-Type will be set by browser with boundary
   }
   
   return config

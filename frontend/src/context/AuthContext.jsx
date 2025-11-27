@@ -63,12 +63,11 @@ export function AuthProvider({ children }) {
         return await getCurrentUser()
       } catch (error) {
         // If 401 (Unauthenticated), that's expected on login/change-password pages - return null
-        // Don't log it as an error
+        // Don't log it as an error - it's handled by onError callback
         if (error.response?.status === 401 || error.status === 401) {
           return null
         }
-        // For other errors, log and rethrow
-        console.error('Auth error:', error)
+        // For other errors, rethrow (onError will handle logging)
         throw error
       }
     },
