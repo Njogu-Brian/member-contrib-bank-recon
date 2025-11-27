@@ -119,9 +119,23 @@ export default function ChangePassword() {
       navigate('/', { replace: true })
     },
     onError: (err) => {
+      // Show all validation errors if available
+      const errors = err.response?.data?.errors
+      if (errors) {
+        // Collect all error messages
+        const errorMessages = []
+        if (errors.password) errorMessages.push(...errors.password)
+        if (errors.password_confirmation) errorMessages.push(...errors.password_confirmation)
+        if (errors.current_password) errorMessages.push(...errors.current_password)
+        
+        if (errorMessages.length > 0) {
+          setError(errorMessages.join('. '))
+          return
+        }
+      }
+      
+      // Fallback to general error message
       const errorMessage = err.response?.data?.message || 
-                          err.response?.data?.errors?.current_password?.[0] ||
-                          err.response?.data?.errors?.password?.[0] ||
                           'Failed to change password. Please try again.'
       setError(errorMessage)
     },
