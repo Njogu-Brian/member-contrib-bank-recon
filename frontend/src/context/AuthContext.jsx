@@ -36,20 +36,19 @@ export function AuthProvider({ children }) {
     }
   }, [routerLocation?.pathname])
   
-  // Skip auth check for public routes - check immediately on mount
+  // Skip auth check for public statement routes only
+  // Login/logout routes still need auth context but don't require authentication
   // Use useMemo to ensure this is calculated before the query runs
   // Check window.location directly to avoid any React Router timing issues
-  const isPublicRoute = useMemo(() => {
+  const isPublicStatementRoute = useMemo(() => {
     // Always check window.location first (most reliable)
     const currentPath = typeof window !== 'undefined' 
       ? window.location.pathname 
       : (pathname || getInitialPathname())
     
+    // Only /s/ and /public/ are true public routes that bypass auth
     const isPublic = currentPath.startsWith('/s/') || 
-                     currentPath.startsWith('/public/') ||
-                     currentPath === '/login' ||
-                     currentPath === '/forgot-password' ||
-                     currentPath === '/reset-password'
+                     currentPath.startsWith('/public/')
     
     return isPublic
   }, [pathname])
@@ -95,14 +94,14 @@ export function AuthProvider({ children }) {
     () => ({
       user: resolvedUser,
       roles,
-      // For public routes, don't show loading state
-      isLoading: isPublicRoute ? false : (isLoading || isFetching),
+      // For public statement routes, don't show loading state
+      isLoading: isPublicStatementRoute ? false : (isLoading || isFetching),
       isAuthenticated: Boolean(resolvedUser?.id),
       error,
       logout: handleLogout,
       refetch: refetchUser,
     }),
-    [resolvedUser, roles, isLoading, isFetching, error, refetchUser, isPublicRoute]
+    [resolvedUser, roles, isLoading, isFetching, error, refetchUser, isPublicStatementRoute]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

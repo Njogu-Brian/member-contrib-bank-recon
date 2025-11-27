@@ -64,20 +64,22 @@ function App() {
   const location = useLocation()
   const pathname = location.pathname
   
-  // Skip auth loading for public routes
-  const isPublicRoute = pathname.startsWith('/s/') || 
-                       pathname.startsWith('/public/') ||
-                       pathname === '/login' ||
-                       pathname === '/forgot-password' ||
-                       pathname === '/reset-password'
+  // Check if this is a public statement route (needs special handling)
+  const isPublicStatementRoute = pathname.startsWith('/s/') || pathname.startsWith('/public/')
   
-  // For public routes, don't use auth context at all
-  if (isPublicRoute) {
-    // Public routes render immediately without any auth checks
+  // For public statement routes, use PublicApp (bypasses auth completely)
+  if (isPublicStatementRoute) {
     return (
       <Routes>
         <Route path="/s/:token" element={<PublicStatement />} />
-        <Route path="*" element={<Navigate to="/s/invalid" replace />} />
+        <Route path="*" element={
+          <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div className="text-center p-6 bg-white rounded-lg shadow-md">
+              <h2 className="text-2xl font-bold text-gray-800">Invalid Link</h2>
+              <p className="mt-2 text-gray-700">The statement link is invalid or has expired.</p>
+            </div>
+          </div>
+        } />
       </Routes>
     )
   }

@@ -1,11 +1,13 @@
-// CRITICAL: Check for public route IMMEDIATELY before any imports
+// CRITICAL: Check for public statement route IMMEDIATELY before any imports
 // This must happen synchronously before React or any other code runs
 (function() {
   if (typeof window !== 'undefined') {
     const pathname = window.location.pathname
-    const isPublicRoute = pathname.startsWith('/s/') || pathname.startsWith('/public/')
+    // Only /s/ and /public/ are true public routes that bypass auth
+    // /login, /forgot-password, etc. are public but still need AuthProvider
+    const isPublicStatementRoute = pathname.startsWith('/s/') || pathname.startsWith('/public/')
     // Store in window so we can access it after imports
-    window.__IS_PUBLIC_ROUTE__ = isPublicRoute
+    window.__IS_PUBLIC_STATEMENT_ROUTE__ = isPublicStatementRoute
   }
 })()
 
@@ -21,24 +23,26 @@ import { SettingsProvider } from './context/SettingsContext.jsx'
 
 const queryClient = new QueryClient()
 
-// Get the public route flag set before imports
-const isPublicRoute = typeof window !== 'undefined' && window.__IS_PUBLIC_ROUTE__ === true
+// Get the public statement route flag set before imports
+const isPublicStatementRoute = typeof window !== 'undefined' && window.__IS_PUBLIC_STATEMENT_ROUTE__ === true
 
-// Create a wrapper component that ensures public route check
+// Create a wrapper component that ensures public statement route check
 function RootApp() {
   // Re-check on mount to be absolutely sure
-  const [isPublic] = React.useState(() => {
+  const [isPublicStatement] = React.useState(() => {
     if (typeof window === 'undefined') return false
     const pathname = window.location.pathname
+    // Only /s/ and /public/ bypass auth completely
     return pathname.startsWith('/s/') || pathname.startsWith('/public/')
   })
   
-  if (isPublic) {
-    // For public routes, use completely separate PublicApp that has NO auth dependencies
+  if (isPublicStatement) {
+    // For public statement routes, use completely separate PublicApp that has NO auth dependencies
     return <PublicApp />
   }
   
-  // For protected routes, use AuthProvider
+  // For all other routes (including /login, /forgot-password, etc.), use AuthProvider
+  // This allows login/logout to work properly
   return (
     <AuthProvider>
       <SettingsProvider>
