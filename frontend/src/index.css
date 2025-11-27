@@ -1,33 +1,109 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  * {
-    @apply border-slate-200;
+/* Print styles for statements */
+@media print {
+  @page {
+    margin: 1cm;
+    size: A4;
   }
 
   body {
-    @apply bg-slate-50 text-slate-900 antialiased font-sans;
+    background: white !important;
+    color: black !important;
   }
 
-  ::selection {
-    @apply bg-brand-200 text-brand-800;
+  /* Hide non-essential elements when printing */
+  .no-print,
+  button:not(.print-visible),
+  nav,
+  header .print\\:hidden {
+    display: none !important;
+  }
+
+  /* Ensure proper page breaks */
+  .page-break {
+    page-break-after: always;
+  }
+
+  /* Statement styling for print */
+  .statement-table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  .statement-table th,
+  .statement-table td {
+    border: 1px solid #000;
+    padding: 8px;
+    text-align: left;
+  }
+
+  .statement-table th {
+    background-color: #f3f4f6 !important;
+    font-weight: bold;
+  }
+
+  /* Print date stamp */
+  .print-date {
+    position: fixed;
+    bottom: 1cm;
+    right: 1cm;
+    font-size: 10px;
+    color: #6b7280;
   }
 }
 
-@layer components {
-  .glass {
-    @apply bg-white/70 backdrop-blur-md shadow-card border border-white/40;
+/* Print styles for statements */
+@media print {
+  @page {
+    margin: 1cm;
+    size: A4;
   }
 
-  .stat-label {
-    @apply text-xs uppercase tracking-wide text-slate-500 font-semibold;
+  body {
+    background: white !important;
+    color: black !important;
   }
 
-  .stat-value {
-    @apply text-2xl font-semibold text-slate-900;
+  /* Hide non-essential elements when printing */
+  .no-print,
+  button:not(.print-visible),
+  nav,
+  header .print\\:hidden {
+    display: none !important;
+  }
+
+  /* Ensure proper page breaks */
+  .page-break {
+    page-break-after: always;
+  }
+
+  /* Statement styling for print */
+  .statement-table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  .statement-table th,
+  .statement-table td {
+    border: 1px solid #000;
+    padding: 8px;
+    text-align: left;
+  }
+
+  .statement-table th {
+    background-color: #f3f4f6 !important;
+    font-weight: bold;
+  }
+
+  /* Print date stamp */
+  .print-date {
+    position: fixed;
+    bottom: 1cm;
+    right: 1cm;
+    font-size: 10px;
+    color: #6b7280;
   }
 }

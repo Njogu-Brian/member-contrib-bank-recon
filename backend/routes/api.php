@@ -56,6 +56,7 @@ Route::prefix('v1')->group(function () {
         // Public member statement view (no authentication required)
         // Shortened path: /s/{token} for SMS links
         Route::get('/statement/{token}', [PublicMemberStatementController::class, 'show']);
+        Route::get('/statement/{token}/pdf', [PublicMemberStatementController::class, 'exportPdf']);
     });
 
     Route::prefix('webhooks')->group(function () {

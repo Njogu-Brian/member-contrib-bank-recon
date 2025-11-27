@@ -3,8 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\Member;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Log;
+use Dompdf\Dompdf;
+use Dompdf\Options;
+use Carbon\Carbon;
 
 class PublicMemberStatementController extends Controller
 {
@@ -14,11 +20,25 @@ class PublicMemberStatementController extends Controller
      */
     public function show(Request $request, string $token)
     {
+        // Rate limiting: max 10 requests per minute per IP
+        $key = 'public-statement:' . $request->ip() . ':' . $token;
+        if (RateLimiter::tooManyAttempts($key, 10)) {
+            return response()->json([
+                'error' => 'Too many requests',
+                'message' => 'Please wait a moment before trying again.',
+            ], 429);
+        }
+        RateLimiter::hit($key, 60); // 1 minute window
+
         $member = Member::where('public_share_token', $token)
             ->where('is_active', true)
             ->first();
 
         if (!$member) {
+            Log::warning('Invalid public statement token attempted', [
+                'token' => substr($token, 0, 8) . '...',
+                'ip' => $request->ip(),
+            ]);
             return response()->json([
                 'error' => 'Invalid or expired link',
                 'message' => 'This statement link is invalid or has expired.',
@@ -68,7 +88,78 @@ class PublicMemberStatementController extends Controller
                 'last_page' => $paginatedStatement->lastPage(),
             ],
             'monthly_totals' => $data['monthly_totals'],
+            'print_date' => now()->toIso8601String(),
         ]);
+    }
+
+    /**
+     * Export public statement as PDF
+     */
+    public function exportPdf(Request $request, string $token)
+    {
+        // Rate limiting: max 5 PDF exports per hour per IP
+        $key = 'public-statement-pdf:' . $request->ip() . ':' . $token;
+        if (RateLimiter::tooManyAttempts($key, 5)) {
+            return response()->json([
+                'error' => 'Too many requests',
+                'message' => 'Please wait before downloading another PDF.',
+            ], 429);
+        }
+        RateLimiter::hit($key, 3600); // 1 hour window
+
+        $member = Member::where('public_share_token', $token)
+            ->where('is_active', true)
+            ->first();
+
+        if (!$member) {
+            return response()->json([
+                'error' => 'Invalid or expired link',
+                'message' => 'This statement link is invalid or has expired.',
+            ], 404);
+        }
+
+        // Check if token has expired (if expiration is set)
+        if ($member->public_share_token_expires_at && now()->greaterThan($member->public_share_token_expires_at)) {
+            return response()->json([
+                'error' => 'Expired link',
+                'message' => 'This statement link has expired. Please request a new one.',
+            ], 410); // 410 Gone
+        }
+
+        $validated = $request->validate([
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date',
+            'month' => 'nullable|date_format:Y-m',
+        ]);
+
+        $data = $this->buildStatementData($member, $validated);
+        $entries = $data['collection'];
+
+        // Get logo URL if available
+        $logoUrl = null;
+        $appName = Setting::get('app_name', 'Member Contributions System');
+        if (Setting::get('logo_path')) {
+            $logoUrl = \Illuminate\Support\Facades\Storage::disk('public')->url(Setting::get('logo_path'));
+        }
+
+        $filename = $this->buildExportFilename($member->name, $validated['month'] ?? null, 'pdf');
+        
+        return $this->renderPdf('exports.public_member_statement', [
+            'member' => $member,
+            'entries' => $entries,
+            'summary' => $data['summary'],
+            'monthlyTotals' => $data['monthly_totals'],
+            'rangeLabel' => $this->formatRangeLabel(
+                $validated['start_date'] ?? null,
+                $validated['end_date'] ?? null,
+                $validated['month'] ?? null
+            ),
+            'generatedAt' => now(),
+            'printDate' => now(),
+            'logoUrl' => $logoUrl,
+            'appName' => $appName,
+            'isPublic' => true,
+        ], $filename);
     }
 
     /**
@@ -184,5 +275,56 @@ class PublicMemberStatementController extends Controller
             'monthly_totals' => $monthlyTotals,
         ];
     }
-}
 
+    /**
+     * Format range label for display
+     */
+    protected function formatRangeLabel(?string $startDate, ?string $endDate, ?string $month): string
+    {
+        if ($month) {
+            $date = Carbon::createFromFormat('Y-m', $month);
+            return $date->format('F Y');
+        }
+        if ($startDate && $endDate) {
+            $start = Carbon::parse($startDate);
+            $end = Carbon::parse($endDate);
+            if ($start->format('Y-m') === $end->format('Y-m')) {
+                return $start->format('F Y');
+            }
+            return $start->format('M d, Y') . ' - ' . $end->format('M d, Y');
+        }
+        return 'All Time';
+    }
+
+    /**
+     * Build export filename
+     */
+    protected function buildExportFilename(string $memberName, ?string $month, string $ext): string
+    {
+        $safeName = preg_replace('/[^a-zA-Z0-9_-]/', '_', $memberName);
+        $datePart = $month ? Carbon::createFromFormat('Y-m', $month)->format('Y-m') : now()->format('Y-m');
+        return "statement_{$safeName}_{$datePart}.{$ext}";
+    }
+
+    /**
+     * Render PDF
+     */
+    protected function renderPdf(string $view, array $data, string $filename, string $paper = 'a4', string $orientation = 'portrait')
+    {
+        $html = view($view, $data)->render();
+
+        $options = new Options();
+        $options->set('isRemoteEnabled', true);
+        $options->set('isHtml5ParserEnabled', true);
+
+        $dompdf = new Dompdf($options);
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper($paper, $orientation);
+        $dompdf->render();
+
+        return response($dompdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
+    }
+}

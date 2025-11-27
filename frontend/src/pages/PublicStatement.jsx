@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import api from '../api/axios'
+import StatementHeader from '../components/StatementHeader'
 
 const formatCurrency = (value) =>
   Number(value ?? 0).toLocaleString('en-KE', {
@@ -123,25 +124,60 @@ export default function PublicStatement() {
     setSearchParams({ ...Object.fromEntries(searchParams), page: newPage })
   }
 
+  const handlePrint = () => {
+    window.print()
+  }
+
+  const handleDownloadPDF = async () => {
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+      let url = `${baseUrl}/public/statement/${token}/pdf`
+      if (url.startsWith('/')) {
+        url = window.location.origin + url
+      }
+      
+      // Add query params if any
+      const params = new URLSearchParams()
+      if (searchParams.get('month')) params.append('month', searchParams.get('month'))
+      if (searchParams.get('start_date')) params.append('start_date', searchParams.get('start_date'))
+      if (searchParams.get('end_date')) params.append('end_date', searchParams.get('end_date'))
+      if (params.toString()) url += '?' + params.toString()
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/pdf',
+        },
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to download PDF')
+      }
+
+      const blob = await response.blob()
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = `statement_${member?.name || 'member'}_${new Date().toISOString().split('T')[0]}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(downloadUrl)
+    } catch (error) {
+      alert('Failed to download PDF: ' + (error.message || 'Unknown error'))
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Member Statement</h1>
-              <p className="text-sm text-gray-600 mt-1">
-                {member?.name} {member?.member_code ? `(${member.member_code})` : ''}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-500">Public View</p>
-              <p className="text-xs text-gray-400">No login required</p>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gray-50 print:bg-white">
+      {/* Statement Header with Logo */}
+      <StatementHeader 
+        member={member} 
+        isPublic={true}
+        onPrint={handlePrint}
+        onDownloadPDF={handleDownloadPDF}
+      />
 
       {/* Summary Cards */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -176,49 +212,51 @@ export default function PublicStatement() {
           </div>
         </div>
 
-        {/* Statement Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Contribution History</h2>
+        {/* Statement Table - Bank Statement Style */}
+        <div className="bg-white rounded-lg shadow overflow-hidden print:shadow-none print:border print:border-gray-300">
+          <div className="px-6 py-4 border-b border-gray-200 print:px-4 print:py-2">
+            <h2 className="text-lg font-semibold text-gray-900 print:text-base">Transaction History</h2>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+          <div className="overflow-x-auto print:overflow-visible">
+            <table className="min-w-full divide-y divide-gray-200 print:table-fixed print:w-full">
+              <thead className="bg-gray-50 print:bg-gray-100">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider print:px-2 print:py-2 print:text-xs print:border print:border-gray-300">
                     Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider print:px-2 print:py-2 print:text-xs print:border print:border-gray-300">
                     Description
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider print:px-2 print:py-2 print:text-xs print:border print:border-gray-300">
                     Reference
                   </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Amount
+                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider print:px-2 print:py-2 print:text-xs print:border print:border-gray-300">
+                    Amount (KES)
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-gray-200 print:divide-gray-300">
                 {statement?.length > 0 ? (
                   statement.map((entry, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <tr key={index} className="hover:bg-gray-50 print:hover:bg-transparent print:border-b print:border-gray-300">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 print:px-2 print:py-2 print:text-xs print:border-r print:border-gray-300">
                         {formatDate(entry.date)}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">{entry.description}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 text-sm text-gray-900 print:px-2 print:py-2 print:text-xs print:border-r print:border-gray-300">
+                        {entry.description}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 print:px-2 print:py-2 print:text-xs print:border-r print:border-gray-300">
                         {entry.reference || 'N/A'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right text-gray-900 print:px-2 print:py-2 print:text-xs">
                         {formatCurrency(entry.amount)}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="4" className="px-6 py-8 text-center text-gray-500">
-                      No contributions found for this period.
+                    <td colSpan="4" className="px-6 py-8 text-center text-gray-500 print:px-2 print:py-4 print:text-xs">
+                      No transactions found for this period.
                     </td>
                   </tr>
                 )}
@@ -256,7 +294,7 @@ export default function PublicStatement() {
 
         {/* Monthly Totals */}
         {monthly_totals && monthly_totals.length > 0 && (
-          <div className="mt-6 bg-white rounded-lg shadow overflow-hidden">
+          <div className="mt-6 bg-white rounded-lg shadow overflow-hidden print:shadow-none print:border print:border-gray-300">
             <div className="px-6 py-4 border-b border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900">Monthly Summary</h2>
             </div>
@@ -295,6 +333,17 @@ export default function PublicStatement() {
           </div>
         )}
 
+      </div>
+      
+      {/* Print Date Stamp */}
+      <div className="print-date print:block hidden">
+        Printed: {new Date().toLocaleString('en-KE', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })}
       </div>
     </div>
   )

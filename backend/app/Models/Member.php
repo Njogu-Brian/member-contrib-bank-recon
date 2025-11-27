@@ -22,6 +22,9 @@ class Member extends Model
         'notes',
         'is_active',
         'public_share_token',
+        'public_share_token_expires_at',
+        'public_share_last_accessed_at',
+        'public_share_access_count',
     ];
 
     protected $casts = [
