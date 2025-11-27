@@ -38,13 +38,20 @@ export function AuthProvider({ children }) {
   
   // Skip auth check for public routes - check immediately on mount
   // Use useMemo to ensure this is calculated before the query runs
+  // Check window.location directly to avoid any React Router timing issues
   const isPublicRoute = useMemo(() => {
-    const currentPath = pathname || getInitialPathname()
-    return currentPath.startsWith('/s/') || 
-           currentPath.startsWith('/public/') ||
-           currentPath === '/login' ||
-           currentPath === '/forgot-password' ||
-           currentPath === '/reset-password'
+    // Always check window.location first (most reliable)
+    const currentPath = typeof window !== 'undefined' 
+      ? window.location.pathname 
+      : (pathname || getInitialPathname())
+    
+    const isPublic = currentPath.startsWith('/s/') || 
+                     currentPath.startsWith('/public/') ||
+                     currentPath === '/login' ||
+                     currentPath === '/forgot-password' ||
+                     currentPath === '/reset-password'
+    
+    return isPublic
   }, [pathname])
 
   const {
@@ -62,6 +69,8 @@ export function AuthProvider({ children }) {
     // Ensure query doesn't run if disabled
     refetchOnMount: !isPublicRoute,
     refetchOnWindowFocus: !isPublicRoute,
+    // Don't use cached data for public routes
+    gcTime: isPublicRoute ? 0 : 5 * 60 * 1000,
   })
 
   const resolvedUser = data?.user ?? data ?? null
