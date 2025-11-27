@@ -15,6 +15,8 @@ export default defineConfig({
         changeOrigin: true,
       }
     }
-  }
+  },
+  // Ensure .htaccess is copied to dist during build
+  publicDir: 'public',
 })
 
