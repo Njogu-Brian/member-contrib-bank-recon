@@ -43,11 +43,15 @@ api.interceptors.response.use(
                          window.location.pathname === '/login'
     
     if (status === 401 || status === 419) {
-      localStorage.removeItem('token')
-      // Only redirect to login if not already on a public route
-      if (!isPublicRoute && window.location.pathname !== '/login') {
-        window.location.href = '/login'
+      // Only remove token and redirect if NOT on a public route
+      if (!isPublicRoute) {
+        localStorage.removeItem('token')
+        // Only redirect to login if not already on a public route
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login'
+        }
       }
+      // For public routes, just reject the error without redirecting
     }
     return Promise.reject(error)
   }
