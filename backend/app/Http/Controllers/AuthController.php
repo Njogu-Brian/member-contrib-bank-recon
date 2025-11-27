@@ -362,24 +362,38 @@ class AuthController extends Controller
 
     protected function formatUserResponse(User $user): array
     {
-        $user->loadMissing(['roles', 'roles.permissions']);
+        try {
+            $user->loadMissing(['roles', 'roles.permissions']);
 
-        $roleSlugs = $user->roles
-            ->pluck('slug')
-            ->map(fn (string $slug) => $this->roleSlugMap[$slug] ?? $slug)
-            ->unique()
-            ->values()
-            ->all();
+            $roleSlugs = $user->roles
+                ->pluck('slug')
+                ->map(fn (string $slug) => $this->roleSlugMap[$slug] ?? $slug)
+                ->unique()
+                ->values()
+                ->all();
 
-        $permissions = $user->getAllPermissions()->pluck('slug')->unique()->values()->all();
-        
-        $mfaEnabled = $this->mfaService->isEnabled($user);
+            $permissions = $user->getAllPermissions()->pluck('slug')->unique()->values()->all();
+            
+            $mfaEnabled = $this->mfaService->isEnabled($user);
 
-        return array_merge($user->toArray(), [
-            'roles' => $roleSlugs,
-            'permissions' => $permissions,
-            'mfa_enabled' => $mfaEnabled,
-        ]);
+            return array_merge($user->toArray(), [
+                'roles' => $roleSlugs,
+                'permissions' => $permissions,
+                'mfa_enabled' => $mfaEnabled,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error formatting user response: ' . $e->getMessage(), [
+                'user_id' => $user->id ?? null,
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            // Return basic user data if relationship loading fails
+            return array_merge($user->toArray(), [
+                'roles' => [],
+                'permissions' => [],
+                'mfa_enabled' => false,
+            ]);
+        }
     }
 }
 
