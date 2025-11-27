@@ -31,18 +31,21 @@ class AppServiceProvider extends ServiceProvider
                 date_default_timezone_set($timezone);
                 Carbon::setLocale(config('app.locale', 'en'));
                 
-                // Set Carbon default timezone
+                // Set Carbon default timezone for all Carbon instances
                 Carbon::setToStringFormat('Y-m-d H:i:s');
+                Carbon::setDefaultTimezone($timezone);
             } else {
                 // Fallback to default if invalid timezone
                 $timezone = 'Africa/Nairobi';
                 Config::set('app.timezone', $timezone);
                 date_default_timezone_set($timezone);
+                Carbon::setDefaultTimezone($timezone);
             }
         } catch (\Exception $e) {
             // If database is not available or settings table doesn't exist, use default
             $timezone = config('app.timezone', 'Africa/Nairobi');
             date_default_timezone_set($timezone);
+            Carbon::setDefaultTimezone($timezone);
         }
     }
 }
