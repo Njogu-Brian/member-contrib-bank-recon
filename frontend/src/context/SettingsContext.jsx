@@ -7,10 +7,28 @@ const SettingsContext = createContext(null)
 export function SettingsProvider({ children }) {
   const { data: settings, isLoading } = useQuery({
     queryKey: ['settings'],
-    queryFn: getSettings,
+    queryFn: async () => {
+      try {
+        return await getSettings()
+      } catch (error) {
+        // If 401 (Unauthenticated), that's expected on login/change-password pages - return empty settings
+        if (error.response?.status === 401 || error.status === 401) {
+          return {}
+        }
+        // For other errors, rethrow
+        throw error
+      }
+    },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    retry: 1, // Retry once if fails
+    retry: false, // Don't retry - 401s are expected when not authenticated
     refetchOnWindowFocus: false, // Don't refetch on window focus
+    // Suppress error logging for 401s (expected when not authenticated)
+    onError: (error) => {
+      // Only log non-401 errors
+      if (error.response?.status !== 401 && error.status !== 401) {
+        console.error('Settings query error:', error)
+      }
+    },
   })
 
   // Update favicon immediately on mount (before settings load)

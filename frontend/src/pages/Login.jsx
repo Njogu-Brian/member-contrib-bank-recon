@@ -212,7 +212,8 @@ export default function Login() {
                   alt={appName}
                   className="h-12 object-contain max-w-xs bg-white/50 p-2 rounded"
                   onError={(e) => {
-                    console.error('Failed to load logo:', logoUrl)
+                    // Silently handle logo load failures - don't log as error
+                    // console.error('Failed to load logo:', logoUrl)
                     // Show fallback instead of hiding
                     e.target.style.display = 'none'
                     const fallback = e.target.nextElementSibling
@@ -281,7 +282,8 @@ export default function Login() {
                     alt={appName}
                     className="h-10 object-contain max-w-xs"
                     onError={(e) => {
-                      console.error('Failed to load logo:', logoUrl)
+                      // Silently handle logo load failures - don't log as error
+                    // console.error('Failed to load logo:', logoUrl)
                       // Show fallback instead of hiding
                       e.target.style.display = 'none'
                     }}

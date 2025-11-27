@@ -48,14 +48,28 @@ api.interceptors.response.use(
     // Don't redirect to login for public routes (like /s/:token)
     const isPublicRoute = window.location.pathname.startsWith('/s/') || 
                          window.location.pathname.startsWith('/public/') ||
-                         window.location.pathname === '/login'
+                         window.location.pathname === '/login' ||
+                         window.location.pathname === '/change-password' ||
+                         window.location.pathname === '/forgot-password' ||
+                         window.location.pathname === '/reset-password'
     
     if (status === 401 || status === 419) {
-      // Only remove token and redirect if NOT on a public route
+      // 401 is expected on login/change-password pages when checking auth status
+      // Don't log it as an error or redirect if we're on these pages
+      if (isPublicRoute || window.location.pathname === '/login' || window.location.pathname === '/change-password') {
+        // Silently handle 401 on login/change-password pages - it's expected
+        // Just reject the promise without logging or redirecting
+        return Promise.reject(error)
+      }
+      
+      // Only remove token and redirect if NOT on a public route or auth pages
       if (!isPublicRoute) {
         localStorage.removeItem('token')
-        // Only redirect to login if not already on a public route
-        if (window.location.pathname !== '/login') {
+        // Only redirect to login if not already on a public route or auth page
+        if (window.location.pathname !== '/login' && 
+            window.location.pathname !== '/change-password' &&
+            window.location.pathname !== '/forgot-password' &&
+            window.location.pathname !== '/reset-password') {
           window.location.href = '/login'
         }
       }

@@ -62,11 +62,13 @@ export function AuthProvider({ children }) {
       try {
         return await getCurrentUser()
       } catch (error) {
-        // If 401 (Unauthenticated), that's expected on login page - return null
+        // If 401 (Unauthenticated), that's expected on login/change-password pages - return null
+        // Don't log it as an error
         if (error.response?.status === 401 || error.status === 401) {
           return null
         }
-        // For other errors, rethrow
+        // For other errors, log and rethrow
+        console.error('Auth error:', error)
         throw error
       }
     },
@@ -78,6 +80,13 @@ export function AuthProvider({ children }) {
     refetchOnWindowFocus: !isPublicStatementRoute,
     // Don't use cached data for public statement routes
     gcTime: isPublicStatementRoute ? 0 : 5 * 60 * 1000,
+    // Suppress error logging for 401s (expected when not authenticated)
+    onError: (error) => {
+      // Only log non-401 errors
+      if (error.response?.status !== 401 && error.status !== 401) {
+        console.error('Auth query error:', error)
+      }
+    },
     // For public statement routes, return immediately without making the request
     ...(isPublicStatementRoute && {
       queryFn: () => Promise.resolve(null),
