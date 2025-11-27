@@ -425,18 +425,44 @@ class AuthController extends Controller
     protected function formatUserResponse(User $user): array
     {
         try {
-            $user->loadMissing(['roles', 'roles.permissions']);
+            // Safely load relationships
+            try {
+                $user->loadMissing(['roles', 'roles.permissions']);
+            } catch (\Exception $e) {
+                Log::warning('Error loading user roles/permissions: ' . $e->getMessage(), [
+                    'user_id' => $user->id ?? null,
+                ]);
+                // Set empty collections if loading fails
+                $user->setRelation('roles', collect());
+            }
 
-            $roleSlugs = $user->roles
-                ->pluck('slug')
-                ->map(fn (string $slug) => $this->roleSlugMap[$slug] ?? $slug)
-                ->unique()
-                ->values()
-                ->all();
+            $roleSlugs = [];
+            try {
+                $roleSlugs = $user->roles
+                    ->pluck('slug')
+                    ->map(fn (string $slug) => $this->roleSlugMap[$slug] ?? $slug)
+                    ->unique()
+                    ->values()
+                    ->all();
+            } catch (\Exception $e) {
+                Log::warning('Error processing roles: ' . $e->getMessage());
+            }
 
-            $permissions = $user->getAllPermissions()->pluck('slug')->unique()->values()->all();
+            $permissions = [];
+            try {
+                if (method_exists($user, 'getAllPermissions')) {
+                    $permissions = $user->getAllPermissions()->pluck('slug')->unique()->values()->all();
+                }
+            } catch (\Exception $e) {
+                Log::warning('Error getting permissions: ' . $e->getMessage());
+            }
             
-            $mfaEnabled = $this->mfaService->isEnabled($user);
+            $mfaEnabled = false;
+            try {
+                $mfaEnabled = $this->mfaService->isEnabled($user);
+            } catch (\Exception $e) {
+                Log::warning('Error checking MFA status: ' . $e->getMessage());
+            }
 
             return array_merge($user->toArray(), [
                 'roles' => $roleSlugs,
