@@ -16,7 +16,21 @@ class AdminSettingsController extends Controller
     public function index()
     {
         try {
-            $settings = Setting::all()->pluck('value', 'key');
+            // Try to get settings from database, but handle database connection issues gracefully
+            try {
+                $settings = Setting::all()->pluck('value', 'key');
+            } catch (\Illuminate\Database\QueryException $e) {
+                Log::warning('Database error in AdminSettingsController::index', [
+                    'error' => $e->getMessage(),
+                ]);
+                // Return empty settings if database is unavailable
+                $settings = collect();
+            } catch (\Exception $e) {
+                Log::warning('Error loading settings from database', [
+                    'error' => $e->getMessage(),
+                ]);
+                $settings = collect();
+            }
             
             // Add URLs for logo and favicon if they exist
             $logoUrl = null;
