@@ -1,9 +1,19 @@
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
-  RewriteRule ^index\.html$ - [L]
+  
+  # Don't rewrite API calls - let them go to backend
+  RewriteCond %{REQUEST_URI} ^/api/
+  RewriteRule ^ - [L]
+  
+  # Don't rewrite storage files
+  RewriteCond %{REQUEST_URI} ^/storage/
+  RewriteRule ^ - [L]
+  
+  # Don't rewrite existing files or directories
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
+  
+  # Rewrite everything else to index.html for SPA routing
   RewriteRule . /index.html [L]
 </IfModule>
-
