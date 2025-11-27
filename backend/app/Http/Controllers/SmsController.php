@@ -97,9 +97,16 @@ class SmsController extends Controller
             ], 422);
         }
 
-        $baseUrl = $request->boolean('include_statement_link') 
-            ? env('FRONTEND_URL', config('app.url', 'http://localhost:5173'))
-            : null;
+        // Get base URL for statement links - ensure it has protocol for SMS clickability
+        $baseUrl = null;
+        if ($request->boolean('include_statement_link')) {
+            $url = env('FRONTEND_URL', config('app.url', 'http://localhost:5173'));
+            // Ensure URL has protocol (http:// or https://) for SMS clickability
+            if (!preg_match('/^https?:\/\//', $url)) {
+                $url = 'https://' . ltrim($url, '/');
+            }
+            $baseUrl = rtrim($url, '/');
+        }
 
         $results = $this->smsService->sendBulk($recipients, $request->message, $baseUrl);
 

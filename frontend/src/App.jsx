@@ -111,7 +111,7 @@ function App() {
         }
       />
       <Route path="/unauthorized" element={<Unauthorized />} />
-      <Route path="/public/statement/:token" element={<PublicStatement />} />
+      <Route path="/s/:token" element={<PublicStatement />} />
       <Route
         path="/"
         element={

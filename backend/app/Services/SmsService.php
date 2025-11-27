@@ -287,6 +287,7 @@ class SmsService
 
     /**
      * Generate public statement link for member (no authentication required)
+     * Uses shortened path /s/{token} for SMS compatibility
      *
      * @param int $memberId
      * @param string $baseUrl
@@ -300,7 +301,15 @@ class SmsService
         }
 
         $token = $member->getPublicShareToken();
-        return rtrim($baseUrl, '/') . '/public/statement/' . $token;
+        // Use shortened path /s/{token} and ensure full URL with protocol for clickability
+        $url = rtrim($baseUrl, '/') . '/s/' . $token;
+        
+        // Ensure URL has protocol (http:// or https://) for SMS clickability
+        if (!preg_match('/^https?:\/\//', $url)) {
+            $url = 'https://' . ltrim($url, '/');
+        }
+        
+        return $url;
     }
 
     /**

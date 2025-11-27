@@ -54,6 +54,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/announcements', [AnnouncementController::class, 'publicList']);
         
         // Public member statement view (no authentication required)
+        // Shortened path: /s/{token} for SMS links
         Route::get('/statement/{token}', [PublicMemberStatementController::class, 'show']);
     });
 
