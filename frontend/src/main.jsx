@@ -1,3 +1,14 @@
+// CRITICAL: Check for public route IMMEDIATELY before any imports
+// This must happen synchronously before React or any other code runs
+(function() {
+  if (typeof window !== 'undefined') {
+    const pathname = window.location.pathname
+    const isPublicRoute = pathname.startsWith('/s/') || pathname.startsWith('/public/')
+    // Store in window so we can access it after imports
+    window.__IS_PUBLIC_ROUTE__ = isPublicRoute
+  }
+})()
+
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -10,28 +21,17 @@ import { SettingsProvider } from './context/SettingsContext.jsx'
 
 const queryClient = new QueryClient()
 
-// Check if this is a public route BEFORE rendering the app
-// Use a function to ensure we get the current pathname at render time
-function getIsPublicRoute() {
-  if (typeof window === 'undefined') return false
-  const pathname = window.location.pathname
-  return pathname.startsWith('/s/') || pathname.startsWith('/public/')
-}
+// Get the public route flag set before imports
+const isPublicRoute = typeof window !== 'undefined' && window.__IS_PUBLIC_ROUTE__ === true
 
-// Store the check result immediately
-const isPublicRoute = getIsPublicRoute()
-
-// Create a wrapper component that re-checks on mount to handle any timing issues
+// Create a wrapper component that ensures public route check
 function RootApp() {
-  const [isPublic, setIsPublic] = React.useState(isPublicRoute)
-  
-  React.useEffect(() => {
-    // Double-check on mount in case pathname changed
-    const check = getIsPublicRoute()
-    if (check !== isPublic) {
-      setIsPublic(check)
-    }
-  }, [isPublic])
+  // Re-check on mount to be absolutely sure
+  const [isPublic] = React.useState(() => {
+    if (typeof window === 'undefined') return false
+    const pathname = window.location.pathname
+    return pathname.startsWith('/s/') || pathname.startsWith('/public/')
+  })
   
   if (isPublic) {
     // For public routes, use completely separate PublicApp that has NO auth dependencies
