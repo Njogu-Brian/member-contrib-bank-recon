@@ -4,6 +4,7 @@ namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Auth\AuthenticationException;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -41,6 +42,14 @@ class Handler extends ExceptionHandler
     public function render($request, Throwable $e)
     {
         if ($request->expectsJson() || $request->is('api/*')) {
+            // Handle authentication exceptions with proper 401 response
+            if ($e instanceof AuthenticationException) {
+                return response()->json([
+                    'message' => 'Unauthenticated.',
+                ], 401);
+            }
+            
+            // Handle validation exceptions
             if ($e instanceof ValidationException) {
                 return response()->json([
                     'message' => 'The given data was invalid.',
@@ -48,6 +57,7 @@ class Handler extends ExceptionHandler
                 ], 422);
             }
 
+            // Handle HTTP exceptions (404, 403, etc.)
             $statusCode = 500;
             if ($this->isHttpException($e)) {
                 $statusCode = $e->getStatusCode();
