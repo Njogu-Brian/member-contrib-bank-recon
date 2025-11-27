@@ -58,7 +58,18 @@ export function AuthProvider({ children }) {
   // Use a conditional query that only runs for non-public-statement routes
   const authQuery = useQuery({
     queryKey: ['auth', 'user', isPublicStatementRoute ? 'public' : 'private'],
-    queryFn: getCurrentUser,
+    queryFn: async () => {
+      try {
+        return await getCurrentUser()
+      } catch (error) {
+        // If 401 (Unauthenticated), that's expected on login page - return null
+        if (error.response?.status === 401 || error.status === 401) {
+          return null
+        }
+        // For other errors, rethrow
+        throw error
+      }
+    },
     retry: false,
     staleTime: 5 * 60 * 1000,
     enabled: !isPublicStatementRoute, // Don't check auth for public statement routes
