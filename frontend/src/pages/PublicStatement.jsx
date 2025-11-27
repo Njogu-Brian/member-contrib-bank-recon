@@ -44,8 +44,15 @@ export default function PublicStatement() {
       const params = new URLSearchParams({ page, per_page: perPage })
       try {
         // Use absolute URL to ensure correct routing
+        // Try both relative and absolute paths
         const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
-        const url = `${baseUrl}/public/statement/${token}?${params}`
+        let url = `${baseUrl}/public/statement/${token}?${params}`
+        
+        // If baseUrl is relative, make it absolute
+        if (url.startsWith('/')) {
+          url = window.location.origin + url
+        }
+        
         const response = await fetch(url, {
           method: 'GET',
           headers: {
@@ -56,14 +63,22 @@ export default function PublicStatement() {
         })
         
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+          let errorData = {}
+          try {
+            errorData = await response.json()
+          } catch {
+            errorData = { message: `HTTP error! status: ${response.status}` }
+          }
+          const error = new Error(errorData.message || `HTTP error! status: ${response.status}`)
+          error.status = response.status
+          error.response = { data: errorData, status: response.status }
+          throw error
         }
         
         return await response.json()
       } catch (err) {
         // Don't let axios interceptor redirect for public routes
-        if (err.response?.status === 401 || err.response?.status === 419) {
+        if (err.status === 401 || err.status === 419) {
           // Return error data instead of letting interceptor handle it
           throw err
         }
