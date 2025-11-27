@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo } from 'react'
+import { createContext, useContext, useMemo, useEffect, useState } from 'react'
 import PropTypes from 'prop-types'
 import { useLocation } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -16,14 +16,30 @@ const AuthContext = createContext({
 
 export function AuthProvider({ children }) {
   const queryClient = useQueryClient()
-  const location = useLocation()
-
+  const routerLocation = useLocation()
+  
+  // Get pathname from window.location first (available immediately)
+  // Then update when React Router location changes
+  const [pathname, setPathname] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.location.pathname
+    }
+    return ''
+  })
+  
+  // Update pathname when React Router location changes
+  useEffect(() => {
+    if (routerLocation?.pathname) {
+      setPathname(routerLocation.pathname)
+    }
+  }, [routerLocation?.pathname])
+  
   // Skip auth check for public routes
-  const isPublicRoute = location.pathname.startsWith('/s/') || 
-                       location.pathname.startsWith('/public/') ||
-                       location.pathname === '/login' ||
-                       location.pathname === '/forgot-password' ||
-                       location.pathname === '/reset-password'
+  const isPublicRoute = pathname.startsWith('/s/') || 
+                       pathname.startsWith('/public/') ||
+                       pathname === '/login' ||
+                       pathname === '/forgot-password' ||
+                       pathname === '/reset-password'
 
   const {
     data,
