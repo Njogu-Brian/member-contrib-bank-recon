@@ -19,13 +19,15 @@ export function AuthProvider({ children }) {
   const routerLocation = useLocation()
   
   // Get pathname from window.location first (available immediately)
-  // Then update when React Router location changes
-  const [pathname, setPathname] = useState(() => {
+  // This is critical - we need to check this BEFORE React Router initializes
+  const getInitialPathname = () => {
     if (typeof window !== 'undefined') {
       return window.location.pathname
     }
     return ''
-  })
+  }
+  
+  const [pathname, setPathname] = useState(getInitialPathname)
   
   // Update pathname when React Router location changes
   useEffect(() => {
@@ -34,12 +36,16 @@ export function AuthProvider({ children }) {
     }
   }, [routerLocation?.pathname])
   
-  // Skip auth check for public routes
-  const isPublicRoute = pathname.startsWith('/s/') || 
-                       pathname.startsWith('/public/') ||
-                       pathname === '/login' ||
-                       pathname === '/forgot-password' ||
-                       pathname === '/reset-password'
+  // Skip auth check for public routes - check immediately on mount
+  // Use useMemo to ensure this is calculated before the query runs
+  const isPublicRoute = useMemo(() => {
+    const currentPath = pathname || getInitialPathname()
+    return currentPath.startsWith('/s/') || 
+           currentPath.startsWith('/public/') ||
+           currentPath === '/login' ||
+           currentPath === '/forgot-password' ||
+           currentPath === '/reset-password'
+  }, [pathname])
 
   const {
     data,
@@ -53,6 +59,9 @@ export function AuthProvider({ children }) {
     retry: false,
     staleTime: 5 * 60 * 1000,
     enabled: !isPublicRoute, // Don't check auth for public routes
+    // Ensure query doesn't run if disabled
+    refetchOnMount: !isPublicRoute,
+    refetchOnWindowFocus: !isPublicRoute,
   })
 
   const resolvedUser = data?.user ?? data ?? null
