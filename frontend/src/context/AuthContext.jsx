@@ -16,6 +16,14 @@ const AuthContext = createContext({
 export function AuthProvider({ children }) {
   const queryClient = useQueryClient()
 
+  // Skip auth check for public routes
+  const isPublicRoute = typeof window !== 'undefined' && 
+    (window.location.pathname.startsWith('/s/') || 
+     window.location.pathname.startsWith('/public/') ||
+     window.location.pathname === '/login' ||
+     window.location.pathname === '/forgot-password' ||
+     window.location.pathname === '/reset-password')
+
   const {
     data,
     isLoading,
@@ -27,6 +35,7 @@ export function AuthProvider({ children }) {
     queryFn: getCurrentUser,
     retry: false,
     staleTime: 5 * 60 * 1000,
+    enabled: !isPublicRoute, // Don't check auth for public routes
   })
 
   const resolvedUser = data?.user ?? data ?? null

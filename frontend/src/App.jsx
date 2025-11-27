@@ -63,6 +63,14 @@ function PublicRoute({ children }) {
 function App() {
   const { isLoading } = useAuthContext()
   const { settings } = useSettings()
+  const location = window.location.pathname
+  
+  // Skip auth loading for public routes
+  const isPublicRoute = location.startsWith('/s/') || 
+                       location.startsWith('/public/') ||
+                       location === '/login' ||
+                       location === '/forgot-password' ||
+                       location === '/reset-password'
   
   // Get session timeout from settings (in minutes), default to 8 hours (480 minutes)
   const sessionTimeoutMinutes = settings?.session_timeout 
@@ -70,9 +78,13 @@ function App() {
     : 480
   
   // Enable inactivity timeout - automatically logs out user after period of inactivity
-  useInactivityTimeout(sessionTimeoutMinutes)
+  // Only enable for authenticated routes
+  if (!isPublicRoute) {
+    useInactivityTimeout(sessionTimeoutMinutes)
+  }
   
-  if (isLoading) {
+  // Don't show loading screen for public routes
+  if (isLoading && !isPublicRoute) {
     return <FullScreenLoader />
   }
 
