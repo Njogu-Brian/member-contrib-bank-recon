@@ -19,6 +19,11 @@ class UpdateTokenActivity
      */
     public function handle(Request $request, Closure $next): Response
     {
+        // Skip token activity update for public routes (no authentication required)
+        if (str_starts_with($request->path(), 'api/v1/public/')) {
+            return $next($request);
+        }
+
         // Check token expiration before processing request
         if ($request->user() && $request->user()->currentAccessToken()) {
             try {
