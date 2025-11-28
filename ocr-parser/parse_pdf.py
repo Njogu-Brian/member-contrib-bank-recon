@@ -367,7 +367,12 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
                 continue
             for i, cell in enumerate(row):
                 cell_str = str(cell).strip().upper() if cell else ""
-                if "CREDIT" in cell_str or "TRAN DATE" in cell_str or "PARTICULARS" in cell_str:
+                # Support both old and new Equity format headers
+                if ("CREDIT" in cell_str or 
+                    "TRAN DATE" in cell_str or 
+                    "TRANSACTION DATE" in cell_str or
+                    "PARTICULARS" in cell_str or 
+                    "NARRATIVE" in cell_str):
                     header_row_found = row
                     header_row = row
                     break
@@ -377,9 +382,11 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
     if header_row:
         for i, cell in enumerate(header_row):
             cell_str = str(cell).strip().upper() if cell else ""
-            if "TRAN DATE" in cell_str or ("DATE" in cell_str and "VALUE" not in cell_str):
+            # Support both old format ("TRAN DATE") and new Equity format ("TRANSACTION DATE")
+            if "TRAN DATE" in cell_str or "TRANSACTION DATE" in cell_str or ("DATE" in cell_str and "VALUE" not in cell_str and "TRANSACTION" not in cell_str):
                 date_col = i
-            elif "PARTICULARS" in cell_str or "DETAILS" in cell_str or "DESCRIPTION" in cell_str:
+            # Support both old format ("PARTICULARS") and new Equity format ("NARRATIVE")
+            elif "PARTICULARS" in cell_str or "NARRATIVE" in cell_str or "DETAILS" in cell_str or "DESCRIPTION" in cell_str:
                 particulars_col = i
             elif "INSTRUMENT" in cell_str and "ID" in cell_str:
                 instrument_id_col = i  # Track this - might contain part of particulars
@@ -435,7 +442,11 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
             # Skip if this looks like a header row (but be less strict)
             row_str = ' '.join([str(c) for c in row if c]).upper()
             # Only skip if it's clearly a header (contains multiple header keywords)
-            header_keywords = ["TRAN DATE", "CREDIT", "PARTICULARS", "VALUE DATE", "DEBIT", "BALANCE"]
+            # Support both old and new Equity format headers
+            header_keywords = [
+                "TRAN DATE", "TRANSACTION DATE", "CREDIT", 
+                "PARTICULARS", "NARRATIVE", "VALUE DATE", "DEBIT", "BALANCE"
+            ]
             header_count = sum(1 for keyword in header_keywords if keyword in row_str)
             if header_count >= 2:  # Only skip if it has 2+ header keywords
                 log_bank_skip(
@@ -1283,8 +1294,8 @@ def detect_table_rows(text, page_number=None, initial_balance=None):
         
         # Clean up particulars
         particulars = re.sub(r'\s+', ' ', particulars).strip()
-        # Remove common header words that might have leaked in
-        particulars = re.sub(r'\b(TRAN DATE|VALUE DATE|PARTICULARS|CREDIT|DEBIT|BALANCE|INSTRUMENT)\b', '', particulars, flags=re.IGNORECASE)
+        # Remove common header words that might have leaked in (support both old and new formats)
+        particulars = re.sub(r'\b(TRAN DATE|TRANSACTION DATE|VALUE DATE|PARTICULARS|NARRATIVE|CREDIT|DEBIT|BALANCE|INSTRUMENT)\b', '', particulars, flags=re.IGNORECASE)
         # Remove any remaining standalone amounts (numbers with commas/decimals that might have been missed)
         # Pattern: numbers with commas or decimals that are standalone (not part of phone/transaction codes)
         particulars = re.sub(r'\b[\d,]+\.\d{2}\b', '', particulars)  # Remove amounts like "2,000.00" or "490,441.00"
