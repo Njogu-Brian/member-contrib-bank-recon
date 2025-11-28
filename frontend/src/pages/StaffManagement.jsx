@@ -24,7 +24,10 @@ import {
   HiOutlinePencil,
   HiOutlineLockClosed,
   HiOutlineUserMinus,
-  HiOutlineTrash
+  HiOutlineTrash,
+  HiOutlineEnvelope,
+  HiOutlineDevicePhoneMobile,
+  HiOutlineArrowRight
 } from 'react-icons/hi2'
 import { ROLES, ROLE_LABELS, useRoleBadge } from '../lib/rbac'
 
@@ -601,7 +604,7 @@ export default function StaffManagement() {
                                     }}
                                     className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
                                   >
-                                    <HiOutlinePaperAirplane className="w-4 h-4" />
+                                    <HiOutlineArrowRight className="w-4 h-4" />
                                     Send Credentials
                                   </button>
                                   <button
@@ -1005,7 +1008,7 @@ export default function StaffManagement() {
                     </>
                   ) : (
                     <>
-                      <HiOutlinePaperAirplane className="w-4 h-4" />
+                      <HiOutlineArrowRight className="w-4 h-4" />
                       Send Credentials
                     </>
                   )}
