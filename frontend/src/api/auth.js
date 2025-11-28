@@ -37,8 +37,9 @@ export const changePassword = async (currentPassword, password, passwordConfirma
     password_confirmation: passwordConfirmation,
   }
   
-  // Only include current_password if provided (not first login)
-  if (currentPassword) {
+  // Only include current_password if provided AND not empty (not first login)
+  // Don't send empty string - backend will treat it as present but invalid
+  if (currentPassword && currentPassword.trim() !== '') {
     payload.current_password = currentPassword
   }
   
