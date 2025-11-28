@@ -33,42 +33,59 @@ class StaffController extends Controller
 
     public function index(Request $request)
     {
-        $query = User::with(['roles']);
-        
-        // Only load member relationship if it exists
-        if (method_exists(User::class, 'member')) {
-            $query->with('member');
+        try {
+            $query = User::with(['roles']);
+            
+            // Only load member relationship if it exists
+            try {
+                if (method_exists(User::class, 'member')) {
+                    $query->with('member');
+                }
+            } catch (\Exception $e) {
+                Log::warning('Error loading member relationship: ' . $e->getMessage());
+                // Continue without member relationship
+            }
+
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%")
+                      ->orWhere('phone', 'like', "%{$search}%");
+                });
+            }
+
+            if ($request->filled('role')) {
+                $query->whereHas('roles', function ($q) use ($request) {
+                    $q->where('slug', $request->role);
+                });
+            }
+
+            if ($request->filled('status')) {
+                $query->where('is_active', $request->status === 'active');
+            }
+
+            $perPage = $request->get('per_page', 25);
+            $staff = $query->orderBy('created_at', 'desc')->paginate($perPage);
+
+            return response()->json([
+                'data' => $staff->items(),
+                'current_page' => $staff->currentPage(),
+                'last_page' => $staff->lastPage(),
+                'per_page' => $staff->perPage(),
+                'total' => $staff->total(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in StaffController::index: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'request' => $request->all(),
+            ]);
+            
+            return response()->json([
+                'message' => 'Failed to load staff members',
+                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
+            ], 500);
         }
-
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%");
-            });
-        }
-
-        if ($request->filled('role')) {
-            $query->whereHas('roles', function ($q) use ($request) {
-                $q->where('slug', $request->role);
-            });
-        }
-
-        if ($request->filled('status')) {
-            $query->where('is_active', $request->status === 'active');
-        }
-
-        $perPage = $request->get('per_page', 25);
-        $staff = $query->orderBy('created_at', 'desc')->paginate($perPage);
-
-        return response()->json([
-            'data' => $staff->items(),
-            'current_page' => $staff->currentPage(),
-            'last_page' => $staff->lastPage(),
-            'per_page' => $staff->perPage(),
-            'total' => $staff->total(),
-        ]);
     }
 
     public function show(User $user)
@@ -135,7 +152,7 @@ class StaffController extends Controller
             $sendEmail = $request->boolean('send_credentials_email', false);
             
             if ($sendSms || $sendEmail) {
-                $this->sendCredentials($user, $validated['password'], $sendSms, $sendEmail);
+                $this->doSendCredentials($user, $validated['password'], $sendSms, $sendEmail);
             }
 
             $user->load(['roles']);
@@ -297,7 +314,7 @@ class StaffController extends Controller
         $sendSms = $request->boolean('send_sms', true);
         $sendEmail = $request->boolean('send_email', true);
 
-        $result = $this->sendCredentials($user, $validated['password'], $sendSms, $sendEmail);
+        $result = $this->doSendCredentials($user, $validated['password'], $sendSms, $sendEmail);
 
         ActivityLog::create([
             'user_id' => $request->user()->id,
@@ -319,7 +336,7 @@ class StaffController extends Controller
     /**
      * Send credentials via SMS and/or Email
      */
-    protected function sendCredentials(User $user, string $password, bool $sendSms = true, bool $sendEmail = true): array
+    protected function doSendCredentials(User $user, string $password, bool $sendSms = true, bool $sendEmail = true): array
     {
         $result = ['sms_sent' => false, 'email_sent' => false];
         $appName = Setting::get('app_name', 'Evimeria Portal');
