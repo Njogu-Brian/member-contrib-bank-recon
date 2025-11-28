@@ -119,13 +119,12 @@ class SettingController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
             
-            // Return empty response with error message
+            // Return empty response instead of 500 to prevent blocking login
+            // The frontend will handle empty settings gracefully
             return response()->json([
-                'error' => 'Failed to load settings',
-                'message' => config('app.debug') ? $e->getMessage() : 'An error occurred while loading settings',
                 'logo_url' => null,
                 'favicon_url' => null,
-            ], 500);
+            ]);
         }
     }
 
