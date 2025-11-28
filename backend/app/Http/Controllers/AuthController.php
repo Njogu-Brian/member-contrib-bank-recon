@@ -161,7 +161,27 @@ class AuthController extends Controller
     public function user(Request $request)
     {
         try {
-            $user = $request->user();
+            // Check authentication first - if no user, return 401 immediately
+            // This avoids database queries when not authenticated
+            try {
+                $user = $request->user();
+            } catch (\Illuminate\Database\QueryException $e) {
+                // Database connection error - return 401 instead of 500
+                Log::warning('Database error in AuthController::user (auth check)', [
+                    'error' => $e->getMessage(),
+                ]);
+                return response()->json([
+                    'message' => 'Unauthenticated.',
+                ], 401);
+            } catch (\Exception $e) {
+                // Other errors during auth check - return 401
+                Log::warning('Error checking authentication in AuthController::user', [
+                    'error' => $e->getMessage(),
+                ]);
+                return response()->json([
+                    'message' => 'Unauthenticated.',
+                ], 401);
+            }
             
             if (!$user) {
                 return response()->json([
@@ -169,31 +189,38 @@ class AuthController extends Controller
                 ], 401);
             }
             
-            return response()->json([
-                'user' => $this->formatUserResponse($user),
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Error in AuthController::user', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'user_id' => $request->user()?->id,
-            ]);
-            
-            // Return basic user data if formatting fails
-            $user = $request->user();
-            if ($user) {
+            // User is authenticated, try to format response
+            try {
+                return response()->json([
+                    'user' => $this->formatUserResponse($user),
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Error formatting user response in AuthController::user', [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'user_id' => $user->id ?? null,
+                ]);
+                
+                // Return basic user data if formatting fails
                 return response()->json([
                     'user' => array_merge($user->toArray(), [
                         'roles' => [],
                         'permissions' => [],
                         'mfa_enabled' => false,
+                        'must_change_password' => filter_var($user->must_change_password ?? false, FILTER_VALIDATE_BOOLEAN),
                     ]),
                 ]);
             }
+        } catch (\Exception $e) {
+            Log::error('Unexpected error in AuthController::user', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             
+            // For any unexpected error, return 401 (not 500) to prevent blocking login
             return response()->json([
-                'message' => 'An error occurred while fetching user data.',
-            ], 500);
+                'message' => 'Unauthenticated.',
+            ], 401);
         }
     }
 
