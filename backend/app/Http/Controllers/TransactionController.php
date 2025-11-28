@@ -120,22 +120,61 @@ class TransactionController extends Controller
             'member_id' => 'required|exists:members,id',
         ]);
 
+        $oldMemberId = $transaction->member_id;
+        $newMemberId = $request->member_id;
+        $transactionAmount = (float) ($transaction->credit > 0 ? $transaction->credit : $transaction->debit);
+
+        // If reassigning to a different member, handle as transfer
+        if ($oldMemberId && $oldMemberId != $newMemberId) {
+            // Delete existing splits and transfers first
+            $transaction->splits()->delete();
+            $transaction->transfers()->delete();
+
+            // Create transfer record
+            TransactionTransfer::create([
+                'transaction_id' => $transaction->id,
+                'from_member_id' => $oldMemberId,
+                'initiated_by' => optional($request->user())->id,
+                'mode' => 'single',
+                'total_amount' => $transactionAmount,
+                'notes' => 'Reassigned via assign endpoint',
+                'metadata' => [
+                    'previous_member_id' => $oldMemberId,
+                    'new_member_id' => $newMemberId,
+                    'previous_assignment_status' => $transaction->assignment_status,
+                ],
+            ]);
+
+            // Create match log for new assignment
+            TransactionMatchLog::create([
+                'transaction_id' => $transaction->id,
+                'member_id' => $newMemberId,
+                'confidence' => 1.0,
+                'match_reason' => "Reassigned from member {$oldMemberId} to member {$newMemberId}",
+                'source' => 'manual',
+                'user_id' => $request->user()->id,
+            ]);
+        } else {
+            // New assignment or same member - just create match log
+            TransactionMatchLog::create([
+                'transaction_id' => $transaction->id,
+                'member_id' => $newMemberId,
+                'confidence' => 1.0,
+                'match_reason' => 'Manual assignment',
+                'source' => 'manual',
+                'user_id' => $request->user()->id,
+            ]);
+        }
+
+        // Update transaction
         $transaction->update([
-            'member_id' => $request->member_id,
+            'member_id' => $newMemberId,
             'assignment_status' => 'manual_assigned',
             'match_confidence' => 1.0,
+            'draft_member_ids' => null,
         ]);
 
-        TransactionMatchLog::create([
-            'transaction_id' => $transaction->id,
-            'member_id' => $request->member_id,
-            'confidence' => 1.0,
-            'match_reason' => 'Manual assignment',
-            'source' => 'manual',
-            'user_id' => $request->user()->id,
-        ]);
-
-        $transaction->load(['member', 'bankStatement']);
+        $transaction->load(['member', 'bankStatement', 'splits.member']);
 
         return response()->json($transaction);
     }
@@ -168,12 +207,13 @@ class TransactionController extends Controller
         }
 
         DB::transaction(function () use ($transaction, $request, $totalAmount) {
+            $oldMemberId = $transaction->member_id;
             $transaction->splits()->delete();
             $transaction->transfers()->delete();
 
             $transfer = TransactionTransfer::create([
                 'transaction_id' => $transaction->id,
-                'from_member_id' => $transaction->member_id,
+                'from_member_id' => $oldMemberId,
                 'initiated_by' => optional($request->user())->id,
                 'mode' => 'split',
                 'total_amount' => $totalAmount,
@@ -197,10 +237,26 @@ class TransactionController extends Controller
                     'notes' => $split['notes'] ?? null,
                     'transfer_id' => $transfer->id,
                 ]);
+
+                TransactionMatchLog::create([
+                    'transaction_id' => $transaction->id,
+                    'member_id' => $split['member_id'],
+                    'confidence' => 1.0,
+                    'match_reason' => "Split share of {$split['amount']}" . ($request->input('notes') ? ": {$request->input('notes')}" : ''),
+                    'source' => 'manual',
+                    'user_id' => optional($request->user())->id,
+                ]);
             }
 
+            // If only one recipient in split, assign to that member; otherwise set to null
+            // This ensures the original member doesn't get double-counted
+            $recipientIds = collect($request->splits)->pluck('member_id')->unique();
+            $newMemberId = $recipientIds->count() === 1 ? $recipientIds->first() : null;
+
             $transaction->update([
+                'member_id' => $newMemberId,
                 'assignment_status' => 'transferred',
+                'draft_member_ids' => null,
             ]);
         });
 
@@ -1343,38 +1399,80 @@ class TransactionController extends Controller
         $success = 0;
         $errors = [];
 
-        foreach ($transactionIds as $transactionId) {
-            try {
-                $transaction = Transaction::findOrFail($transactionId);
+        DB::transaction(function () use ($transactionIds, $request, &$success, &$errors) {
+            foreach ($transactionIds as $transactionId) {
+                try {
+                    $transaction = Transaction::findOrFail($transactionId);
 
-                if ($transaction->is_archived) {
-                    $errors[] = "Transaction {$transactionId}: Archived transactions cannot be assigned";
-                    continue;
+                    if ($transaction->is_archived) {
+                        $errors[] = "Transaction {$transactionId}: Archived transactions cannot be assigned";
+                        continue;
+                    }
+
+                    $oldMemberId = $transaction->member_id;
+                    $newMemberId = $request->member_id;
+                    $transactionAmount = (float) ($transaction->credit > 0 ? $transaction->credit : $transaction->debit);
+
+                    // If reassigning to a different member, handle as transfer
+                    if ($oldMemberId && $oldMemberId != $newMemberId) {
+                        // Delete existing splits and transfers first
+                        $transaction->splits()->delete();
+                        $transaction->transfers()->delete();
+
+                        // Create transfer record
+                        TransactionTransfer::create([
+                            'transaction_id' => $transaction->id,
+                            'from_member_id' => $oldMemberId,
+                            'initiated_by' => optional($request->user())->id,
+                            'mode' => 'single',
+                            'total_amount' => $transactionAmount,
+                            'notes' => 'Bulk reassignment',
+                            'metadata' => [
+                                'previous_member_id' => $oldMemberId,
+                                'new_member_id' => $newMemberId,
+                                'previous_assignment_status' => $transaction->assignment_status,
+                            ],
+                        ]);
+
+                        // Create match log for new assignment
+                        TransactionMatchLog::create([
+                            'transaction_id' => $transaction->id,
+                            'member_id' => $newMemberId,
+                            'confidence' => 1.0,
+                            'match_reason' => "Bulk reassigned from member {$oldMemberId} to member {$newMemberId}",
+                            'source' => 'manual',
+                            'user_id' => $request->user()->id,
+                        ]);
+                    } else {
+                        // New assignment or same member - just create match log
+                        TransactionMatchLog::create([
+                            'transaction_id' => $transaction->id,
+                            'member_id' => $newMemberId,
+                            'confidence' => 1.0,
+                            'match_reason' => 'Bulk manual assignment',
+                            'source' => 'manual',
+                            'user_id' => $request->user()->id,
+                        ]);
+                    }
+
+                    // Update transaction
+                    $transaction->update([
+                        'member_id' => $newMemberId,
+                        'assignment_status' => 'manual_assigned',
+                        'match_confidence' => 1.0,
+                        'draft_member_ids' => null,
+                    ]);
+
+                    $success++;
+                } catch (\Exception $e) {
+                    $errors[] = "Transaction {$transactionId}: " . $e->getMessage();
                 }
-
-                $transaction->update([
-                    'member_id' => $request->member_id,
-                    'assignment_status' => 'manual_assigned',
-                    'match_confidence' => 1.0,
-                ]);
-
-                TransactionMatchLog::create([
-                    'transaction_id' => $transaction->id,
-                    'member_id' => $request->member_id,
-                    'confidence' => 1.0,
-                    'match_reason' => 'Bulk manual assignment',
-                    'source' => 'manual',
-                    'user_id' => $request->user()->id,
-                ]);
-
-                $success++;
-            } catch (\Exception $e) {
-                $errors[] = "Transaction {$transactionId}: " . $e->getMessage();
             }
-        }
+        });
 
         return response()->json([
             'success' => $success,
+            'failed' => count($errors),
             'errors' => $errors,
         ]);
     }

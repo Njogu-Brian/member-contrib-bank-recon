@@ -102,6 +102,7 @@ export default function Transactions({
     mutationFn: ({ transactionIds, memberId }) => bulkAssign(transactionIds, memberId),
     onSuccess: (result) => {
       queryClient.invalidateQueries(['transactions'])
+      queryClient.invalidateQueries(['members']) // Invalidate members to refresh balances
       setSelectedTransactions([])
       setSelectedMemberForAssign(null)
       const success = result?.success ?? 0
@@ -135,6 +136,7 @@ export default function Transactions({
     mutationFn: ({ id, toMemberId, recipients, notes }) => transferTransaction(id, { toMemberId, recipients, notes }),
     onSuccess: () => {
       queryClient.invalidateQueries(['transactions'])
+      queryClient.invalidateQueries(['members']) // Invalidate members to refresh balances
       resetTransferState()
       alert('Transaction transferred successfully!')
     },
@@ -147,6 +149,7 @@ export default function Transactions({
     mutationFn: ({ transactionId, splits, notes }) => splitTransaction(transactionId, { splits, notes }),
     onSuccess: () => {
       queryClient.invalidateQueries(['transactions'])
+      queryClient.invalidateQueries(['members']) // Invalidate members to refresh balances
       resetTransferState()
       alert('Deposit shared successfully!')
     },
