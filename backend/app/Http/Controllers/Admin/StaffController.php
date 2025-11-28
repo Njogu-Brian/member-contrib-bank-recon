@@ -19,9 +19,16 @@ class StaffController extends Controller
 {
     protected $smsService;
 
-    public function __construct(SmsService $smsService)
+    public function __construct()
     {
-        $this->smsService = $smsService;
+        // Inject SmsService only when needed (for sendCredentials method)
+        // This prevents errors if SmsService has issues during construction
+        try {
+            $this->smsService = app(SmsService::class);
+        } catch (\Exception $e) {
+            Log::warning('SmsService could not be instantiated: ' . $e->getMessage());
+            $this->smsService = null;
+        }
     }
 
     public function index(Request $request)
@@ -349,7 +356,7 @@ class StaffController extends Controller
         $emailMessage .= "{$appName} Administration";
 
         // Send SMS if requested and phone number exists
-        if ($sendSms && $user->phone) {
+        if ($sendSms && $user->phone && $this->smsService) {
             try {
                 $smsResult = $this->smsService->send($user->phone, $smsMessage);
                 $result['sms_sent'] = $smsResult['success'] ?? false;
@@ -372,6 +379,11 @@ class StaffController extends Controller
                     'error' => $e->getMessage(),
                 ]);
             }
+        } elseif ($sendSms && $user->phone && !$this->smsService) {
+            Log::warning('SMS requested but SmsService is not available', [
+                'user_id' => $user->id,
+                'phone' => $user->phone,
+            ]);
         }
 
         // Send Email if requested and email exists
