@@ -12,13 +12,19 @@
   RewriteCond %{REQUEST_URI} ^/storage/
   RewriteRule ^ - [L]
 
-  # Don't rewrite existing files (like index.html, assets, etc.)
+  # Don't rewrite existing files EXCEPT index.php (we want index.html for root)
+  # This allows assets, images, etc. to be served directly
   RewriteCond %{REQUEST_FILENAME} -f
+  RewriteCond %{REQUEST_URI} !^/index\.php$
   RewriteRule ^ - [L]
 
   # Don't rewrite existing directories
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]
+
+  # For root path, explicitly serve index.html (React app)
+  RewriteCond %{REQUEST_URI} ^/$
+  RewriteRule ^ /index.html [L]
 
   # Rewrite everything else to index.html for SPA routing
   # This includes /login, /logout, /s/*, and all other frontend routes
