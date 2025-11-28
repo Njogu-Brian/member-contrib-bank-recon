@@ -29,3 +29,7 @@ export const toggleStaffStatus = (id) => {
   return adminApi.post(`/staff/${id}/toggle-status`)
 }
 
+export const sendStaffCredentials = (id, data) => {
+  return adminApi.post(`/staff/${id}/send-credentials`, data)
+}
+

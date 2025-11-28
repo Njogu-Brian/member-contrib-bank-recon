@@ -7,6 +7,7 @@ import {
   deleteStaff,
   resetStaffPassword,
   toggleStaffStatus,
+  sendStaffCredentials,
 } from '../api/staff'
 import { getRoles } from '../api/roles'
 import { getMembers } from '../api/members'
@@ -70,6 +71,14 @@ export default function StaffManagement() {
     member_id: '',
     roles: [],
     is_active: true,
+    send_credentials_sms: false,
+    send_credentials_email: false,
+  })
+  const [showSendCredentialsModal, setShowSendCredentialsModal] = useState(false)
+  const [credentialsPassword, setCredentialsPassword] = useState('')
+  const [sendCredentialsOptions, setSendCredentialsOptions] = useState({
+    send_sms: true,
+    send_email: true,
   })
   const queryClient = useQueryClient()
 
@@ -160,6 +169,25 @@ export default function StaffManagement() {
     },
   })
 
+  const sendCredentialsMutation = useMutation({
+    mutationFn: ({ id, data }) => sendStaffCredentials(id, data),
+    onSuccess: (response) => {
+      const data = response?.data || {}
+      const messages = []
+      if (data.sms_sent) messages.push('SMS sent successfully')
+      if (data.email_sent) messages.push('Email sent successfully')
+      if (messages.length === 0) messages.push('Credentials sent')
+      alert(messages.join(', '))
+      setShowSendCredentialsModal(false)
+      setShowActionsMenu(null)
+      setCredentialsPassword('')
+    },
+    onError: (error) => {
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to send credentials'
+      alert(`Error: ${errorMessage}`)
+    },
+  })
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -169,6 +197,8 @@ export default function StaffManagement() {
       member_id: '',
       roles: [],
       is_active: true,
+      send_credentials_sms: false,
+      send_credentials_email: false,
     })
   }
 
@@ -212,6 +242,9 @@ export default function StaffManagement() {
     
     if (editingStaff && !submitData.password) {
       delete submitData.password
+      // Don't send credentials flags when updating without password
+      delete submitData.send_credentials_sms
+      delete submitData.send_credentials_email
     }
     
     console.log('Submitting staff data:', submitData)
@@ -560,6 +593,19 @@ export default function StaffManagement() {
                                   </button>
                                   <button
                                     onClick={() => {
+                                      setEditingStaff(member)
+                                      setCredentialsPassword('')
+                                      setSendCredentialsOptions({ send_sms: true, send_email: true })
+                                      setShowSendCredentialsModal(true)
+                                      setShowActionsMenu(null)
+                                    }}
+                                    className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                                  >
+                                    <HiOutlinePaperAirplane className="w-4 h-4" />
+                                    Send Credentials
+                                  </button>
+                                  <button
+                                    onClick={() => {
                                       toggleStatusMutation.mutate(member.id)
                                       setShowActionsMenu(null)
                                     }}
@@ -778,6 +824,42 @@ export default function StaffManagement() {
                   Account is active (user can login)
                 </label>
               </div>
+
+              {!editingStaff && (
+                <div className="space-y-3 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                  <p className="text-sm font-semibold text-blue-900 mb-2">Send Credentials</p>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.send_credentials_sms}
+                        onChange={(e) => setFormData({ ...formData, send_credentials_sms: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                        disabled={!formData.phone}
+                      />
+                      <div className="flex items-center gap-2">
+                        <HiOutlineDevicePhoneMobile className="w-4 h-4 text-blue-600" />
+                        <span className="text-sm text-blue-900">Send via SMS {formData.phone ? '' : '(phone number required)'}</span>
+                      </div>
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.send_credentials_email}
+                        onChange={(e) => setFormData({ ...formData, send_credentials_email: e.target.checked })}
+                        className="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                      />
+                      <div className="flex items-center gap-2">
+                        <HiOutlineEnvelope className="w-4 h-4 text-blue-600" />
+                        <span className="text-sm text-blue-900">Send via Email</span>
+                      </div>
+                    </label>
+                  </div>
+                  <p className="text-xs text-blue-700 mt-2">
+                    Credentials will include: Name, Email, Password, and Portal Login Link
+                  </p>
+                </div>
+              )}
             </form>
             </div>
             <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex gap-3">

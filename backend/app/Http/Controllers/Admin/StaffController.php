@@ -6,13 +6,24 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Role;
 use App\Models\ActivityLog;
+use App\Models\Setting;
+use App\Services\SmsService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 class StaffController extends Controller
 {
+    protected $smsService;
+
+    public function __construct(SmsService $smsService)
+    {
+        $this->smsService = $smsService;
+    }
+
     public function index(Request $request)
     {
         $query = User::with(['roles']);
@@ -81,6 +92,8 @@ class StaffController extends Controller
             'roles' => 'required|array|min:1',
             'roles.*' => 'exists:roles,id',
             'is_active' => 'boolean',
+            'send_credentials_sms' => 'boolean',
+            'send_credentials_email' => 'boolean',
         ]);
 
         DB::beginTransaction();
@@ -109,6 +122,14 @@ class StaffController extends Controller
             ]);
 
             DB::commit();
+
+            // Send credentials via SMS and/or Email if requested
+            $sendSms = $request->boolean('send_credentials_sms', false);
+            $sendEmail = $request->boolean('send_credentials_email', false);
+            
+            if ($sendSms || $sendEmail) {
+                $this->sendCredentials($user, $validated['password'], $sendSms, $sendEmail);
+            }
 
             $user->load(['roles']);
             if (method_exists(User::class, 'member')) {
@@ -253,6 +274,129 @@ class StaffController extends Controller
         ]);
 
         return response()->json(['message' => 'Staff user deleted successfully']);
+    }
+
+    /**
+     * Send credentials to existing staff member
+     */
+    public function sendCredentials(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'password' => 'required|string|min:8',
+            'send_sms' => 'boolean',
+            'send_email' => 'boolean',
+        ]);
+
+        $sendSms = $request->boolean('send_sms', true);
+        $sendEmail = $request->boolean('send_email', true);
+
+        $result = $this->sendCredentials($user, $validated['password'], $sendSms, $sendEmail);
+
+        ActivityLog::create([
+            'user_id' => $request->user()->id,
+            'action' => 'credentials_sent',
+            'model_type' => User::class,
+            'model_id' => $user->id,
+            'description' => "Sent credentials to staff: {$user->name}",
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
+        return response()->json([
+            'message' => 'Credentials sent successfully',
+            'sms_sent' => $result['sms_sent'] ?? false,
+            'email_sent' => $result['email_sent'] ?? false,
+        ]);
+    }
+
+    /**
+     * Send credentials via SMS and/or Email
+     */
+    protected function sendCredentials(User $user, string $password, bool $sendSms = true, bool $sendEmail = true): array
+    {
+        $result = ['sms_sent' => false, 'email_sent' => false];
+        $appName = Setting::get('app_name', 'Evimeria Portal');
+        $appUrl = rtrim(config('app.url', env('APP_URL', 'https://evimeria.breysomsolutions.co.ke')), '/');
+
+        // Prepare SMS message (shorter format for SMS)
+        $smsMessage = "Hello {$user->name},\n\n";
+        $smsMessage .= "Your {$appName} account:\n";
+        $smsMessage .= "Email: {$user->email}\n";
+        $smsMessage .= "Password: {$password}\n";
+        $smsMessage .= "Login: {$appUrl}/login\n\n";
+        $smsMessage .= "Change password on first login.";
+
+        // Prepare Email message (more detailed format)
+        $emailMessage = "Hello {$user->name},\n\n";
+        $emailMessage .= "Your {$appName} staff account has been created. Below are your login credentials:\n\n";
+        $emailMessage .= "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+        $emailMessage .= "ACCOUNT CREDENTIALS\n";
+        $emailMessage .= "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
+        $emailMessage .= "Name: {$user->name}\n";
+        $emailMessage .= "Email: {$user->email}\n";
+        $emailMessage .= "Password: {$password}\n\n";
+        $emailMessage .= "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+        $emailMessage .= "ACCESS PORTAL\n";
+        $emailMessage .= "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
+        $emailMessage .= "Portal URL: {$appUrl}/login\n\n";
+        $emailMessage .= "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
+        $emailMessage .= "IMPORTANT NOTES\n";
+        $emailMessage .= "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n";
+        $emailMessage .= "• Please change your password immediately after your first login.\n";
+        $emailMessage .= "• Keep your credentials secure and do not share them with anyone.\n";
+        $emailMessage .= "• If you did not request this account, please contact your administrator.\n\n";
+        $emailMessage .= "Thank you,\n";
+        $emailMessage .= "{$appName} Administration";
+
+        // Send SMS if requested and phone number exists
+        if ($sendSms && $user->phone) {
+            try {
+                $smsResult = $this->smsService->send($user->phone, $smsMessage);
+                $result['sms_sent'] = $smsResult['success'] ?? false;
+                if (!$result['sms_sent']) {
+                    Log::warning('Failed to send SMS credentials to staff', [
+                        'user_id' => $user->id,
+                        'phone' => $user->phone,
+                        'error' => $smsResult['error'] ?? 'Unknown error',
+                    ]);
+                } else {
+                    Log::info('SMS credentials sent to staff', [
+                        'user_id' => $user->id,
+                        'phone' => $user->phone,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error('Error sending SMS credentials to staff', [
+                    'user_id' => $user->id,
+                    'phone' => $user->phone,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Send Email if requested and email exists
+        if ($sendEmail && $user->email) {
+            try {
+                Mail::raw($emailMessage, function ($mail) use ($user, $appName) {
+                    $mail->to($user->email)
+                         ->subject("Your {$appName} Staff Account Credentials");
+                });
+                $result['email_sent'] = true;
+                Log::info('Email credentials sent to staff', [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Error sending email credentials to staff', [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'error' => $e->getMessage(),
+                ]);
+                $result['email_sent'] = false;
+            }
+        }
+
+        return $result;
     }
 }
 

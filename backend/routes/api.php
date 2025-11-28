@@ -225,6 +225,7 @@ Route::prefix('v1')->group(function () {
             Route::delete('/staff/{user}', [StaffController::class, 'destroy']);
             Route::post('/staff/{user}/reset-password', [StaffController::class, 'resetPassword']);
             Route::post('/staff/{user}/toggle-status', [StaffController::class, 'toggleStatus']);
+            Route::post('/staff/{user}/send-credentials', [StaffController::class, 'sendCredentials']);
 
             // Role Management
             Route::get('/roles', [RoleController::class, 'index']);
