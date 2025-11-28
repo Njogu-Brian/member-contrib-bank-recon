@@ -117,7 +117,7 @@ export default function ChangePassword() {
 
   const changePasswordMutation = useMutation({
     mutationFn: () => changePassword(
-      formData.current_password || undefined, // Only send if not first login
+      isFirstLogin ? undefined : (formData.current_password || undefined), // Don't send current_password for first login
       formData.password,
       formData.password_confirmation
     ),
