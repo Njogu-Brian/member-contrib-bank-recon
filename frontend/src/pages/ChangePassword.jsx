@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { changePassword } from '../api/auth'
@@ -45,6 +45,16 @@ export default function ChangePassword() {
   // Fallback to location.state if user object not yet loaded
   // Only check user.must_change_password if user is loaded (not null/undefined)
   const isFirstLogin = user ? (user.must_change_password ?? false) : (location.state?.firstLogin ?? false)
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('ChangePassword component state:', {
+      user: user ? { id: user.id, must_change_password: user.must_change_password, email: user.email } : null,
+      isLoading,
+      locationState: location.state,
+      isFirstLogin,
+    })
+  }, [user, isLoading, location.state, isFirstLogin])
 
   const [formData, setFormData] = useState({
     current_password: '',
