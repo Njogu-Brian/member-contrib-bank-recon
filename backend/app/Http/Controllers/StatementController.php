@@ -182,13 +182,16 @@ class StatementController extends Controller
             'duplicates' => $duplicatesCollection->count(),
         ];
 
+        // Build document URL manually to avoid route name resolution issues
+        $documentUrl = url("/api/v1/admin/statements/{$statement->id}/document");
+        
         return response()->json([
             'statement' => [
                 'id' => $statement->id,
                 'filename' => $statement->filename,
                 'file_url' => null,
-                'document_url' => route('statements.document', $statement, absolute: false),
-                'document_absolute_url' => route('statements.document', $statement),
+                'document_url' => "/api/v1/admin/statements/{$statement->id}/document",
+                'document_absolute_url' => $documentUrl,
                 'status' => $statement->status,
                 'statement_date' => optional($statement->statement_date)?->toDateString(),
                 'uploaded_at' => $statement->created_at?->toDateTimeString(),
