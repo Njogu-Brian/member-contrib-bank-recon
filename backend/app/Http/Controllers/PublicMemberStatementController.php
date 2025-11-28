@@ -158,10 +158,12 @@ class PublicMemberStatementController extends Controller
 
         // Get logo URL if available
         $logoUrl = null;
-        $appName = Setting::get('app_name', 'Member Contributions System');
         if (Setting::get('logo_path')) {
             $logoUrl = \Illuminate\Support\Facades\Storage::disk('public')->url(Setting::get('logo_path'));
         }
+
+        // Get contact phone for footer
+        $contactPhone = Setting::get('contact_phone', null);
 
         $filename = $this->buildExportFilename($member->name, $validated['month'] ?? null, 'pdf');
         
@@ -178,8 +180,7 @@ class PublicMemberStatementController extends Controller
             'generatedAt' => now(),
             'printDate' => now(),
             'logoUrl' => $logoUrl,
-            'appName' => $appName,
-            'isPublic' => true,
+            'contactPhone' => $contactPhone,
         ], $filename);
     }
 

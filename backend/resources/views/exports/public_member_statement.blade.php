@@ -5,17 +5,6 @@
     <title>Member Statement - {{ $member->name }}</title>
     @include('exports.partials.member_statement_styles')
     <style>
-        .watermark {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(-45deg);
-            font-size: 72px;
-            color: rgba(0, 0, 0, 0.05);
-            font-weight: bold;
-            z-index: -1;
-            pointer-events: none;
-        }
         .page-number {
             position: fixed;
             bottom: 20px;
@@ -23,26 +12,15 @@
             font-size: 10px;
             color: #6b7280;
         }
-        .public-badge {
-            background-color: #fef3c7;
-            color: #92400e;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 10px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
     </style>
 </head>
 <body>
-    <div class="watermark">PUBLIC VIEW</div>
-    
     <div class="statement">
         <div class="branding">
             <div class="brand-lockup">
                 @if($logoUrl)
                     <div class="brand-icon">
-                        <img src="{{ $logoUrl }}" alt="{{ $appName }}" style="max-width: 120px; max-height: 80px;">
+                        <img src="{{ $logoUrl }}" alt="Logo" style="max-width: 120px; max-height: 80px;">
                     </div>
                 @else
                     <div class="brand-icon">
@@ -50,7 +28,6 @@
                     </div>
                 @endif
                 <div class="brand-text">
-                    <div class="brand-name">{{ $appName }}</div>
                     <div class="brand-tagline">Member Contribution Statement</div>
                 </div>
             </div>
@@ -60,7 +37,6 @@
         <div class="generated">
             Generated: {{ $generatedAt->format('F j, Y g:i A') }} | 
             Printed: {{ $printDate->format('F j, Y g:i A') }}
-            <span class="public-badge" style="margin-left: 12px;">Public View</span>
         </div>
 
         <table class="info-table">
@@ -151,8 +127,11 @@
         @endif
 
         <div class="footer-text" style="margin-top: 24px;">
-            <p>This is a public view of your contribution statement. Generated electronically.</p>
-            <p style="margin-top: 4px; font-size: 9px;">For official records, please contact the administrator.</p>
+            <p>This is an electronically generated statement. For further clarification, contact the administrator
+            @if(isset($contactPhone) && $contactPhone)
+                at <strong>{{ $contactPhone }}</strong>
+            @endif
+            .</p>
         </div>
     </div>
     
