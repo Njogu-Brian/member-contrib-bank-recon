@@ -188,6 +188,7 @@ Route::prefix('v1')->group(function () {
         // Settings
         Route::get('/settings', [SettingController::class, 'index']);
         Route::put('/settings', [SettingController::class, 'update']);
+        Route::post('/settings', [SettingController::class, 'update']); // POST for file uploads
 
         // Reports
         Route::get('/reports/summary', [ReportController::class, 'summary']);
