@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use PDOException;
 
 class AuthController extends Controller
 {
@@ -181,7 +182,15 @@ class AuthController extends Controller
                 $user = $request->user();
             } catch (\Illuminate\Database\QueryException $e) {
                 // Database connection error - return 401 instead of 500
-                Log::warning('Database error in AuthController::user (auth check)', [
+                Log::warning('Database query error in AuthController::user (auth check)', [
+                    'error' => $e->getMessage(),
+                ]);
+                return response()->json([
+                    'message' => 'Unauthenticated.',
+                ], 401);
+            } catch (\PDOException $e) {
+                // PDO connection error - return 401 instead of 500
+                Log::warning('PDO error in AuthController::user (auth check)', [
                     'error' => $e->getMessage(),
                 ]);
                 return response()->json([

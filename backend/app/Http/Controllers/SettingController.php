@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\QueryException;
+use PDOException;
 
 class SettingController extends Controller
 {
@@ -66,34 +67,51 @@ class SettingController extends Controller
     public function index()
     {
         try {
-            // Check database connection first
+            // Try to get settings from database, but handle database connection issues gracefully
+            $settings = collect();
             try {
-                \DB::connection()->getPdo();
-            } catch (\Exception $dbError) {
-                Log::warning('Database connection error in SettingController::index', [
-                    'error' => $dbError->getMessage(),
+                // Check database connection first - wrap in try-catch
+                try {
+                    DB::connection()->getPdo();
+                } catch (\Exception $dbError) {
+                    Log::warning('Database connection error in SettingController::index', [
+                        'error' => $dbError->getMessage(),
+                    ]);
+                    // Return empty settings with 200 status (not 500) if database is unavailable
+                    return response()->json([
+                        'logo_url' => null,
+                        'favicon_url' => null,
+                    ], 200);
+                }
+                
+                $settings = Setting::all()->pluck('value', 'key');
+            } catch (\Illuminate\Database\QueryException $e) {
+                Log::warning('Database query error in SettingController::index', [
+                    'error' => $e->getMessage(),
                 ]);
-                // Return empty settings with 200 status (not 500) if database is unavailable
+                // Return empty settings if database is unavailable
                 return response()->json([
                     'logo_url' => null,
                     'favicon_url' => null,
                 ], 200);
-            }
-            
-            // Try to get settings from database, but handle database connection issues gracefully
-            try {
-                $settings = Setting::all()->pluck('value', 'key');
-            } catch (\Illuminate\Database\QueryException $e) {
-                Log::warning('Database error in SettingController::index', [
+            } catch (\PDOException $e) {
+                Log::warning('PDO error in SettingController::index', [
                     'error' => $e->getMessage(),
                 ]);
                 // Return empty settings if database is unavailable
-                $settings = collect();
+                return response()->json([
+                    'logo_url' => null,
+                    'favicon_url' => null,
+                ], 200);
             } catch (\Exception $e) {
                 Log::warning('Error loading settings from database', [
                     'error' => $e->getMessage(),
                 ]);
-                $settings = collect();
+                // Return empty settings if database is unavailable
+                return response()->json([
+                    'logo_url' => null,
+                    'favicon_url' => null,
+                ], 200);
             }
             
             // Add URLs for logo and favicon if they exist
@@ -139,7 +157,7 @@ class SettingController extends Controller
             return response()->json([
                 'logo_url' => null,
                 'favicon_url' => null,
-            ]);
+            ], 200);
         }
     }
 
