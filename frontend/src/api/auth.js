@@ -43,6 +43,13 @@ export const changePassword = async (currentPassword, password, passwordConfirma
     payload.current_password = currentPassword
   }
   
+  // Debug logging
+  console.log('changePassword API call:', {
+    hasCurrentPassword: !!currentPassword,
+    payloadKeys: Object.keys(payload),
+    payload: { ...payload, password: '***', password_confirmation: '***', current_password: currentPassword ? '***' : undefined },
+  })
+  
   const response = await api.post(`${AUTH_BASE}/password/change`, payload)
   return response.data
 }
