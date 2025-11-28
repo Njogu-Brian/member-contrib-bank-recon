@@ -894,6 +894,128 @@ export default function StaffManagement() {
         </div>
       )}
 
+      {/* Send Credentials Modal */}
+      {showSendCredentialsModal && editingStaff && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl">
+            <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+              <h2 className="text-2xl font-bold text-gray-900">Send Credentials</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Send login credentials to {editingStaff.name}
+              </p>
+            </div>
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault()
+                if (!credentialsPassword || credentialsPassword.length < 8) {
+                  alert('Password must be at least 8 characters')
+                  return
+                }
+                if (!sendCredentialsOptions.send_sms && !sendCredentialsOptions.send_email) {
+                  alert('Please select at least one delivery method (SMS or Email)')
+                  return
+                }
+                sendCredentialsMutation.mutate({
+                  id: editingStaff.id,
+                  data: {
+                    password: credentialsPassword,
+                    send_sms: sendCredentialsOptions.send_sms,
+                    send_email: sendCredentialsOptions.send_email,
+                  },
+                })
+              }}
+              className="p-6 space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Password <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  value={credentialsPassword}
+                  onChange={(e) => setCredentialsPassword(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
+                  placeholder="Enter password to send"
+                />
+                <p className="mt-1 text-xs text-gray-500">This password will be sent to the staff member</p>
+              </div>
+
+              <div className="space-y-2 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                <p className="text-sm font-semibold text-blue-900 mb-2">Delivery Method</p>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={sendCredentialsOptions.send_sms}
+                    onChange={(e) => setSendCredentialsOptions({ ...sendCredentialsOptions, send_sms: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                    disabled={!editingStaff.phone}
+                  />
+                  <div className="flex items-center gap-2">
+                    <HiOutlineDevicePhoneMobile className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm text-blue-900">
+                      Send via SMS {editingStaff.phone ? `(${editingStaff.phone})` : '(phone number not set)'}
+                    </span>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={sendCredentialsOptions.send_email}
+                    onChange={(e) => setSendCredentialsOptions({ ...sendCredentialsOptions, send_email: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                  />
+                  <div className="flex items-center gap-2">
+                    <HiOutlineEnvelope className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm text-blue-900">
+                      Send via Email ({editingStaff.email})
+                    </span>
+                  </div>
+                </label>
+              </div>
+
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <p className="text-xs text-gray-600">
+                  <strong>Message will include:</strong> Staff Name, Email, Password, and Portal Login Link
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSendCredentialsModal(false)
+                    setCredentialsPassword('')
+                    setEditingStaff(null)
+                  }}
+                  className="flex-1 px-5 py-2.5 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={sendCredentialsMutation.isPending || !credentialsPassword || credentialsPassword.length < 8}
+                  className="flex-1 px-5 py-2.5 bg-brand-600 text-white rounded-xl hover:bg-brand-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {sendCredentialsMutation.isPending ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <HiOutlinePaperAirplane className="w-4 h-4" />
+                      Send Credentials
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Password Reset Modal */}
       {showPasswordModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
