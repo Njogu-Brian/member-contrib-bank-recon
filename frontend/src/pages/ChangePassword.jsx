@@ -44,7 +44,10 @@ export default function ChangePassword() {
   // Check if this is first login - use user object as source of truth (backend)
   // Fallback to location.state if user object not yet loaded
   // Only check user.must_change_password if user is loaded (not null/undefined)
-  const isFirstLogin = user ? (user.must_change_password ?? false) : (location.state?.firstLogin ?? false)
+  // Handle both boolean true and string/number representations (1, '1', true)
+  const isFirstLogin = user 
+    ? (user.must_change_password === true || user.must_change_password === 1 || user.must_change_password === '1')
+    : (location.state?.firstLogin ?? false)
   
   // Debug logging
   useEffect(() => {
