@@ -46,152 +46,173 @@ class DashboardController extends Controller
 
     public function index()
     {
-        $totalMembers = Member::where('is_active', true)->count();
-        $unassignedTransactions = Transaction::where('assignment_status', 'unassigned')
-            ->where('is_archived', false)
-            ->count();
-        $draftAssignments = Transaction::where('assignment_status', 'draft')
-            ->where('is_archived', false)
-            ->count();
-        $autoAssigned = Transaction::where('assignment_status', 'auto_assigned')
-            ->where('is_archived', false)
-            ->count();
-        
-        // Calculate total contributions from ALL transactions (including unassigned)
-        $allTransactionContributions = $this->excludeDuplicateTransactions(
-            Transaction::where('credit', '>', 0)
+        try {
+            $totalMembers = Member::where('is_active', true)->count();
+            $unassignedTransactions = Transaction::where('assignment_status', 'unassigned')
                 ->where('is_archived', false)
-        )->sum('credit');
-        
-        // Calculate assigned contributions (for display)
-        $assignedContributions = Transaction::whereIn('assignment_status', ['auto_assigned', 'manual_assigned', 'draft', 'transferred'])
-            ->where('credit', '>', 0)
-            ->where('is_archived', false)
-            ->sum('credit');
-        
-        // Add manual contributions
-        $manualContributions = ManualContribution::sum('amount');
-        
-        // Total contributions = all transactions + manual
-        $totalContributions = $allTransactionContributions + $manualContributions;
-        
-        $statementsProcessed = BankStatement::where('status', 'completed')->count();
+                ->count();
+            $draftAssignments = Transaction::where('assignment_status', 'draft')
+                ->where('is_archived', false)
+                ->count();
+            $autoAssigned = Transaction::where('assignment_status', 'auto_assigned')
+                ->where('is_archived', false)
+                ->count();
+            
+            // Calculate total contributions from ALL transactions (including unassigned)
+            $allTransactionContributions = $this->excludeDuplicateTransactions(
+                Transaction::where('credit', '>', 0)
+                    ->where('is_archived', false)
+            )->sum('credit');
+            
+            // Calculate assigned contributions (for display)
+            $assignedContributions = Transaction::whereIn('assignment_status', ['auto_assigned', 'manual_assigned', 'draft', 'transferred'])
+                ->where('credit', '>', 0)
+                ->where('is_archived', false)
+                ->sum('credit');
+            
+            // Add manual contributions
+            $manualContributions = ManualContribution::sum('amount');
+            
+            // Total contributions = all transactions + manual
+            $totalContributions = $allTransactionContributions + $manualContributions;
+            
+            $statementsProcessed = BankStatement::where('status', 'completed')->count();
 
-        // Contributions by week (last 10 weeks)
-        $weeksData = $this->getContributionsByWeek();
-        
-        // Contributions by month (all months)
-        $monthsData = $this->getContributionsByMonth();
+            // Contributions by week (last 10 weeks)
+            $weeksData = $this->getContributionsByWeek();
+            
+            // Contributions by month (all months)
+            $monthsData = $this->getContributionsByMonth();
 
-        // Recent transactions
-        $recentTransactions = $this->excludeDuplicateTransactions(
-            Transaction::with('member')->where('is_archived', false)
-        )
-            ->orderBy('tran_date', 'desc')
-            ->limit(10)
-            ->get();
+            // Recent transactions
+            $recentTransactions = $this->excludeDuplicateTransactions(
+                Transaction::with('member')->where('is_archived', false)
+            )
+                ->orderBy('tran_date', 'desc')
+                ->limit(10)
+                ->get();
 
-        // Recent statements
-        $recentStatements = BankStatement::orderBy('created_at', 'desc')
-            ->limit(5)
-            ->get();
+            // Recent statements
+            $recentStatements = BankStatement::orderBy('created_at', 'desc')
+                ->limit(5)
+                ->get();
 
-        return response()->json([
-            'statistics' => [
-                'total_members' => $totalMembers,
-                'unassigned_transactions' => $unassignedTransactions,
-                'draft_assignments' => $draftAssignments,
-                'auto_assigned' => $autoAssigned,
-                'total_contributions' => $totalContributions,
-                'assigned_contributions' => $assignedContributions,
-                'unassigned_contributions' => $allTransactionContributions - $assignedContributions,
-                'statements_processed' => $statementsProcessed,
-            ],
-            'contributions_by_week' => $weeksData,
-            'contributions_by_month' => $monthsData,
-            'recent_transactions' => $recentTransactions,
-            'recent_statements' => $recentStatements,
-        ]);
+            return response()->json([
+                'statistics' => [
+                    'total_members' => $totalMembers,
+                    'unassigned_transactions' => $unassignedTransactions,
+                    'draft_assignments' => $draftAssignments,
+                    'auto_assigned' => $autoAssigned,
+                    'total_contributions' => $totalContributions,
+                    'assigned_contributions' => $assignedContributions,
+                    'unassigned_contributions' => $allTransactionContributions - $assignedContributions,
+                    'statements_processed' => $statementsProcessed,
+                ],
+                'contributions_by_week' => $weeksData,
+                'contributions_by_month' => $monthsData,
+                'recent_transactions' => $recentTransactions,
+                'recent_statements' => $recentStatements,
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Dashboard index error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            return response()->json([
+                'message' => 'Error loading dashboard data',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred while loading dashboard',
+            ], 500);
+        }
     }
 
     protected function getContributionsByWeek()
     {
-        $weeks = [];
-        for ($i = 9; $i >= 0; $i--) {
-            $startDate = now()->subWeeks($i)->startOfWeek();
-            $endDate = now()->subWeeks($i)->endOfWeek();
+        try {
+            $weeks = [];
+            for ($i = 9; $i >= 0; $i--) {
+                $startDate = now()->subWeeks($i)->startOfWeek();
+                $endDate = now()->subWeeks($i)->endOfWeek();
+                
+                $transactionTotal = $this->excludeDuplicateTransactions(
+                    Transaction::whereIn('assignment_status', ['auto_assigned', 'manual_assigned', 'draft', 'transferred'])
+                        ->where('credit', '>', 0)
+                        ->where('is_archived', false)
+                        ->whereBetween('tran_date', [$startDate, $endDate])
+                )->sum('credit');
+                
+                $manualTotal = ManualContribution::whereBetween('contribution_date', [$startDate, $endDate])
+                    ->sum('amount');
+                
+                $weeks[] = [
+                    'week' => $startDate->format('Y-W'),
+                    'week_start' => $startDate->toDateString(),
+                    'week_end' => $endDate->toDateString(),
+                    'amount' => $transactionTotal + $manualTotal,
+                ];
+            }
             
-            $transactionTotal = $this->excludeDuplicateTransactions(
-                Transaction::whereIn('assignment_status', ['auto_assigned', 'manual_assigned', 'draft', 'transferred'])
-                    ->where('credit', '>', 0)
-                    ->where('is_archived', false)
-                    ->whereBetween('tran_date', [$startDate, $endDate])
-            )->sum('credit');
-            
-            $manualTotal = ManualContribution::whereBetween('contribution_date', [$startDate, $endDate])
-                ->sum('amount');
-            
-            $weeks[] = [
-                'week' => $startDate->format('Y-W'),
-                'week_start' => $startDate->toDateString(),
-                'week_end' => $endDate->toDateString(),
-                'amount' => $transactionTotal + $manualTotal,
-            ];
+            return $weeks;
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Error getting contributions by week: ' . $e->getMessage());
+            return [];
         }
-        
-        return $weeks;
     }
 
     protected function getContributionsByMonth()
     {
-        // Get the earliest transaction or manual contribution date
-        $earliestTransaction = Transaction::where('credit', '>', 0)->min('tran_date');
-        $earliestManual = ManualContribution::min('contribution_date');
-        
-        $earliestDate = null;
-        if ($earliestTransaction && $earliestManual) {
-            $earliestDate = min($earliestTransaction, $earliestManual);
-        } elseif ($earliestTransaction) {
-            $earliestDate = $earliestTransaction;
-        } elseif ($earliestManual) {
-            $earliestDate = $earliestManual;
+        try {
+            // Get the earliest transaction or manual contribution date
+            $earliestTransaction = Transaction::where('credit', '>', 0)->min('tran_date');
+            $earliestManual = ManualContribution::min('contribution_date');
+            
+            $earliestDate = null;
+            if ($earliestTransaction && $earliestManual) {
+                $earliestDate = min($earliestTransaction, $earliestManual);
+            } elseif ($earliestTransaction) {
+                $earliestDate = $earliestTransaction;
+            } elseif ($earliestManual) {
+                $earliestDate = $earliestManual;
+            }
+            
+            if (!$earliestDate) {
+                // If no data, show last 12 months
+                $earliestDate = now()->subMonths(11)->startOfMonth();
+            } else {
+                $earliestDate = \Carbon\Carbon::parse($earliestDate)->startOfMonth();
+            }
+            
+            $months = [];
+            $currentMonth = now()->startOfMonth();
+            $month = $earliestDate->copy();
+            
+            while ($month <= $currentMonth) {
+                $startDate = $month->copy()->startOfMonth();
+                $endDate = $month->copy()->endOfMonth();
+                
+                $transactionTotal = $this->excludeDuplicateTransactions(
+                    Transaction::whereIn('assignment_status', ['auto_assigned', 'manual_assigned', 'draft', 'transferred'])
+                        ->where('credit', '>', 0)
+                        ->where('is_archived', false)
+                        ->whereBetween('tran_date', [$startDate, $endDate])
+                )->sum('credit');
+                
+                $manualTotal = ManualContribution::whereBetween('contribution_date', [$startDate, $endDate])
+                    ->sum('amount');
+                
+                $months[] = [
+                    'month' => $startDate->format('Y-m'),
+                    'month_name' => $startDate->format('F Y'),
+                    'amount' => $transactionTotal + $manualTotal,
+                ];
+                
+                $month->addMonth();
+            }
+            
+            return $months;
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Error getting contributions by month: ' . $e->getMessage());
+            return [];
         }
-        
-        if (!$earliestDate) {
-            // If no data, show last 12 months
-            $earliestDate = now()->subMonths(11)->startOfMonth();
-        } else {
-            $earliestDate = \Carbon\Carbon::parse($earliestDate)->startOfMonth();
-        }
-        
-        $months = [];
-        $currentMonth = now()->startOfMonth();
-        $month = $earliestDate->copy();
-        
-        while ($month <= $currentMonth) {
-            $startDate = $month->copy()->startOfMonth();
-            $endDate = $month->copy()->endOfMonth();
-            
-            $transactionTotal = $this->excludeDuplicateTransactions(
-                Transaction::whereIn('assignment_status', ['auto_assigned', 'manual_assigned', 'draft', 'transferred'])
-                    ->where('credit', '>', 0)
-                    ->where('is_archived', false)
-                    ->whereBetween('tran_date', [$startDate, $endDate])
-            )->sum('credit');
-            
-            $manualTotal = ManualContribution::whereBetween('contribution_date', [$startDate, $endDate])
-                ->sum('amount');
-            
-            $months[] = [
-                'month' => $startDate->format('Y-m'),
-                'month_name' => $startDate->format('F Y'),
-                'amount' => $transactionTotal + $manualTotal,
-            ];
-            
-            $month->addMonth();
-        }
-        
-        return $months;
     }
     protected function excludeDuplicateTransactions($query)
     {
