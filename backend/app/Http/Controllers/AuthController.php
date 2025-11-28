@@ -282,14 +282,12 @@ class AuthController extends Controller
         ];
         
         // Only require current_password if NOT first login
-        // For first login, explicitly exclude current_password from validation
+        // For first login, completely exclude current_password from validation
         if (!$isFirstLogin) {
             $rules['current_password'] = 'required|string';
-        } else {
-            // For first login, ensure current_password is not validated even if sent
-            // This prevents validation errors if frontend accidentally sends it
-            $rules['current_password'] = 'nullable|string';
         }
+        // For first login, don't add current_password to rules at all
+        // This ensures Laravel doesn't validate it even if it's sent
         
         try {
             $validated = $request->validate($rules);

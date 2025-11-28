@@ -34,10 +34,16 @@ const generatePassword = (length = 16, includeUppercase = true, includeLowercase
   return password.split('').sort(() => Math.random() - 0.5).join('')
 }
 
+import { useAuthContext } from '../context/AuthContext'
+
 export default function ChangePassword() {
   const navigate = useNavigate()
   const location = useLocation()
-  const isFirstLogin = location.state?.firstLogin || false
+  const { user } = useAuthContext()
+  
+  // Check if this is first login - use user object as source of truth (backend)
+  // Fallback to location.state if user object not yet loaded
+  const isFirstLogin = user?.must_change_password ?? location.state?.firstLogin ?? false
 
   const [formData, setFormData] = useState({
     current_password: '',
