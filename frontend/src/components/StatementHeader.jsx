@@ -46,36 +46,37 @@ export default function StatementHeader({ member, isPublic = false, onPrint, onD
 
   return (
     <div className="bg-white border-b border-gray-200 print:border-0">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Logo and Header */}
-        <div className="flex items-center justify-between mb-6 print:mb-4">
-          <div className="flex items-center gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 print:py-4">
+        {/* Logo and Title - Stack on mobile, side-by-side on desktop */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6 print:mb-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             {logoUrl ? (
               <img 
                 src={logoUrl} 
-                alt={appName}
-                className="h-16 w-auto object-contain print:h-20"
+                alt="Logo"
+                className="h-12 w-auto object-contain sm:h-16 print:h-20"
                 onError={() => setLogoUrl(null)}
               />
             ) : (
-              <div className="h-16 w-16 bg-indigo-600 rounded-lg flex items-center justify-center print:h-20 print:w-20">
-                <span className="text-white font-bold text-xl print:text-2xl">
+              <div className="h-12 w-12 sm:h-16 sm:w-16 bg-indigo-600 rounded-lg flex items-center justify-center print:h-20 print:w-20">
+                <span className="text-white font-bold text-lg sm:text-xl print:text-2xl">
                   {appName.charAt(0).toUpperCase()}
                 </span>
               </div>
             )}
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 print:text-3xl">{appName}</h1>
-              <p className="text-sm text-gray-600 print:text-base">Member Contribution Statement</p>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 print:text-3xl">
+                Member Contribution Statement
+              </h1>
             </div>
           </div>
           
-          {/* Action Buttons (hidden in print) */}
-          <div className="flex items-center gap-2 print:hidden">
+          {/* Action Buttons - Stack on mobile, horizontal on desktop (hidden in print) */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 print:hidden">
             {onPrint && (
               <button
                 onClick={onPrint}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 w-full sm:w-auto"
               >
                 Print
               </button>
@@ -83,7 +84,7 @@ export default function StatementHeader({ member, isPublic = false, onPrint, onD
             {onDownloadPDF && (
               <button
                 onClick={onDownloadPDF}
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 w-full sm:w-auto"
               >
                 Download PDF
               </button>
@@ -117,11 +118,6 @@ export default function StatementHeader({ member, isPublic = false, onPrint, onD
             <p className="text-sm text-gray-900 print:text-base">
               <span className="font-semibold">Printed:</span> {printDate}
             </p>
-            {isPublic && (
-              <p className="text-xs text-gray-500 mt-1 print:text-sm">
-                Public View - No login required
-              </p>
-            )}
           </div>
         </div>
       </div>

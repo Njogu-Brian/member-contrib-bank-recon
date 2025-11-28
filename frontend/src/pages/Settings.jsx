@@ -16,6 +16,7 @@ export default function Settings() {
   const [formData, setFormData] = useState({
     contribution_start_date: '',
     weekly_contribution_amount: 1000,
+    contact_phone: '',
     logo: null,
     favicon: null,
   })
@@ -47,6 +48,7 @@ export default function Settings() {
       setFormData({
         contribution_start_date: settings.contribution_start_date || '',
         weekly_contribution_amount: parseFloat(settings.weekly_contribution_amount) || 1000,
+        contact_phone: settings.contact_phone || '',
         logo: null,
         favicon: null,
       })

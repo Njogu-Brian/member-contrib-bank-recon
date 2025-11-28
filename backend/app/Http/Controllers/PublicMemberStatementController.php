@@ -86,6 +86,9 @@ class PublicMemberStatementController extends Controller
             ['path' => $request->url(), 'query' => $request->query()]
         );
 
+        // Get contact phone from settings
+        $contactPhone = \App\Models\Setting::get('contact_phone', null);
+
         return response()->json([
             'member' => [
                 'id' => $member->id,
@@ -106,6 +109,7 @@ class PublicMemberStatementController extends Controller
             ],
             'monthly_totals' => $data['monthly_totals'],
             'print_date' => now()->toIso8601String(),
+            'contact_phone' => $contactPhone,
         ]);
     }
 

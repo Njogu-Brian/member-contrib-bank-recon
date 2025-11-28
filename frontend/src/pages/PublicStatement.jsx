@@ -335,15 +335,14 @@ export default function PublicStatement() {
 
       </div>
       
-      {/* Print Date Stamp */}
-      <div className="print-date print:block hidden">
-        Printed: {new Date().toLocaleString('en-KE', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        })}
+      {/* Footer */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 mt-8 border-t border-gray-200 print:border-t-2">
+        <p className="text-xs text-gray-600 text-center print:text-sm">
+          This is an electronically generated statement. For further clarification, contact the administrator{' '}
+          {data?.contact_phone && (
+            <span className="font-semibold">at {data.contact_phone}</span>
+          )}
+        </p>
       </div>
     </div>
   )

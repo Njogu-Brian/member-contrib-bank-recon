@@ -85,6 +85,7 @@ class SettingController extends Controller
         $validated = $request->validate([
             'contribution_start_date' => 'nullable|date',
             'weekly_contribution_amount' => 'nullable|numeric|min:0',
+            'contact_phone' => 'nullable|string|max:20',
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
             'favicon' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,ico|max:512',
         ]);
@@ -126,6 +127,10 @@ class SettingController extends Controller
         
         if ($request->has('weekly_contribution_amount')) {
             Setting::set('weekly_contribution_amount', $validated['weekly_contribution_amount']);
+        }
+        
+        if ($request->has('contact_phone')) {
+            Setting::set('contact_phone', $validated['contact_phone']);
         }
 
         // Return updated settings
