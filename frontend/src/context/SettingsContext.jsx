@@ -9,10 +9,26 @@ export function SettingsProvider({ children }) {
     queryKey: ['settings'],
     queryFn: async () => {
       try {
+        // First try to get authenticated settings
         return await getSettings()
       } catch (error) {
-        // If 401 (Unauthenticated), that's expected on login/change-password pages - return empty settings
+        // If 401 (Unauthenticated), try public settings endpoint instead
         if (error.response?.status === 401 || error.status === 401) {
+          try {
+            const response = await fetch('/api/v1/public/settings', {
+              headers: { 'Accept': 'application/json' },
+            })
+            if (response.ok) {
+              return await response.json()
+            }
+          } catch (publicError) {
+            // If public settings also fails, return empty object
+            return {}
+          }
+          return {}
+        }
+        // For other errors (500, etc.), return empty object to prevent blocking
+        if (error.response?.status >= 500) {
           return {}
         }
         // For other errors, rethrow
@@ -22,10 +38,11 @@ export function SettingsProvider({ children }) {
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     retry: false, // Don't retry - 401s are expected when not authenticated
     refetchOnWindowFocus: false, // Don't refetch on window focus
-    // Suppress error logging for 401s (expected when not authenticated)
+    // Suppress error logging for 401s and 500s (expected when not authenticated or server issues)
     onError: (error) => {
-      // Only log non-401 errors
-      if (error.response?.status !== 401 && error.status !== 401) {
+      // Only log non-401, non-500 errors
+      if (error.response?.status !== 401 && error.status !== 401 && 
+          error.response?.status !== 500 && error.status !== 500) {
         console.error('Settings query error:', error)
       }
     },
