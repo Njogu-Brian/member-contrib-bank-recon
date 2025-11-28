@@ -6,6 +6,7 @@ use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Database\QueryException;
 
 class SettingController extends Controller
@@ -65,6 +66,20 @@ class SettingController extends Controller
     public function index()
     {
         try {
+            // Check database connection first
+            try {
+                \DB::connection()->getPdo();
+            } catch (\Exception $dbError) {
+                Log::warning('Database connection error in SettingController::index', [
+                    'error' => $dbError->getMessage(),
+                ]);
+                // Return empty settings with 200 status (not 500) if database is unavailable
+                return response()->json([
+                    'logo_url' => null,
+                    'favicon_url' => null,
+                ], 200);
+            }
+            
             // Try to get settings from database, but handle database connection issues gracefully
             try {
                 $settings = Setting::all()->pluck('value', 'key');

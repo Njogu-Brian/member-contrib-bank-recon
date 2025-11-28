@@ -8,6 +8,7 @@ use App\Services\MfaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class AuthController extends Controller
@@ -57,6 +58,19 @@ class AuthController extends Controller
                 'email' => 'required|email',
                 'password' => 'required',
             ]);
+
+            // Check database connection first
+            try {
+                \DB::connection()->getPdo();
+            } catch (\Exception $dbError) {
+                Log::error('Database connection error during login', [
+                    'error' => $dbError->getMessage(),
+                ]);
+                return response()->json([
+                    'message' => 'Database connection failed. Please contact the administrator.',
+                    'error' => config('app.debug') ? $dbError->getMessage() : 'Database unavailable',
+                ], 503); // Service Unavailable
+            }
 
             $user = User::where('email', $request->email)->first();
 
