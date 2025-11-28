@@ -26,27 +26,36 @@ class AnnouncementController extends Controller
      */
     public function publicList(): JsonResponse
     {
-        // Get published announcements (published_at is null or in the past)
-        $announcements = Announcement::where(function ($query) {
-                // Only show announcements that are published (published_at is null or in the past)
-                $query->whereNull('published_at')
-                    ->orWhere('published_at', '<=', now());
-            })
-            ->orderBy('is_pinned', 'desc') // Pinned announcements first
-            ->orderBy('created_at', 'desc')
-            ->limit(5) // Limit to recent 5 for login page
-            ->get()
-            ->map(function ($announcement) {
-                return [
-                    'id' => $announcement->id,
-                    'title' => $announcement->title,
-                    'content' => $announcement->body ?? '',
-                    'created_at' => $announcement->created_at,
-                    'is_pinned' => $announcement->is_pinned ?? false,
-                ];
-            });
-        
-        return response()->json($announcements);
+        try {
+            // Get published announcements (published_at is null or in the past)
+            $announcements = Announcement::where(function ($query) {
+                    // Only show announcements that are published (published_at is null or in the past)
+                    $query->whereNull('published_at')
+                        ->orWhere('published_at', '<=', now());
+                })
+                ->orderBy('is_pinned', 'desc') // Pinned announcements first
+                ->orderBy('created_at', 'desc')
+                ->limit(5) // Limit to recent 5 for login page
+                ->get()
+                ->map(function ($announcement) {
+                    return [
+                        'id' => $announcement->id,
+                        'title' => $announcement->title,
+                        'content' => $announcement->body ?? '',
+                        'created_at' => $announcement->created_at,
+                        'is_pinned' => $announcement->is_pinned ?? false,
+                    ];
+                });
+            
+            return response()->json($announcements);
+        } catch (\Illuminate\Database\QueryException $e) {
+            \Illuminate\Support\Facades\Log::error('Database error in publicList: ' . $e->getMessage());
+            // Return empty array if database is unavailable
+            return response()->json([]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error in publicList: ' . $e->getMessage());
+            return response()->json([], 500);
+        }
     }
 
     public function store(AnnouncementRequest $request): JsonResponse
