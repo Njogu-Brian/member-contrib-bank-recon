@@ -204,12 +204,30 @@ class StatementController extends Controller
 
     public function document(BankStatement $statement)
     {
-        if (!$statement->file_path || !Storage::disk('statements')->exists($statement->file_path)) {
+        if (!$statement->file_path) {
+            \Illuminate\Support\Facades\Log::warning("Statement {$statement->id} has no file_path");
             abort(404, 'Statement file not found');
         }
 
+        if (!Storage::disk('statements')->exists($statement->file_path)) {
+            \Illuminate\Support\Facades\Log::warning("Statement {$statement->id} file missing", [
+                'file_path' => $statement->file_path,
+                'storage_root' => Storage::disk('statements')->path(''),
+            ]);
+            abort(404, 'Statement file not found in storage');
+        }
+
+        $filePath = Storage::disk('statements')->path($statement->file_path);
+        
+        if (!is_readable($filePath)) {
+            \Illuminate\Support\Facades\Log::error("Statement {$statement->id} file not readable", [
+                'file_path' => $filePath,
+            ]);
+            abort(500, 'Statement file cannot be read');
+        }
+
         return response()->file(
-            Storage::disk('statements')->path($statement->file_path),
+            $filePath,
             [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'inline; filename="' . addslashes($statement->filename ?? 'statement.pdf') . '"',
