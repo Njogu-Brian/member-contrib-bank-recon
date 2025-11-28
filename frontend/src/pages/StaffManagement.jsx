@@ -910,18 +910,15 @@ export default function StaffManagement() {
             <form 
               onSubmit={(e) => {
                 e.preventDefault()
-                if (!credentialsPassword || credentialsPassword.length < 8) {
-                  alert('Password must be at least 8 characters')
-                  return
-                }
                 if (!sendCredentialsOptions.send_sms && !sendCredentialsOptions.send_email) {
                   alert('Please select at least one delivery method (SMS or Email)')
                   return
                 }
+                // Password is optional - backend will auto-generate if not provided
                 sendCredentialsMutation.mutate({
                   id: editingStaff.id,
                   data: {
-                    password: credentialsPassword,
+                    password: credentialsPassword || undefined, // Only send if provided, otherwise backend generates
                     send_sms: sendCredentialsOptions.send_sms,
                     send_email: sendCredentialsOptions.send_email,
                   },
@@ -929,20 +926,30 @@ export default function StaffManagement() {
               }}
               className="p-6 space-y-4"
             >
+              <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
+                <p className="text-sm text-blue-900">
+                  <strong>Auto-Generated Password:</strong> A secure password will be automatically generated and sent to the staff member. 
+                  You can optionally provide a custom password below.
+                </p>
+              </div>
+              
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Password <span className="text-red-500">*</span>
+                  Custom Password (Optional)
                 </label>
                 <input
                   type="password"
-                  required
                   minLength={8}
                   value={credentialsPassword}
                   onChange={(e) => setCredentialsPassword(e.target.value)}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-colors"
-                  placeholder="Enter password to send"
+                  placeholder="Leave empty to auto-generate password"
                 />
-                <p className="mt-1 text-xs text-gray-500">This password will be sent to the staff member</p>
+                <p className="mt-1 text-xs text-gray-500">
+                  {credentialsPassword 
+                    ? 'This custom password will be sent to the staff member' 
+                    : 'A secure password will be auto-generated and sent to the staff member'}
+                </p>
               </div>
 
               <div className="space-y-2 p-4 bg-blue-50 rounded-xl border border-blue-200">
@@ -998,7 +1005,7 @@ export default function StaffManagement() {
                 </button>
                 <button
                   type="submit"
-                  disabled={sendCredentialsMutation.isPending || !credentialsPassword || credentialsPassword.length < 8}
+                  disabled={sendCredentialsMutation.isPending || (credentialsPassword && credentialsPassword.length < 8)}
                   className="flex-1 px-5 py-2.5 bg-brand-600 text-white rounded-xl hover:bg-brand-700 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {sendCredentialsMutation.isPending ? (

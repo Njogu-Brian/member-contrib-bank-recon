@@ -306,7 +306,7 @@ class StaffController extends Controller
     public function sendCredentials(Request $request, User $user)
     {
         $validated = $request->validate([
-            'password' => 'required|string|min:8',
+            'password' => 'nullable|string|min:8', // Make password optional - will auto-generate if not provided
             'send_sms' => 'boolean',
             'send_email' => 'boolean',
         ]);
@@ -314,7 +314,17 @@ class StaffController extends Controller
         $sendSms = $request->boolean('send_sms', true);
         $sendEmail = $request->boolean('send_email', true);
 
-        $result = $this->doSendCredentials($user, $validated['password'], $sendSms, $sendEmail);
+        // Auto-generate password if not provided
+        $password = $validated['password'] ?? $this->generatePassword();
+        
+        // Update user's password with the generated/passed password
+        $user->update([
+            'password' => Hash::make($password),
+            'must_change_password' => true, // Force password change on next login
+            'password_changed_at' => null,
+        ]);
+
+        $result = $this->doSendCredentials($user, $password, $sendSms, $sendEmail);
 
         ActivityLog::create([
             'user_id' => $request->user()->id,
@@ -331,6 +341,34 @@ class StaffController extends Controller
             'sms_sent' => $result['sms_sent'] ?? false,
             'email_sent' => $result['email_sent'] ?? false,
         ]);
+    }
+
+    /**
+     * Generate a secure random password
+     */
+    protected function generatePassword(int $length = 12): string
+    {
+        $uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        $lowercase = 'abcdefghijklmnopqrstuvwxyz';
+        $numbers = '0123456789';
+        $symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+        
+        $chars = $uppercase . $lowercase . $numbers . $symbols;
+        
+        // Ensure at least one character from each type
+        $password = '';
+        $password .= $uppercase[random_int(0, strlen($uppercase) - 1)];
+        $password .= $lowercase[random_int(0, strlen($lowercase) - 1)];
+        $password .= $numbers[random_int(0, strlen($numbers) - 1)];
+        $password .= $symbols[random_int(0, strlen($symbols) - 1)];
+        
+        // Fill the rest randomly
+        for ($i = strlen($password); $i < $length; $i++) {
+            $password .= $chars[random_int(0, strlen($chars) - 1)];
+        }
+        
+        // Shuffle the password
+        return str_shuffle($password);
     }
 
     /**
@@ -377,11 +415,32 @@ class StaffController extends Controller
             try {
                 $smsResult = $this->smsService->send($user->phone, $smsMessage);
                 $result['sms_sent'] = $smsResult['success'] ?? false;
+                
+                // Log SMS to database (for staff credentials)
+                try {
+                    \App\Models\SmsLog::create([
+                        'member_id' => null, // Staff credentials - no member_id
+                        'phone' => $user->phone,
+                        'message' => $smsMessage,
+                        'status' => $result['sms_sent'] ? 'sent' : 'failed',
+                        'response' => $smsResult['response'] ?? null,
+                        'error' => $smsResult['error'] ?? null,
+                        'sent_by' => auth()->id(),
+                        'sent_at' => $result['sms_sent'] ? now() : null,
+                    ]);
+                } catch (\Exception $logError) {
+                    Log::warning('Failed to log SMS for staff credentials', [
+                        'user_id' => $user->id,
+                        'error' => $logError->getMessage(),
+                    ]);
+                }
+                
                 if (!$result['sms_sent']) {
                     Log::warning('Failed to send SMS credentials to staff', [
                         'user_id' => $user->id,
                         'phone' => $user->phone,
                         'error' => $smsResult['error'] ?? 'Unknown error',
+                        'response' => $smsResult['response'] ?? null,
                     ]);
                 } else {
                     Log::info('SMS credentials sent to staff', [
@@ -394,7 +453,23 @@ class StaffController extends Controller
                     'user_id' => $user->id,
                     'phone' => $user->phone,
                     'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
                 ]);
+                
+                // Log failed SMS attempt
+                try {
+                    \App\Models\SmsLog::create([
+                        'member_id' => null,
+                        'phone' => $user->phone,
+                        'message' => $smsMessage,
+                        'status' => 'failed',
+                        'error' => $e->getMessage(),
+                        'sent_by' => auth()->id(),
+                        'sent_at' => null,
+                    ]);
+                } catch (\Exception $logError) {
+                    // Ignore logging errors
+                }
             }
         } elseif ($sendSms && $user->phone && !$this->smsService) {
             Log::warning('SMS requested but SmsService is not available', [
