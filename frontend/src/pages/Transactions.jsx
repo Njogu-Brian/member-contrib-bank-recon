@@ -42,7 +42,10 @@ export default function Transactions({
   useEffect(() => {
     const handleClickOutside = (event) => {
       // Don't close if clicking on a button inside the menu
-      if (event.target.closest('button[type="button"]')) {
+      // Also don't close if clicking on modal overlays
+      if (event.target.closest('button[type="button"]') || 
+          event.target.closest('.fixed.z-50') ||
+          event.target.closest('.fixed.z-40')) {
         return
       }
       if (actionMenuRef.current && !actionMenuRef.current.contains(event.target)) {
@@ -208,12 +211,14 @@ export default function Transactions({
   })
 
   const handleAssignMemberSelect = (member) => {
+    console.log('Member selected for assignment:', member)
     setSelectedMemberForAssign(member)
     setShowAssignModal(false)
     if (selectedTransactions.length === 0) {
       alert('Select at least one transaction to assign')
       return
     }
+    console.log('Calling bulkAssignMutation with:', { transactionIds: selectedTransactions, memberId: member.id })
     bulkAssignMutation.mutate({
       transactionIds: selectedTransactions,
       memberId: member.id,
@@ -271,6 +276,7 @@ export default function Transactions({
   }
 
   const handleTransfer = (transaction) => {
+    console.log('handleTransfer called with transaction:', transaction)
     setSelectedTransaction(transaction)
     setSelectedMemberForTransfer(null)
     setTransferNotes('')
@@ -283,6 +289,7 @@ export default function Transactions({
     }
     setActiveShareIndex(null)
     setShowTransferModal(true)
+    console.log('Transfer modal should now be open, showTransferModal:', true)
   }
 
   const handleTransferSubmit = () => {
@@ -678,7 +685,7 @@ export default function Transactions({
                 </th>
                 <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Type</th>
                 <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Code</th>
-                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Particulars</th>
+                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase min-w-[300px]">Particulars</th>
                 <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden xl:table-cell">Statement</th>
                 <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                   <div className="flex items-center gap-1">
@@ -759,7 +766,7 @@ export default function Transactions({
                       {tx.transaction_code || '-'}
                     </td>
                     <td className="px-2 py-2 text-sm text-gray-900">
-                      <div className="max-w-xs truncate" title={tx.particulars}>
+                      <div className="min-w-[300px] max-w-2xl break-words whitespace-normal" title={tx.particulars}>
                         {tx.particulars}
                       </div>
                       <div className="md:hidden mt-1 flex flex-wrap gap-1">
@@ -835,7 +842,11 @@ export default function Transactions({
                               ) : (
                                 <>
                                   <button
-                                    onClick={() => {
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      console.log('Assign button clicked for transaction:', tx.id)
                                       setSelectedTransactions([tx.id])
                                       setShowAssignModal(true)
                                       setActionMenuOpen(null)
@@ -845,7 +856,11 @@ export default function Transactions({
                                     {tx.member_id ? 'Reassign' : 'Assign'}
                                   </button>
                                   <button
-                                    onClick={() => {
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      console.log('Transfer/Share button clicked for transaction:', tx.id)
                                       handleTransfer(tx)
                                       setActionMenuOpen(null)
                                     }}

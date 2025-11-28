@@ -350,6 +350,8 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
     Debit (ignore), Credit, Balance (ignore)
     """
     transactions = []
+    # Track seen transactions to prevent duplicates within the same table
+    seen_transactions = set()
     
     # Try to identify column indices from header if available
     date_col = None
@@ -393,9 +395,12 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
             elif "CREDIT" in cell_str:
                 # CRITICAL: Verify this is the Credit column by checking it's not Balance or Debit
                 # Only set credit_col if we explicitly see "CREDIT" in the header and it's not part of another word
+                # For new Equity format, ensure it's exactly "CREDIT" or starts with "CREDIT"
                 if "BALANCE" not in cell_str and "DEBIT" not in cell_str:
-                    credit_col = i
-            elif "BALANCE" in cell_str:
+                    # Additional check: ensure it's not "CREDIT BALANCE" or similar
+                    if cell_str.strip() == "CREDIT" or cell_str.strip().startswith("CREDIT"):
+                        credit_col = i
+            elif "BALANCE" in cell_str or "RUNNING BALANCE" in cell_str:
                 balance_col = i  # Track balance column to exclude it
             elif "DEBIT" in cell_str:
                 debit_col = i  # Track debit column to exclude it
@@ -423,21 +428,38 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
             # Track columns we should never treat as credit (balance, debit, last column when unknown)
             row_len = len(row)
             last_value_idx = None
+            second_last_value_idx = None
+            # Find last and second-to-last populated columns
+            populated_indices = []
             for idx in range(row_len - 1, -1, -1):
                 cell = row[idx] if idx < len(row) else None
                 cell_str = str(cell).strip() if cell else ""
                 if cell_str:
-                    last_value_idx = idx
-                    break
+                    populated_indices.append(idx)
+                    if last_value_idx is None:
+                        last_value_idx = idx
+                    elif second_last_value_idx is None:
+                        second_last_value_idx = idx
+                        break  # Found both, stop
 
             excluded_amount_indexes = set()
             if balance_col is not None:
                 excluded_amount_indexes.add(balance_col)
             if debit_col is not None:
                 excluded_amount_indexes.add(debit_col)
-            # If we couldn't positively identify the credit column, assume the last populated column is balance
+            
+            # CRITICAL: In new Equity format, Running Balance is the column immediately after Credit
+            # If we found credit_col but not balance_col, balance is likely credit_col + 1
+            if credit_col is not None and balance_col is None:
+                # The column immediately after Credit is likely the Running Balance
+                balance_col = credit_col + 1
+                excluded_amount_indexes.add(balance_col)
+            
+            # If we still couldn't identify balance, and credit_col is known, don't assume last column
+            # Only assume last column is balance if we have no credit_col reference
             if credit_col is None and balance_col is None and last_value_idx is not None:
                 possible_balance_idx = last_value_idx
+                excluded_amount_indexes.add(possible_balance_idx)
             
             # Skip if this looks like a header row (but be less strict)
             row_str = ' '.join([str(c) for c in row if c]).upper()
@@ -606,25 +628,60 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
                         pass
                     else:
                         # CRITICAL: Double-check this is not the Balance column
-                        # If balance_col is identified and it matches credit_col, skip
                         if balance_col is not None and credit_col == balance_col:
+                            # credit_col was incorrectly identified as balance - skip
                             pass
+                        # CRITICAL: If credit_col is in excluded indexes (balance, debit, etc.), skip
+                        elif credit_col in excluded_amount_indexes:
+                            pass
+                        # CRITICAL: In new Equity format, balance is credit_col + 1
+                        # Verify credit_col is not the balance column itself
+                        # If balance_col was auto-set to credit_col + 1, then credit_col is safe
                         else:
+                            # Credit column is valid - use it
+                            # In new Equity format, Running Balance is immediately after Credit (credit_col + 1)
+                            # So credit_col is safe to use as long as it's not the balance_col itself
                             parsed_credit = parse_amount(credit_str)
                             if parsed_credit and parsed_credit > 0:
-                                credit_candidates.append({
-                                    'amount': parsed_credit,
-                                    'source': 'credit_header',
-                                    'index': credit_col,
-                                    'raw': credit_str,
-                                })
+                                # CRITICAL: Reject very large amounts (>= 200,000) - these are almost always balances
+                                # The last transaction's balance was 605,865.00, which is way too large for a credit
+                                # This check MUST happen FIRST, before any other logic
+                                if parsed_credit >= 200000:
+                                    # This is likely a balance, not a credit - skip it completely
+                                    # Don't add to candidates at all
+                                    pass
+                                # CRITICAL: Final check - ensure credit_col is not the balance column
+                                # In new Equity format, balance is credit_col + 1, so credit_col should be safe
+                                # But double-check it's not in excluded indexes
+                                elif credit_col not in excluded_amount_indexes:
+                                    # Additional check: ensure credit_col is not balance_col
+                                    if balance_col is None or credit_col != balance_col:
+                                        # Final safety check - ensure amount is still reasonable
+                                        if parsed_credit < 200000:
+                                            credit_candidates.append({
+                                                'amount': parsed_credit,
+                                                'source': 'credit_header',
+                                                'index': credit_col,
+                                                'raw': credit_str,
+                                            })
                             # Large amounts are still captured; users can review/archive later
             
             # Fallback: find columns by content if indices not available
-            if not tran_date or not particulars or not credit_candidates:
+            # CRITICAL: Only use this fallback if credit_col was NOT identified from header
+            # If credit_col was identified, we should have already found the credit amount above
+            if (not tran_date or not particulars or not credit_candidates) and credit_col is None:
                 for i, cell in enumerate(row):
                     # Skip balance and debit columns explicitly
                     if i in excluded_amount_indexes:
+                        continue
+                    
+                    # CRITICAL: In new Equity format, if we know credit_col, balance is credit_col + 1
+                    # Skip balance column even if not in excluded_amount_indexes yet
+                    if credit_col is not None and i == credit_col + 1:
+                        continue
+                    
+                    # CRITICAL: Skip the last column - it's almost always the balance
+                    if i == possible_balance_idx:
                         continue
                     
                     cell_str = str(cell).strip() if cell else ""
@@ -661,42 +718,101 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
                         # Skip if it's too long without decimals/commas (likely phone number)
                         if len(cleaned_cell) > 10 and '.' not in cell_str and ',' not in cell_str:
                             continue
+                        # CRITICAL: In new Equity format, if credit_col is known, skip credit_col + 1 (balance)
+                        if credit_col is not None and i == credit_col + 1:
+                            continue
+                        # CRITICAL: Skip if this is the balance column
+                        if balance_col is not None and i == balance_col:
+                            continue
+                        # CRITICAL: Skip if this index is in excluded_amount_indexes (includes balance)
+                        if i in excluded_amount_indexes:
+                            continue
+                        # CRITICAL: Skip very large amounts that are likely balances (>= 100,000)
+                        # Real contributions are rarely this large, balances often are
                         # Check if it's a valid amount format (digits with optional commas and .00)
                         if re.match(r'^[\d,]+\.?\d{0,2}$', cell_str.replace(' ', '')):
                             amount = parse_amount(cell_str)
                             if amount and amount > 0:
+                                # CRITICAL: Skip very large amounts (>= 200,000) - these are almost always balances
+                                # The last transaction's balance was 605,865.00, which is way too large for a credit
+                                # This check MUST happen BEFORE adding to candidates
+                                if amount >= 200000:
+                                    continue
+                                # CRITICAL: Also skip if this is in excluded_amount_indexes (includes balance column)
+                                if i in excluded_amount_indexes:
+                                    continue
                                 # Note: Large amounts (>50K) will be flagged later, not rejected here
                                 # Must have decimal/comma for currency or be small amount
                                 if ('.' in cell_str or ',' in cell_str) or (amount < 10000 and len(cleaned_cell) <= 6):
-                                    credit_candidates.append({
-                                        'amount': amount,
-                                        'source': 'fallback_scan',
-                                        'index': i,
-                                        'raw': cell_str,
-                                    })
+                                    # Final check before adding - ensure amount is reasonable
+                                    if amount < 200000:
+                                        credit_candidates.append({
+                                            'amount': amount,
+                                            'source': 'fallback_scan',
+                                            'index': i,
+                                            'raw': cell_str,
+                                        })
 
             # Resolve credit amount from collected candidates
             if credit_candidates:
-                # Prefer header-derived credits
-                header_candidate = next((c for c in credit_candidates if c['source'] == 'credit_header'), None)
-                if header_candidate:
-                    credit = header_candidate['amount']
+                # CRITICAL: First, filter out ANY candidates that are in the balance column
+                # This must happen BEFORE any selection logic
+                # ALSO filter out very large amounts (>= 200,000) - these are almost always balances
+                filtered_candidates = [
+                    c for c in credit_candidates
+                    if c['index'] not in excluded_amount_indexes
+                    and (credit_col is None or c['index'] != credit_col + 1)  # Exclude balance (credit_col + 1)
+                    and (balance_col is None or c['index'] != balance_col)  # Exclude explicitly identified balance
+                    and c['index'] != possible_balance_idx  # Exclude possible balance
+                    and c['amount'] < 200000  # CRITICAL: Exclude very large amounts (likely balances)
+                ]
+                
+                if not filtered_candidates:
+                    # No valid candidates after filtering - skip this row
+                    credit = None
                 else:
-                    # Prefer realistic contribution-sized amounts first (<= 100,000)
-                    realistic = [c for c in credit_candidates if c['amount'] <= 100000]
-                    candidates = realistic or credit_candidates
-                    credit = min(candidates, key=lambda c: (c['amount'], c['index']))['amount']
+                    # Prefer corrected credit position (second-to-last when header was wrong)
+                    corrected_candidate = next((c for c in filtered_candidates if c['source'] == 'corrected_credit_position'), None)
+                    if corrected_candidate:
+                        credit = corrected_candidate['amount']
+                    else:
+                        # Prefer header-derived credits (from explicitly identified CREDIT column)
+                        header_candidate = next((c for c in filtered_candidates if c['source'] == 'credit_header'), None)
+                        if header_candidate:
+                            # CRITICAL: Reject very large amounts even from header - they're likely balances
+                            if header_candidate['amount'] >= 200000:
+                                # This is likely a balance, not a credit - skip it
+                                header_candidate = None
+                            # Double-check it's not balance (should already be filtered, but be extra safe)
+                            if header_candidate and ((credit_col is not None and header_candidate['index'] == credit_col + 1) or \
+                               (balance_col is not None and header_candidate['index'] == balance_col)):
+                                header_candidate = None
+                            
+                            if header_candidate:
+                                credit = header_candidate['amount']
+                            else:
+                                credit = None
+                        
+                        # If header candidate was invalid or not found, use fallback from filtered candidates
+                        if credit is None:
+                            # CRITICAL: Filter out very large amounts (>= 200,000) from fallback candidates too
+                            safe_candidates = [c for c in filtered_candidates if c['amount'] < 200000]
+                            if not safe_candidates:
+                                # No safe candidates - skip this row
+                                credit = None
+                            else:
+                                # Prefer realistic contribution-sized amounts first (<= 100,000)
+                                realistic = [c for c in safe_candidates if c['amount'] <= 100000]
+                                candidates = realistic or safe_candidates
+                                if candidates:
+                                    # Prefer the candidate with the smallest index (leftmost) to avoid balance
+                                    credit = min(candidates, key=lambda c: (c['index'], c['amount']))['amount']
+                                else:
+                                    credit = None
 
-            # As a last resort, consider the rightmost value if we couldn't identify credit column
-            if credit is None and possible_balance_idx is not None and possible_balance_idx < len(row):
-                possible_value = str(row[possible_balance_idx]).strip() if row[possible_balance_idx] else ""
-                if possible_value:
-                    # Skip if the row context explicitly references balance carry forward/backward
-                    context_upper = row_str.upper()
-                    if not any(keyword in context_upper for keyword in ["BALANCE", "BAL.", "B/F", "C/F", "CARRIED FORWARD", "BROUGHT FORWARD"]):
-                        possible_amount = parse_amount(possible_value)
-                        if possible_amount and possible_amount > 0:
-                            credit = possible_amount
+            # CRITICAL: Do NOT use the last column as credit - it's almost always the balance column
+            # Only use explicitly identified credit column or fallback candidates
+            # Removed the dangerous fallback that used possible_balance_idx as credit
             
             # Skip header rows (but be less strict - only if multiple indicators)
             is_header = False
@@ -847,6 +963,48 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
                     table_index=table_index
                 )
                 continue
+            
+            # Create a unique key for this transaction to prevent duplicates
+            transaction_key = (
+                parsed_date,
+                round(credit, 2),  # Round to 2 decimals for comparison
+                particulars[:50] if particulars else ""  # First 50 chars of particulars
+            )
+            
+            # Skip if we've already seen this transaction
+            if transaction_key in seen_transactions:
+                log_bank_skip(
+                    "duplicate_transaction",
+                    row,
+                    page_number=page_number,
+                    row_offset=row_offset,
+                    table_index=table_index,
+                    extra={'key': transaction_key}
+                )
+                continue
+            
+            seen_transactions.add(transaction_key)
+            
+            # Create a unique key for this transaction to prevent duplicates
+            transaction_key = (
+                parsed_date,
+                round(credit, 2),  # Round to 2 decimals for comparison
+                particulars[:50] if particulars else ""  # First 50 chars of particulars
+            )
+            
+            # Skip if we've already seen this transaction
+            if transaction_key in seen_transactions:
+                log_bank_skip(
+                    "duplicate_transaction",
+                    row,
+                    page_number=page_number,
+                    row_offset=row_offset,
+                    table_index=table_index,
+                    extra={'key': transaction_key}
+                )
+                continue
+            
+            seen_transactions.add(transaction_key)
             
             transaction_data = {
                 'tran_date': parsed_date,
@@ -1185,6 +1343,10 @@ def detect_table_rows(text, page_number=None, initial_balance=None):
                             # But if this is the last amount, it might be Balance
                             if remaining_amounts:
                                 # There's another amount after - this could be Credit
+                                # CRITICAL: Reject very large amounts (>= 200,000) - these are almost always balances
+                                if amount_val >= 200000:
+                                    # This is likely a balance, not a credit - skip it
+                                    continue
                                 # Note: Large amounts (>50K) will be flagged later, not rejected here
                                 credit = amount_val
                                 break
@@ -1209,6 +1371,10 @@ def detect_table_rows(text, page_number=None, initial_balance=None):
                         ]
                         if remaining_amounts:
                             # There's another amount after - this could be Credit
+                            # CRITICAL: Reject very large amounts (>= 200,000) - these are almost always balances
+                            if amount_val >= 200000:
+                                # This is likely a balance, not a credit - skip it
+                                continue
                             # Note: Large amounts (>50K) will be flagged later, not rejected here
                             if amount_val < 10000:
                                 credit = amount_val

@@ -46,21 +46,21 @@ export default function MemberSearchModal({ isOpen, onClose, onSelect, title = '
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/70 px-4 py-10 md:items-center"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-gray-900/95 px-4 py-10 md:items-center"
       onClick={onClose}
     >
       <div
-        className="glass w-full max-w-3xl rounded-3xl border border-white/40 p-6 shadow-2xl"
+        className="bg-white w-full max-w-3xl rounded-3xl border-2 border-gray-300 p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs uppercase tracking-wide text-slate-400">Quick switch</p>
-            <h3 className="text-xl font-semibold text-slate-900">{title}</h3>
+            <p className="text-xs uppercase tracking-wide text-gray-500">Quick switch</p>
+            <h3 className="text-xl font-semibold text-gray-900">{title}</h3>
           </div>
           <button
             onClick={onClose}
-            className="rounded-full border border-slate-200 px-3 py-1 text-sm text-slate-500"
+            className="rounded-full border border-gray-300 px-3 py-1 text-sm text-gray-600 hover:bg-gray-50"
           >
             Esc
           </button>
@@ -72,32 +72,32 @@ export default function MemberSearchModal({ isOpen, onClose, onSelect, title = '
             placeholder="Search by name, phone, code…"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+            className="w-full rounded-2xl border-2 border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
             autoFocus
           />
         </div>
 
-        <div className="mt-4 max-h-96 overflow-y-auto rounded-3xl border border-slate-200">
+        <div className="mt-4 max-h-96 overflow-y-auto rounded-2xl border-2 border-gray-300 bg-white">
           {isLoading ? (
-            <div className="p-6 text-center text-slate-500">Searching members…</div>
+            <div className="p-6 text-center text-gray-600">Searching members…</div>
           ) : filteredMembers.length === 0 ? (
-            <div className="p-6 text-center text-slate-500">No members match “{searchTerm}”.</div>
+            <div className="p-6 text-center text-gray-600">No members match "{searchTerm}".</div>
           ) : (
-            <ul className="divide-y divide-slate-100">
+            <ul className="divide-y divide-gray-100">
               {filteredMembers.map((member) => {
                 const isSelected = selectedMemberId === member.id.toString()
                 return (
                   <li
                     key={member.id}
                     onClick={() => setSelectedMemberId(member.id.toString())}
-                    className={`cursor-pointer px-5 py-4 transition ${
-                      isSelected ? 'bg-brand-50 border-l-4 border-brand-500' : 'hover:bg-slate-50'
+                    className={`cursor-pointer px-5 py-4 transition bg-white ${
+                      isSelected ? 'bg-brand-50 border-l-4 border-brand-500' : 'hover:bg-gray-50'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-semibold text-slate-900">{member.name}</p>
-                        <div className="text-xs text-slate-500">
+                        <p className="text-sm font-semibold text-gray-900">{member.name}</p>
+                        <div className="text-xs text-gray-600">
                           {[member.phone, member.email, member.member_code]
                             .filter(Boolean)
                             .join(' • ')}
@@ -119,16 +119,16 @@ export default function MemberSearchModal({ isOpen, onClose, onSelect, title = '
         <div className="mt-6 flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            className="rounded-2xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 bg-white"
           >
             Cancel
           </button>
           <button
             onClick={handleSelect}
             disabled={!selectedMemberId}
-            className="rounded-2xl bg-brand-600 px-5 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-2xl bg-brand-600 px-5 py-2 text-sm font-semibold text-white shadow-lg transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            View statement
+            Select
           </button>
         </div>
       </div>

@@ -148,7 +148,7 @@ export default function Dashboard() {
               <div key={tx.id} className="border-b pb-3 last:border-0">
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900 truncate">{tx.particulars}</p>
+                    <p className="text-sm font-medium text-gray-900 break-words whitespace-normal">{tx.particulars}</p>
                     <p className="text-xs text-gray-500">{tx.tran_date}</p>
                   </div>
                   <div className="ml-4 text-right">
