@@ -283,15 +283,19 @@ class AuthController extends Controller
         $user = $request->user();
         
         // Check if this is a first login (must_change_password is true)
-        $isFirstLogin = $user->must_change_password ?? false;
+        // Handle both boolean true and integer 1 (database might store as tinyint)
+        $isFirstLogin = (bool) ($user->must_change_password ?? false);
         
         // Log incoming request for debugging
         Log::info('Password change request', [
             'user_id' => $user->id,
+            'must_change_password_raw' => $user->must_change_password,
+            'must_change_password_type' => gettype($user->must_change_password),
             'is_first_login' => $isFirstLogin,
             'has_password' => $request->has('password'),
             'has_password_confirmation' => $request->has('password_confirmation'),
             'has_current_password' => $request->has('current_password'),
+            'request_data' => $request->only(['password', 'password_confirmation', 'current_password']),
         ]);
         
         // Validation rules
