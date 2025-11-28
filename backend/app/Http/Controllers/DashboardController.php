@@ -16,32 +16,47 @@ class DashboardController extends Controller
      */
     public function publicSnapshot()
     {
-        // Pending approvals = draft assignments that need approval
-        $pendingApprovals = $this->excludeDuplicateTransactions(
-            Transaction::where('assignment_status', 'draft')
-                ->where('is_archived', false)
-        )->count();
-        
-        // Today's inflow = total credits from transactions today (excluding duplicates)
-        $todayStart = now()->startOfDay();
-        $todayEnd = now()->endOfDay();
-        
-        $todayInflow = $this->excludeDuplicateTransactions(
-            Transaction::where('credit', '>', 0)
-                ->where('is_archived', false)
-                ->whereBetween('tran_date', [$todayStart, $todayEnd])
-        )->sum('credit');
-        
-        // Also include manual contributions from today
-        $todayManual = ManualContribution::whereDate('contribution_date', today())
-            ->sum('amount');
-        
-        $todayTotal = $todayInflow + $todayManual;
-        
-        return response()->json([
-            'pending_approvals' => $pendingApprovals,
-            'today_inflow' => round($todayTotal, 2),
-        ]);
+        try {
+            // Pending approvals = draft assignments that need approval
+            $pendingApprovals = $this->excludeDuplicateTransactions(
+                Transaction::where('assignment_status', 'draft')
+                    ->where('is_archived', false)
+            )->count();
+            
+            // Today's inflow = total credits from transactions today (excluding duplicates)
+            $todayStart = now()->startOfDay();
+            $todayEnd = now()->endOfDay();
+            
+            $todayInflow = $this->excludeDuplicateTransactions(
+                Transaction::where('credit', '>', 0)
+                    ->where('is_archived', false)
+                    ->whereBetween('tran_date', [$todayStart, $todayEnd])
+            )->sum('credit');
+            
+            // Also include manual contributions from today
+            $todayManual = ManualContribution::whereDate('contribution_date', today())
+                ->sum('amount');
+            
+            $todayTotal = $todayInflow + $todayManual;
+            
+            return response()->json([
+                'pending_approvals' => $pendingApprovals,
+                'today_inflow' => round($todayTotal, 2),
+            ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            \Illuminate\Support\Facades\Log::error('Database error in publicSnapshot: ' . $e->getMessage());
+            // Return default values if database is unavailable
+            return response()->json([
+                'pending_approvals' => 0,
+                'today_inflow' => 0,
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error in publicSnapshot: ' . $e->getMessage());
+            return response()->json([
+                'pending_approvals' => 0,
+                'today_inflow' => 0,
+            ], 500);
+        }
     }
 
     public function index()

@@ -15,29 +15,50 @@ class SettingController extends Controller
      */
     public function publicIndex()
     {
-        $settings = \App\Models\Setting::whereIn('key', [
-            'app_name',
-            'logo_path',
-            'favicon_path',
-            'theme_primary_color',
-            'theme_secondary_color',
-            'login_background_color',
-            'login_text_color',
-            'navbar_background_color',
-        ])->pluck('value', 'key');
-        
-        $response = $settings->toArray();
-        
-        // Add URLs for logo and favicon if they exist
-        if ($settings->get('logo_path')) {
-            $response['logo_url'] = \Illuminate\Support\Facades\Storage::disk('public')->url($settings->get('logo_path'));
+        try {
+            $settings = \App\Models\Setting::whereIn('key', [
+                'app_name',
+                'logo_path',
+                'favicon_path',
+                'theme_primary_color',
+                'theme_secondary_color',
+                'login_background_color',
+                'login_text_color',
+                'navbar_background_color',
+            ])->pluck('value', 'key');
+            
+            $response = $settings->toArray();
+            
+            // Add URLs for logo and favicon if they exist
+            try {
+                if ($settings->get('logo_path')) {
+                    $response['logo_url'] = \Illuminate\Support\Facades\Storage::disk('public')->url($settings->get('logo_path'));
+                }
+                
+                if ($settings->get('favicon_path')) {
+                    $response['favicon_url'] = \Illuminate\Support\Facades\Storage::disk('public')->url($settings->get('favicon_path'));
+                }
+            } catch (\Exception $e) {
+                Log::warning('Error getting logo/favicon URLs: ' . $e->getMessage());
+            }
+            
+            return response()->json($response);
+        } catch (\Illuminate\Database\QueryException $e) {
+            Log::error('Database error in publicIndex: ' . $e->getMessage());
+            // Return default settings if database is unavailable
+            return response()->json([
+                'app_name' => 'Member Contributions System',
+                'logo_url' => null,
+                'favicon_url' => null,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error in publicIndex: ' . $e->getMessage());
+            return response()->json([
+                'app_name' => 'Member Contributions System',
+                'logo_url' => null,
+                'favicon_url' => null,
+            ], 500);
         }
-        
-        if ($settings->get('favicon_path')) {
-            $response['favicon_url'] = \Illuminate\Support\Facades\Storage::disk('public')->url($settings->get('favicon_path'));
-        }
-        
-        return response()->json($response);
     }
 
     public function index()
