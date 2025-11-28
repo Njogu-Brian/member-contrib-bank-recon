@@ -60,11 +60,31 @@ export function AuthProvider({ children }) {
     queryKey: ['auth', 'user', isPublicStatementRoute ? 'public' : 'private'],
     queryFn: async () => {
       try {
-        return await getCurrentUser()
+        // Add timeout to prevent hanging
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+        
+        try {
+          const result = await Promise.race([
+            getCurrentUser(),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Request timeout')), 5000)
+            )
+          ])
+          clearTimeout(timeoutId)
+          return result
+        } catch (timeoutError) {
+          clearTimeout(timeoutId)
+          throw timeoutError
+        }
       } catch (error) {
         // If 401 (Unauthenticated), that's expected on login/change-password pages - return null
         // Don't log it as an error - it's handled by onError callback
         if (error.response?.status === 401 || error.status === 401) {
+          return null
+        }
+        // For timeout or network errors, return null to allow login page to load
+        if (error.message === 'Request timeout' || error.code === 'ECONNABORTED' || !error.response) {
           return null
         }
         // For other errors, rethrow (onError will handle logging)
@@ -79,10 +99,16 @@ export function AuthProvider({ children }) {
     refetchOnWindowFocus: !isPublicStatementRoute,
     // Don't use cached data for public statement routes
     gcTime: isPublicStatementRoute ? 0 : 5 * 60 * 1000,
-    // Suppress error logging for 401s (expected when not authenticated)
+    // Set a maximum time for the query to be considered loading
+    // After 3 seconds, consider it done (even if still loading) to prevent infinite loading
+    refetchInterval: false,
+    // Suppress error logging for 401s and timeouts (expected when not authenticated or backend unavailable)
     onError: (error) => {
-      // Only log non-401 errors
-      if (error.response?.status !== 401 && error.status !== 401) {
+      // Only log non-401, non-timeout errors
+      if (error.response?.status !== 401 && 
+          error.status !== 401 && 
+          error.message !== 'Request timeout' &&
+          error.code !== 'ECONNABORTED') {
         console.error('Auth query error:', error)
       }
     },
@@ -110,18 +136,33 @@ export function AuthProvider({ children }) {
     window.location.href = '/login'
   }
 
+  // Add timeout for loading state - if query takes more than 3 seconds, stop showing loading
+  // This prevents infinite loading if backend is unreachable
+  const [loadingTimeout, setLoadingTimeout] = useState(false)
+  useEffect(() => {
+    if (isLoading || isFetching) {
+      const timeout = setTimeout(() => {
+        setLoadingTimeout(true)
+      }, 3000) // 3 second timeout
+      return () => clearTimeout(timeout)
+    } else {
+      setLoadingTimeout(false)
+    }
+  }, [isLoading, isFetching])
+
   const value = useMemo(
     () => ({
       user: resolvedUser,
       roles,
       // For public statement routes, don't show loading state
-      isLoading: isPublicStatementRoute ? false : (isLoading || isFetching),
+      // Also stop showing loading after timeout to prevent infinite loading
+      isLoading: isPublicStatementRoute ? false : ((isLoading || isFetching) && !loadingTimeout),
       isAuthenticated: Boolean(resolvedUser?.id),
       error,
       logout: handleLogout,
       refetch: refetchUser,
     }),
-    [resolvedUser, roles, isLoading, isFetching, error, refetchUser, isPublicStatementRoute]
+    [resolvedUser, roles, isLoading, isFetching, error, refetchUser, isPublicStatementRoute, loadingTimeout]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
