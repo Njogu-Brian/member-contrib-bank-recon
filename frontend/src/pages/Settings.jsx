@@ -447,6 +447,22 @@ export default function Settings() {
                   </p>
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Contact Phone Number
+                  </label>
+                  <input
+                    type="text"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    placeholder="e.g., +254 700 000 000"
+                    value={formData.contact_phone}
+                    onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
+                  />
+                  <p className="mt-1 text-sm text-gray-500">
+                    This phone number will appear in the statement footer for member inquiries.
+                  </p>
+                </div>
+
                 <div className="pt-4 border-t">
                   <button
                     type="submit"
