@@ -110,13 +110,32 @@ class AuthController extends Controller
             // Update last login
             $user->update(['last_login_at' => now()]);
 
-            // Log activity
-            \App\Helpers\ActivityLogger::log('login', $user, null, "User {$user->name} logged in");
+            // Log activity (wrap in try-catch to prevent login failure if logging fails)
+            try {
+                \App\Helpers\ActivityLogger::log('login', $user, null, "User {$user->name} logged in");
+            } catch (\Exception $logError) {
+                Log::warning('Failed to log login activity: ' . $logError->getMessage());
+            }
 
             $token = $user->createToken('auth_token')->plainTextToken;
 
+            try {
+                $userResponse = $this->formatUserResponse($user);
+            } catch (\Exception $formatError) {
+                Log::error('Failed to format user response during login: ' . $formatError->getMessage(), [
+                    'user_id' => $user->id,
+                    'trace' => $formatError->getTraceAsString(),
+                ]);
+                // Return basic user data if formatting fails
+                $userResponse = array_merge($user->toArray(), [
+                    'roles' => [],
+                    'permissions' => [],
+                    'mfa_enabled' => false,
+                ]);
+            }
+
             return response()->json([
-                'user' => $this->formatUserResponse($user),
+                'user' => $userResponse,
                 'token' => $token,
                 'must_change_password' => $mustChangePassword,
             ]);
