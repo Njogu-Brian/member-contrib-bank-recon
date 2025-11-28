@@ -6,6 +6,7 @@ use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Database\QueryException;
 
 class SettingController extends Controller
 {
@@ -63,21 +64,69 @@ class SettingController extends Controller
 
     public function index()
     {
-        $settings = Setting::all()->pluck('value', 'key');
-        
-        // Add URLs for logo and favicon if they exist
-        $settings['logo_url'] = null;
-        $settings['favicon_url'] = null;
-        
-        if ($settings->get('logo_path')) {
-            $settings['logo_url'] = Storage::disk('public')->url($settings->get('logo_path'));
+        try {
+            // Try to get settings from database, but handle database connection issues gracefully
+            try {
+                $settings = Setting::all()->pluck('value', 'key');
+            } catch (\Illuminate\Database\QueryException $e) {
+                Log::warning('Database error in SettingController::index', [
+                    'error' => $e->getMessage(),
+                ]);
+                // Return empty settings if database is unavailable
+                $settings = collect();
+            } catch (\Exception $e) {
+                Log::warning('Error loading settings from database', [
+                    'error' => $e->getMessage(),
+                ]);
+                $settings = collect();
+            }
+            
+            // Add URLs for logo and favicon if they exist
+            $logoUrl = null;
+            $faviconUrl = null;
+            
+            try {
+                if ($settings->get('logo_path')) {
+                    $logoPath = $settings->get('logo_path');
+                    if (Storage::disk('public')->exists($logoPath)) {
+                        $logoUrl = Storage::disk('public')->url($logoPath);
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('Error getting logo URL', ['error' => $e->getMessage()]);
+            }
+            
+            try {
+                if ($settings->get('favicon_path')) {
+                    $faviconPath = $settings->get('favicon_path');
+                    if (Storage::disk('public')->exists($faviconPath)) {
+                        $faviconUrl = Storage::disk('public')->url($faviconPath);
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('Error getting favicon URL', ['error' => $e->getMessage()]);
+            }
+            
+            // Convert to array and add URLs
+            $response = $settings->toArray();
+            $response['logo_url'] = $logoUrl;
+            $response['favicon_url'] = $faviconUrl;
+            
+            return response()->json($response);
+        } catch (\Exception $e) {
+            Log::error('Error in SettingController::index', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            
+            // Return empty response with error message
+            return response()->json([
+                'error' => 'Failed to load settings',
+                'message' => config('app.debug') ? $e->getMessage() : 'An error occurred while loading settings',
+                'logo_url' => null,
+                'favicon_url' => null,
+            ], 500);
         }
-        
-        if ($settings->get('favicon_path')) {
-            $settings['favicon_url'] = Storage::disk('public')->url($settings->get('favicon_path'));
-        }
-        
-        return response()->json($settings);
     }
 
     public function update(Request $request)
