@@ -45,8 +45,12 @@ export default function ChangePassword() {
   // Fallback to location.state if user object not yet loaded
   // Only check user.must_change_password if user is loaded (not null/undefined)
   // Handle both boolean true and string/number representations (1, '1', true)
+  // Also explicitly exclude false, 0, '0', null, undefined
   const isFirstLogin = user 
-    ? (user.must_change_password === true || user.must_change_password === 1 || user.must_change_password === '1')
+    ? (user.must_change_password === true || 
+       user.must_change_password === 1 || 
+       user.must_change_password === '1' ||
+       String(user.must_change_password).toLowerCase() === 'true')
     : (location.state?.firstLogin ?? false)
   
   // Debug logging
