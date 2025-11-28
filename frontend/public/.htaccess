@@ -1,3 +1,6 @@
+# Set directory index to prefer index.html over index.php
+DirectoryIndex index.html index.php
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
