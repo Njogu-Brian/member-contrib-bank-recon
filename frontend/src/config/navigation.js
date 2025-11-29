@@ -67,6 +67,18 @@ export const NAVIGATION = [
         roles: [ROLES.SUPER_ADMIN, ROLES.TREASURER, ROLES.ACCOUNTANT],
       },
       { label: 'Reports', icon: HiOutlineChartBar, path: '/reports', roles: [] },
+      {
+        label: 'Accounting',
+        icon: HiOutlineChartBar,
+        path: '/accounting',
+        roles: [ROLES.SUPER_ADMIN, ROLES.TREASURER, ROLES.ACCOUNTANT],
+      },
+      {
+        label: 'MPESA Reconciliation',
+        icon: HiOutlineCurrencyDollar,
+        path: '/mpesa-reconciliation',
+        roles: [ROLES.SUPER_ADMIN, ROLES.TREASURER],
+      },
     ],
   },
   {
@@ -101,6 +113,12 @@ export const NAVIGATION = [
         icon: HiOutlineShieldExclamation,
         path: '/compliance',
         roles: [ROLES.SUPER_ADMIN, ROLES.IT_SUPPORT],
+      },
+      {
+        label: 'KYC Management',
+        icon: HiOutlineShieldExclamation,
+        path: '/kyc-management',
+        roles: [ROLES.SUPER_ADMIN, ROLES.TREASURER],
       },
     ],
   },

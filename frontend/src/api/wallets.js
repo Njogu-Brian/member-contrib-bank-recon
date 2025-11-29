@@ -20,3 +20,8 @@ export const getPenalties = async (memberId) => {
   return data
 }
 
+export const syncTransactions = async (memberId, params = {}) => {
+  const { data } = await api.post(`/admin/members/${memberId}/sync-transactions`, params)
+  return data
+}
+

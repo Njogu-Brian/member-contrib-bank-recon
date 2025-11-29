@@ -2,12 +2,15 @@
 
 namespace App\Services;
 
+use App\Jobs\ReconcileMpesaTransaction;
 use App\Models\Member;
 use App\Models\Payment;
 use App\Models\PaymentReceipt;
 use App\Models\Wallet;
+use App\Services\MpesaReconciliationService;
 use Dompdf\Dompdf;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -17,15 +20,37 @@ class PaymentService
         private readonly WalletService $walletService,
         private readonly QrCodeService $qrCodeService,
         private readonly AuditLogger $auditLogger,
+        private readonly MpesaReconciliationService $reconciliationService,
     ) {
     }
 
     public function handleMpesaCallback(array $payload): void
     {
         DB::transaction(function () use ($payload) {
-            $member = Member::where('phone', $payload['msisdn'])->first();
+            // Extract MPESA transaction details
+            $mpesaTransactionId = $payload['transaction_id'] ?? $payload['MpesaReceiptNumber'] ?? null;
+            $mpesaReceiptNumber = $payload['MpesaReceiptNumber'] ?? $payload['receipt_number'] ?? null;
+            $msisdn = $payload['msisdn'] ?? $payload['MSISDN'] ?? $payload['phone_number'] ?? null;
+            $amount = $payload['amount'] ?? $payload['TransAmount'] ?? 0;
+            $resultCode = $payload['result_code'] ?? $payload['ResultCode'] ?? null;
+
+            $member = Member::where('phone', $msisdn)->first();
             if (! $member) {
-                throw new \RuntimeException('Member not found for MSISDN ' . $payload['msisdn']);
+                Log::warning('Member not found for MPESA callback', [
+                    'msisdn' => $msisdn,
+                    'transaction_id' => $mpesaTransactionId,
+                ]);
+                throw new \RuntimeException('Member not found for MSISDN ' . $msisdn);
+            }
+
+            // Check for duplicate payment before creating
+            if ($this->isDuplicatePayment($mpesaTransactionId, $mpesaReceiptNumber, $member->id, $amount)) {
+                Log::warning('Duplicate MPESA payment detected', [
+                    'msisdn' => $msisdn,
+                    'transaction_id' => $mpesaTransactionId,
+                    'receipt_number' => $mpesaReceiptNumber,
+                ]);
+                throw new \RuntimeException('Duplicate payment detected');
             }
 
             $wallet = $this->walletService->ensureWallet($member);
@@ -33,11 +58,14 @@ class PaymentService
             $payment = Payment::create([
                 'member_id' => $member->id,
                 'channel' => 'mpesa',
-                'provider_reference' => $payload['transaction_id'],
-                'amount' => $payload['amount'],
+                'provider_reference' => $mpesaTransactionId,
+                'mpesa_transaction_id' => $mpesaTransactionId,
+                'mpesa_receipt_number' => $mpesaReceiptNumber,
+                'amount' => $amount,
                 'currency' => 'KES',
-                'status' => $payload['result_code'] === '0' ? 'completed' : 'failed',
-                'payload' => $payload['payload'] ?? null,
+                'status' => ($resultCode === '0' || $resultCode === 0) ? 'completed' : 'failed',
+                'reconciliation_status' => 'pending',
+                'payload' => $payload,
             ]);
 
             if ($payment->status === 'completed') {
@@ -50,15 +78,55 @@ class PaymentService
 
                 $payment->contribution()->associate($contribution);
                 $payment->save();
+
+                // Queue reconciliation job
+                ReconcileMpesaTransaction::dispatch($payment);
             }
 
             $this->auditLogger->log(
                 null,
                 'payment.mpesa_callback',
                 $payment,
-                ['result_code' => $payload['result_code']]
+                ['result_code' => $resultCode]
             );
         });
+    }
+
+    /**
+     * Check if payment is duplicate
+     */
+    protected function isDuplicatePayment(?string $transactionId, ?string $receiptNumber, int $memberId, float $amount): bool
+    {
+        // Check by MPESA transaction ID
+        if ($transactionId) {
+            $existing = Payment::where('mpesa_transaction_id', $transactionId)
+                ->where('member_id', $memberId)
+                ->exists();
+
+            if ($existing) {
+                return true;
+            }
+        }
+
+        // Check by receipt number
+        if ($receiptNumber) {
+            $existing = Payment::where('mpesa_receipt_number', $receiptNumber)
+                ->where('member_id', $memberId)
+                ->exists();
+
+            if ($existing) {
+                return true;
+            }
+        }
+
+        // Check by amount and recent date (within last 5 minutes)
+        $recentPayment = Payment::where('member_id', $memberId)
+            ->where('amount', $amount)
+            ->where('channel', 'mpesa')
+            ->where('created_at', '>=', now()->subMinutes(5))
+            ->exists();
+
+        return $recentPayment;
     }
 
     public function generateReceipt(int $paymentId, array $data = []): PaymentReceipt

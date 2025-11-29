@@ -29,6 +29,8 @@ use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\ActivityLogController;
+use App\Http\Controllers\AccountingController;
+use App\Http\Controllers\KycController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -110,6 +112,12 @@ Route::prefix('v1')->group(function () {
         Route::get('/members/{member}/statement', [MemberController::class, 'statement']);
         Route::get('/members/{member}/statement/export', [MemberController::class, 'exportStatement']);
         Route::get('/members/statements/export', [MemberController::class, 'exportBulkStatements']);
+        Route::post('/members/{member}/activate', [KycController::class, 'activateMember']);
+
+        // KYC Management
+        Route::get('/kyc/pending', [KycController::class, 'pending']);
+        Route::post('/kyc/{document}/approve', [KycController::class, 'approve']);
+        Route::post('/kyc/{document}/reject', [KycController::class, 'reject']);
 
         // Wallets & Contributions
         Route::get('/wallets', [WalletController::class, 'index']);
@@ -117,12 +125,19 @@ Route::prefix('v1')->group(function () {
         Route::get('/wallets/{wallet}', [WalletController::class, 'show']);
         Route::post('/wallets/{wallet}/contributions', [WalletController::class, 'contribute']);
         Route::get('/members/{member}/penalties', [WalletController::class, 'penalties']);
+        Route::post('/members/{member}/sync-transactions', [WalletController::class, 'syncTransactions']);
 
         // Payments
         Route::post('/payments/{payment}/receipt', [PaymentController::class, 'issueReceipt']);
+        Route::post('/payments/reconcile', [PaymentController::class, 'reconcile']);
+        Route::get('/payments/reconciliation-logs', [PaymentController::class, 'reconciliationLogs']);
+        Route::post('/payments/{payment}/retry-reconciliation', [PaymentController::class, 'retryReconciliation']);
 
         // Investments
         Route::apiResource('investments', InvestmentController::class);
+        Route::post('/investments/{investment}/calculate-roi', [InvestmentController::class, 'calculateRoi']);
+        Route::get('/investments/{investment}/roi-history', [InvestmentController::class, 'roiHistory']);
+        Route::post('/investments/{investment}/payout/{payout}', [InvestmentController::class, 'payout']);
 
         // Announcements
         Route::apiResource('announcements', AnnouncementController::class);
@@ -198,6 +213,15 @@ Route::prefix('v1')->group(function () {
         Route::get('/reports/members', [ReportController::class, 'members']);
         Route::get('/reports/transactions', [ReportController::class, 'transactions']);
 
+        // Accounting
+        Route::post('/accounting/journal-entries', [AccountingController::class, 'createJournalEntry']);
+        Route::post('/accounting/journal-entries/{entry}/post', [AccountingController::class, 'postJournalEntry']);
+        Route::get('/accounting/general-ledger', [AccountingController::class, 'getGeneralLedger']);
+        Route::get('/accounting/trial-balance', [AccountingController::class, 'getTrialBalance']);
+        Route::get('/accounting/profit-loss', [AccountingController::class, 'getProfitAndLoss']);
+        Route::get('/accounting/cash-flow', [AccountingController::class, 'getCashFlow']);
+        Route::get('/accounting/chart-of-accounts', [AccountingController::class, 'getChartOfAccounts']);
+
         // Duplicates
         Route::get('/duplicates', [DuplicateController::class, 'index']);
         Route::post('/duplicates/reanalyze', [DuplicateController::class, 'reanalyze']);
@@ -207,6 +231,11 @@ Route::prefix('v1')->group(function () {
         Route::get('/sms/statistics', [SmsController::class, 'statistics']);
         Route::post('/sms/bulk', [SmsController::class, 'sendBulk']);
         Route::post('/sms/members/{member}', [SmsController::class, 'sendSingle']);
+
+        // Notifications
+        Route::post('/notifications/whatsapp/send', [\App\Http\Controllers\NotificationController::class, 'sendWhatsApp']);
+        Route::post('/statements/send-monthly', [\App\Http\Controllers\NotificationController::class, 'sendMonthlyStatements']);
+        Route::post('/contributions/send-reminders', [\App\Http\Controllers\NotificationController::class, 'sendContributionReminders']);
 
         // Audits
         Route::get('/audits', [AuditController::class, 'index']);

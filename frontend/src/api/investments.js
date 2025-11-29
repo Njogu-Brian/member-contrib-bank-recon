@@ -15,3 +15,18 @@ export const updateInvestment = async ({ id, payload }) => {
   return data
 }
 
+export const calculateRoi = async (investmentId, params = {}) => {
+  const { data } = await api.post(`/admin/investments/${investmentId}/calculate-roi`, params)
+  return data
+}
+
+export const getRoiHistory = async (investmentId) => {
+  const { data } = await api.get(`/admin/investments/${investmentId}/roi-history`)
+  return data
+}
+
+export const processPayout = async (investmentId, payoutId, payload = {}) => {
+  const { data } = await api.post(`/admin/investments/${investmentId}/payout/${payoutId}`, payload)
+  return data
+}
+

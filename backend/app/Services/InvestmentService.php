@@ -106,5 +106,62 @@ class InvestmentService
             ],
         ]);
     }
+
+    /**
+     * Calculate ROI for an investment
+     */
+    public function calculateRoi(Investment $investment, ?Carbon $asOfDate = null): RoiCalculation
+    {
+        $asOfDate = $asOfDate ?? now();
+        $endDate = $investment->end_date ? Carbon::parse($investment->end_date) : $asOfDate;
+        $startDate = Carbon::parse($investment->start_date);
+
+        $durationInYears = max(0.01, $startDate->diffInMonths($endDate) / 12);
+        $accrued = $investment->principal_amount * ($investment->expected_roi_rate / 100) * $durationInYears;
+
+        return RoiCalculation::create([
+            'investment_id' => $investment->id,
+            'principal' => $investment->principal_amount,
+            'accrued_interest' => round($accrued, 2),
+            'calculated_on' => $asOfDate->toDateString(),
+            'inputs' => [
+                'duration_years' => $durationInYears,
+                'roi_rate' => $investment->expected_roi_rate,
+                'as_of_date' => $asOfDate->toDateString(),
+            ],
+        ]);
+    }
+
+    /**
+     * Get ROI history for an investment
+     */
+    public function getRoiHistory(Investment $investment): Collection
+    {
+        return RoiCalculation::where('investment_id', $investment->id)
+            ->orderBy('calculated_on', 'desc')
+            ->get();
+    }
+
+    /**
+     * Process investment payout
+     */
+    public function processPayout(Investment $investment, InvestmentPayout $payout, array $data = []): InvestmentPayout
+    {
+        if ($payout->status !== 'scheduled') {
+            throw new \Exception('Payout must be scheduled to process');
+        }
+
+        return DB::transaction(function () use ($investment, $payout, $data) {
+            $payout->update([
+                'status' => 'paid',
+                'paid_at' => $data['paid_at'] ?? now(),
+                'metadata' => array_merge($payout->metadata ?? [], $data['metadata'] ?? []),
+            ]);
+
+            $this->auditLogger->log(auth()->id(), 'investment.payout_processed', $payout, $data);
+
+            return $payout->fresh();
+        });
+    }
 }
 

@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\Member;
+use App\Observers\MemberObserver;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Config;
 use Carbon\Carbon;
@@ -49,6 +51,9 @@ class AppServiceProvider extends ServiceProvider
             $timezone = config('app.timezone', 'Africa/Nairobi');
             date_default_timezone_set($timezone);
         }
+
+        // Register model observers
+        Member::observe(MemberObserver::class);
     }
 }
 

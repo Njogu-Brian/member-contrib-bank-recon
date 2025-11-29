@@ -14,7 +14,8 @@ class AuthServiceProvider extends ServiceProvider
      * @var array<class-string, class-string>
      */
     protected $policies = [
-        //
+        \App\Models\KycDocument::class => \App\Policies\KycPolicy::class,
+        \App\Models\Member::class => \App\Policies\KycPolicy::class,
     ];
 
     /**

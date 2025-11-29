@@ -38,5 +38,57 @@ class InvestmentController extends Controller
 
         return response()->json($investment);
     }
+
+    /**
+     * Calculate ROI for an investment
+     */
+    public function calculateRoi(Request $request, int $investmentId): JsonResponse
+    {
+        $investment = $this->investmentService->find($investmentId);
+        
+        $asOfDate = $request->has('as_of_date') 
+            ? \Carbon\Carbon::parse($request->as_of_date) 
+            : null;
+
+        $roiCalculation = $this->investmentService->calculateRoi($investment, $asOfDate);
+
+        return response()->json([
+            'message' => 'ROI calculated successfully',
+            'calculation' => $roiCalculation,
+        ]);
+    }
+
+    /**
+     * Get ROI history for an investment
+     */
+    public function roiHistory(int $investmentId): JsonResponse
+    {
+        $investment = $this->investmentService->find($investmentId);
+        $history = $this->investmentService->getRoiHistory($investment);
+
+        return response()->json($history);
+    }
+
+    /**
+     * Process investment payout
+     */
+    public function payout(Request $request, int $investmentId, int $payoutId): JsonResponse
+    {
+        $validated = $request->validate([
+            'paid_at' => 'sometimes|date',
+            'metadata' => 'sometimes|array',
+        ]);
+
+        $investment = $this->investmentService->find($investmentId);
+        $payout = \App\Models\InvestmentPayout::where('investment_id', $investmentId)
+            ->findOrFail($payoutId);
+
+        $payout = $this->investmentService->processPayout($investment, $payout, $validated);
+
+        return response()->json([
+            'message' => 'Payout processed successfully',
+            'payout' => $payout,
+        ]);
+    }
 }
 

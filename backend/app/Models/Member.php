@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use App\Models\ContributionStatusRule;
+use App\Models\Setting;
 
 class Member extends Model
 {
@@ -25,11 +26,19 @@ class Member extends Model
         'public_share_token_expires_at',
         'public_share_last_accessed_at',
         'public_share_access_count',
+        'kyc_status',
+        'kyc_approved_at',
+        'kyc_approved_by',
+        'kyc_rejection_reason',
+        'activated_at',
+        'activated_by',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'date_of_registration' => 'date',
+        'kyc_approved_at' => 'datetime',
+        'activated_at' => 'datetime',
     ];
 
     protected $appends = [
@@ -59,6 +68,46 @@ class Member extends Model
         return $this->belongsToMany(Expense::class, 'expense_members')
                     ->withPivot('amount')
                     ->withTimestamps();
+    }
+
+    public function kycDocuments()
+    {
+        return $this->hasMany(KycDocument::class);
+    }
+
+    public function kycApprovedBy()
+    {
+        return $this->belongsTo(User::class, 'kyc_approved_by');
+    }
+
+    public function activatedByUser()
+    {
+        return $this->belongsTo(User::class, 'activated_by');
+    }
+
+    public function wallet()
+    {
+        return $this->hasOne(Wallet::class);
+    }
+
+    public function isKycApproved(): bool
+    {
+        return $this->kyc_status === 'approved';
+    }
+
+    public function isKycPending(): bool
+    {
+        return $this->kyc_status === 'pending';
+    }
+
+    public function isKycRejected(): bool
+    {
+        return $this->kyc_status === 'rejected';
+    }
+
+    public function isActivated(): bool
+    {
+        return $this->is_active && $this->activated_at !== null;
     }
 
     public function getTotalContributionsAttribute()

@@ -15,3 +15,18 @@ export const getNotificationLog = async () => {
   return data
 }
 
+export const sendWhatsApp = async (payload) => {
+  const { data } = await api.post('/admin/notifications/whatsapp/send', payload)
+  return data
+}
+
+export const sendMonthlyStatements = async (payload) => {
+  const { data } = await api.post('/admin/statements/send-monthly', payload)
+  return data
+}
+
+export const sendContributionReminders = async (payload) => {
+  const { data } = await api.post('/admin/contributions/send-reminders', payload)
+  return data
+}
+

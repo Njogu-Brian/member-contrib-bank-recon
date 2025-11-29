@@ -6,10 +6,12 @@ use App\Models\Contribution;
 use App\Models\Member;
 use App\Models\Payment;
 use App\Models\PaymentPenalty;
+use App\Models\Transaction;
 use App\Models\Wallet;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class WalletService
 {
@@ -103,5 +105,82 @@ class WalletService
             ['balance' => 0, 'locked_balance' => 0],
         );
     }
-}
 
+    /**
+     * Sync transactions to contributions for a member
+     */
+    public function syncTransactionsToContributions(Member $member, array $options = []): array
+    {
+        $dryRun = $options['dry_run'] ?? false;
+        $startDate = $options['start_date'] ?? null;
+        $endDate = $options['end_date'] ?? null;
+
+        $wallet = $this->ensureWallet($member);
+
+        $query = Transaction::where('member_id', $member->id)
+            ->where('credit', '>', 0)
+            ->whereNotIn('assignment_status', ['unassigned', 'duplicate'])
+            ->where('is_archived', false);
+
+        if ($startDate) {
+            $query->whereDate('tran_date', '>=', $startDate);
+        }
+
+        if ($endDate) {
+            $query->whereDate('tran_date', '<=', $endDate);
+        }
+
+        $transactions = $query->get();
+        $synced = 0;
+        $skipped = 0;
+        $errors = [];
+
+        foreach ($transactions as $transaction) {
+            try {
+                // Check if contribution already exists for this transaction
+                $existingContribution = Contribution::where('reference', $transaction->transaction_code ?? "TXN-{$transaction->id}")
+                    ->where('member_id', $member->id)
+                    ->where('wallet_id', $wallet->id)
+                    ->first();
+
+                if ($existingContribution) {
+                    $skipped++;
+                    continue;
+                }
+
+                if (!$dryRun) {
+                    $this->contribute($wallet->id, [
+                        'amount' => $transaction->credit,
+                        'source' => 'bank',
+                        'reference' => $transaction->transaction_code ?? "TXN-{$transaction->id}",
+                        'contributed_at' => $transaction->tran_date,
+                        'metadata' => [
+                            'transaction_id' => $transaction->id,
+                            'particulars' => $transaction->particulars,
+                        ],
+                    ]);
+                }
+
+                $synced++;
+            } catch (\Exception $e) {
+                $errors[] = [
+                    'transaction_id' => $transaction->id,
+                    'error' => $e->getMessage(),
+                ];
+                Log::error('Failed to sync transaction to contribution', [
+                    'transaction_id' => $transaction->id,
+                    'member_id' => $member->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return [
+            'total' => $transactions->count(),
+            'synced' => $synced,
+            'skipped' => $skipped,
+            'errors' => $errors,
+            'dry_run' => $dryRun,
+        ];
+    }
+}

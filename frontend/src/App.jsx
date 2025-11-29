@@ -35,6 +35,9 @@ import StaffManagement from './pages/StaffManagement'
 import RoleManagement from './pages/RoleManagement'
 import ActivityLogs from './pages/ActivityLogs'
 import MfaSetup from './pages/MfaSetup'
+import KycManagement from './pages/KycManagement'
+import Accounting from './pages/Accounting'
+import MpesaReconciliation from './pages/MpesaReconciliation'
 import FullScreenLoader from './components/FullScreenLoader'
 import { useAuthContext } from './context/AuthContext'
 import { useSettings } from './context/SettingsContext'
@@ -197,6 +200,30 @@ function App() {
         <Route path="bulk-sms" element={<BulkSms />} />
         <Route path="compliance" element={<Compliance />} />
         <Route path="attendance-uploads" element={<AttendanceUploads />} />
+        <Route
+          path="kyc-management"
+          element={
+            <ProtectedRoute roles={[ROLES.SUPER_ADMIN, ROLES.TREASURER]}>
+              <KycManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="accounting"
+          element={
+            <ProtectedRoute roles={[ROLES.SUPER_ADMIN, ROLES.TREASURER, ROLES.ACCOUNTANT]}>
+              <Accounting />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="mpesa-reconciliation"
+          element={
+            <ProtectedRoute roles={[ROLES.SUPER_ADMIN, ROLES.TREASURER]}>
+              <MpesaReconciliation />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="settings"
           element={

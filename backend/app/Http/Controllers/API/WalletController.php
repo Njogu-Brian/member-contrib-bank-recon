@@ -51,5 +51,26 @@ class WalletController extends Controller
 
         return response()->json($penalties);
     }
+
+    /**
+     * Sync transactions to contributions for a member
+     */
+    public function syncTransactions(Request $request, int $memberId): JsonResponse
+    {
+        $validated = $request->validate([
+            'dry_run' => 'sometimes|boolean',
+            'start_date' => 'sometimes|date',
+            'end_date' => 'sometimes|date',
+        ]);
+
+        $member = \App\Models\Member::findOrFail($memberId);
+        
+        $result = $this->walletService->syncTransactionsToContributions($member, $validated);
+
+        return response()->json([
+            'message' => $result['dry_run'] ? 'Dry run completed' : 'Transactions synced successfully',
+            'result' => $result,
+        ]);
+    }
 }
 
