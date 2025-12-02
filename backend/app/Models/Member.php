@@ -18,6 +18,7 @@ class Member extends Model
         'phone',
         'secondary_phone',
         'email',
+        'id_number',
         'gender',
         'next_of_kin_name',
         'next_of_kin_phone',

@@ -47,6 +47,7 @@ class MemberController extends Controller
             'phone' => 'nullable|string|max:20',
             'secondary_phone' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:255',
+            'id_number' => 'nullable|string|max:50|unique:members,id_number',
             'gender' => 'nullable|string|in:male,female,other',
             'next_of_kin_name' => 'nullable|string|max:255',
             'next_of_kin_phone' => 'nullable|string|max:255',

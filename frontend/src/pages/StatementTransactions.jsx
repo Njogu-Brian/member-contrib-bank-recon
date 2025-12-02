@@ -834,7 +834,7 @@ export default function StatementTransactions() {
               </tbody>
             </table>
           </div>
-          {(pagination.last_page > 1 || pagination.total > 0 || transactions.length > 0) && (
+          {transactions.length > 0 && (
             <div className="border-t border-gray-200 bg-gray-50 px-4 py-3 sm:px-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="flex items-center gap-3">
@@ -854,15 +854,22 @@ export default function StatementTransactions() {
                   </select>
                   <span className="text-sm text-gray-700">per page</span>
                 </div>
-                <Pagination
-                  pagination={{
-                    current_page: pagination.current_page || page,
-                    last_page: pagination.last_page || Math.ceil((pagination.total || transactions.length) / perPage),
-                    per_page: perPage,
-                    total: pagination.total || transactions.length,
-                  }}
-                  onPageChange={(newPage) => setPage(newPage)}
-                />
+                <div className="flex items-center gap-4">
+                  <p className="text-sm text-gray-700">
+                    Showing <span className="font-medium">{((page - 1) * perPage) + 1}</span> to{' '}
+                    <span className="font-medium">{Math.min(page * perPage, pagination.total || transactions.length)}</span> of{' '}
+                    <span className="font-medium">{pagination.total || transactions.length}</span> results
+                  </p>
+                  <Pagination
+                    pagination={{
+                      current_page: pagination.current_page || page,
+                      last_page: pagination.last_page || Math.max(1, Math.ceil((pagination.total || transactions.length) / perPage)),
+                      per_page: perPage,
+                      total: pagination.total || transactions.length,
+                    }}
+                    onPageChange={(newPage) => setPage(newPage)}
+                  />
+                </div>
               </div>
             </div>
           )}

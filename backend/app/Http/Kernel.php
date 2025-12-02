@@ -43,6 +43,7 @@ class Kernel extends HttpKernel
             \Illuminate\Routing\Middleware\ThrottleRequests::class.':api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \App\Http\Middleware\UpdateTokenActivity::class,
+            \App\Http\Middleware\SessionTimeout::class,
             \App\Http\Middleware\AuditMiddleware::class,
         ],
     ];
