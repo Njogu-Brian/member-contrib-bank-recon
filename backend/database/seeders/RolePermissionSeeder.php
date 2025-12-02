@@ -189,6 +189,19 @@ class RolePermissionSeeder extends Seeder
                     'kyc.view', 'kyc.approve',
                 ],
             ],
+            'group_leader' => [
+                'name' => 'Group Leader',
+                'description' => 'Can approve expenses and view reports',
+                'permissions' => [
+                    'dashboard.view',
+                    'members.view',
+                    'contributions.view',
+                    'expenses.view', 'expenses.update', 'expenses.manage',
+                    'reports.view',
+                    'announcements.view',
+                    'meetings.view',
+                ],
+            ],
             'member' => [
                 'name' => 'Member',
                 'description' => 'Basic member access',
