@@ -7,6 +7,10 @@ export const login = async (email, password) => {
   const token = response.data?.token
   if (token) {
     localStorage.setItem('token', token)
+    // Store timestamp for session management
+    localStorage.setItem('token_timestamp', Date.now().toString())
+    // Set session indicator in sessionStorage (expires when browser closes)
+    sessionStorage.setItem('session_active', 'true')
   }
   return response.data
 }
@@ -14,6 +18,8 @@ export const login = async (email, password) => {
 export const logout = async () => {
   await api.post(`${AUTH_BASE}/logout`)
   localStorage.removeItem('token')
+  localStorage.removeItem('token_timestamp')
+  sessionStorage.removeItem('session_active')
 }
 
 export const requestPasswordReset = async (email) => {

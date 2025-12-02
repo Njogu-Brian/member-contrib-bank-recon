@@ -12,7 +12,7 @@ class InvestmentController extends Controller
 {
     public function __construct(private readonly InvestmentService $investmentService)
     {
-        $this->middleware('can:manage-investments')->except(['index', 'show']);
+        $this->middleware('can:manage-investments')->only(['store', 'update', 'delete', 'calculateRoi', 'payout']);
     }
 
     public function index(Request $request): JsonResponse
@@ -88,6 +88,68 @@ class InvestmentController extends Controller
         return response()->json([
             'message' => 'Payout processed successfully',
             'payout' => $payout,
+        ]);
+    }
+
+    /**
+     * Mobile: Get investments for authenticated user's member
+     */
+    public function mobileIndex(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $member = $user->member;
+        
+        if (!$member) {
+            return response()->json(['data' => []]);
+        }
+
+        $investments = $this->investmentService->list(['member_id' => $member->id]);
+        return response()->json($investments);
+    }
+
+    /**
+     * Mobile: Create investment for authenticated user's member
+     */
+    public function mobileStore(InvestmentRequest $request): JsonResponse
+    {
+        $user = $request->user();
+        $member = $user->member;
+        
+        if (!$member) {
+            return response()->json(['message' => 'No member associated with this user'], 404);
+        }
+
+        $data = $request->validated();
+        $data['member_id'] = $member->id;
+        
+        $investment = $this->investmentService->create($data);
+        return response()->json($investment, 201);
+    }
+
+    /**
+     * Mobile: Get ROI for investment
+     */
+    public function mobileRoi(Request $request, int $investmentId): JsonResponse
+    {
+        $user = $request->user();
+        $member = $user->member;
+        
+        $investment = $this->investmentService->find($investmentId);
+        
+        // Verify investment belongs to user's member
+        if ($member && $investment->member_id !== $member->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $asOfDate = $request->has('as_of_date') 
+            ? \Carbon\Carbon::parse($request->as_of_date) 
+            : null;
+
+        $roiCalculation = $this->investmentService->calculateRoi($investment, $asOfDate);
+
+        return response()->json([
+            'roi' => $roiCalculation['roi'] ?? 0,
+            'calculation' => $roiCalculation,
         ]);
     }
 }

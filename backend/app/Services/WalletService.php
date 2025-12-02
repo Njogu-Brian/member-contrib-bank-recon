@@ -21,7 +21,7 @@ class WalletService
 
     public function list(?int $memberId = null): Collection
     {
-        $query = Wallet::with('member');
+        $query = Wallet::with(['member', 'contributions']);
         if ($memberId) {
             $query->where('member_id', $memberId);
         }

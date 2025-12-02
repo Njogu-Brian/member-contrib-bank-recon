@@ -20,6 +20,7 @@ export default function Transactions({
     sort_by: 'tran_date',
     sort_order: 'desc',
   })
+  const [searchInput, setSearchInput] = useState('') // Local state for immediate UI update
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(25)
   const [archivedFilter, setArchivedFilter] = useState(initialArchivedFilter)
@@ -37,6 +38,16 @@ export default function Transactions({
   const [actionMenuOpen, setActionMenuOpen] = useState(null)
   const actionMenuRef = useRef(null)
   const queryClient = useQueryClient()
+
+  // Debounce search input - only trigger API call after user stops typing for 500ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilters(prev => ({ ...prev, search: searchInput }))
+      setPage(1)
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [searchInput])
 
   // Close action menu when clicking outside
   useEffect(() => {
@@ -569,10 +580,9 @@ export default function Transactions({
             <label className="block text-sm font-medium text-gray-700">Search</label>
             <input
               type="text"
-              value={filters.search}
+              value={searchInput}
               onChange={(e) => {
-                setFilters({ ...filters, search: e.target.value })
-                setPage(1)
+                setSearchInput(e.target.value)
               }}
               placeholder="Search transactions..."
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
@@ -693,28 +703,54 @@ export default function Transactions({
                     <div className="flex flex-col">
                       <button
                         onClick={() => {
-                          setFilters({ ...filters, sort_by: 'credit', sort_order: 'asc' })
-                          setPage(1)
-                        }}
-                        className={`text-xs leading-none ${filters.sort_by === 'credit' && filters.sort_order === 'asc' ? 'text-indigo-600' : 'text-gray-400'}`}
-                        title="Sort: Lowest to Highest"
-                      >
-                        ↑
-                      </button>
-                      <button
-                        onClick={() => {
                           setFilters({ ...filters, sort_by: 'credit', sort_order: 'desc' })
                           setPage(1)
                         }}
                         className={`text-xs leading-none ${filters.sort_by === 'credit' && filters.sort_order === 'desc' ? 'text-indigo-600' : 'text-gray-400'}`}
                         title="Sort: Highest to Lowest"
                       >
+                        ↑
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFilters({ ...filters, sort_by: 'credit', sort_order: 'asc' })
+                          setPage(1)
+                        }}
+                        className={`text-xs leading-none ${filters.sort_by === 'credit' && filters.sort_order === 'asc' ? 'text-indigo-600' : 'text-gray-400'}`}
+                        title="Sort: Lowest to Highest"
+                      >
                         ↓
                       </button>
                     </div>
                   </div>
                 </th>
-                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Member</th>
+                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">
+                  <div className="flex items-center gap-1">
+                    <span>Member</span>
+                    <div className="flex flex-col">
+                      <button
+                        onClick={() => {
+                          setFilters({ ...filters, sort_by: 'member_name', sort_order: 'asc' })
+                          setPage(1)
+                        }}
+                        className={`text-xs leading-none ${filters.sort_by === 'member_name' && filters.sort_order === 'asc' ? 'text-indigo-600' : 'text-gray-400'}`}
+                        title="Sort: A to Z"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFilters({ ...filters, sort_by: 'member_name', sort_order: 'desc' })
+                          setPage(1)
+                        }}
+                        className={`text-xs leading-none ${filters.sort_by === 'member_name' && filters.sort_order === 'desc' ? 'text-indigo-600' : 'text-gray-400'}`}
+                        title="Sort: Z to A"
+                      >
+                        ↓
+                      </button>
+                    </div>
+                  </div>
+                </th>
                 <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Status</th>
                 <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>

@@ -78,5 +78,22 @@ class AnnouncementController extends Controller
 
         return response()->json(['status' => 'deleted']);
     }
+
+    /**
+     * Mobile: Get announcements for authenticated user
+     */
+    public function mobileIndex(): JsonResponse
+    {
+        $announcements = Announcement::where(function ($query) {
+                $query->whereNull('published_at')
+                    ->orWhere('published_at', '<=', now());
+            })
+            ->where('is_active', true)
+            ->orderBy('is_pinned', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json(['data' => $announcements]);
+    }
 }
 

@@ -72,5 +72,43 @@ class WalletController extends Controller
             'result' => $result,
         ]);
     }
+
+    /**
+     * Mobile: Get wallets for authenticated user's member
+     */
+    public function mobileIndex(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $member = $user->member;
+        
+        if (!$member) {
+            return response()->json(['message' => 'No member associated with this user'], 404);
+        }
+
+        $wallets = $this->walletService->list($member->id);
+        return response()->json(WalletResource::collection($wallets));
+    }
+
+    /**
+     * Mobile: Create contribution for authenticated user's wallet
+     */
+    public function mobileContribute(StoreContributionRequest $request, int $walletId): JsonResponse
+    {
+        $user = $request->user();
+        $member = $user->member;
+        
+        if (!$member) {
+            return response()->json(['message' => 'No member associated with this user'], 404);
+        }
+
+        // Verify wallet belongs to user's member
+        $wallet = $this->walletService->find($walletId);
+        if ($wallet->member_id !== $member->id) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $contribution = $this->walletService->contribute($walletId, $request->validated());
+        return response()->json($contribution, 201);
+    }
 }
 

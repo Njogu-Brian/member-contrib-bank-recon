@@ -11,10 +11,11 @@ export default function DuplicateTransactions() {
     search: '',
   })
   const [page, setPage] = useState(1)
+  const [perPage, setPerPage] = useState(25)
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['duplicates', filters, page],
-    queryFn: () => getDuplicates({ ...filters, page }),
+    queryKey: ['duplicates', filters, page, perPage],
+    queryFn: () => getDuplicates({ ...filters, page, per_page: perPage }),
   })
 
   const { data: statementsData } = useQuery({
@@ -231,13 +232,37 @@ export default function DuplicateTransactions() {
           </table>
         </div>
 
-        {pagination?.last_page > 1 && (
-          <div className="border-t px-6 py-4 bg-gray-50">
-            <Pagination
-              currentPage={pagination.current_page}
-              totalPages={pagination.last_page}
-              onPageChange={(nextPage) => setPage(nextPage)}
-            />
+        {/* Pagination */}
+        {pagination && (pagination.last_page > 1 || pagination.total > 0) && (
+          <div className="border-t border-gray-200 bg-gray-50 px-4 py-3 sm:px-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-700">Show</span>
+                <select
+                  value={perPage}
+                  onChange={(e) => {
+                    setPerPage(Number(e.target.value))
+                    setPage(1)
+                  }}
+                  className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                >
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={200}>200</option>
+                </select>
+                <span className="text-sm text-gray-700">per page</span>
+              </div>
+              <Pagination
+                pagination={{
+                  current_page: pagination.current_page || page,
+                  last_page: pagination.last_page || 1,
+                  per_page: perPage,
+                  total: pagination.total || 0,
+                }}
+                onPageChange={(newPage) => setPage(newPage)}
+              />
+            </div>
           </div>
         )}
       </div>

@@ -1,31 +1,9 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getSummary, getDepositReport, getExpensesReport, getMembersReport } from '../api/reports'
-
-const currency = (value = 0) => new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(value || 0)
-const number = (value = 0) => new Intl.NumberFormat().format(value || 0)
-
-const buildBadgeStyle = (hex) => {
-  if (!hex) return {}
-  let normalized = hex.trim()
-  if (!normalized.startsWith('#')) {
-    normalized = `#${normalized}`
-  }
-  if (normalized.length === 4) {
-    normalized = `#${normalized[1]}${normalized[1]}${normalized[2]}${normalized[2]}${normalized[3]}${normalized[3]}`
-  }
-  if (normalized.length !== 7) {
-    return { color: normalized }
-  }
-  const r = parseInt(normalized.slice(1, 3), 16)
-  const g = parseInt(normalized.slice(3, 5), 16)
-  const b = parseInt(normalized.slice(5, 7), 16)
-  return {
-    color: `rgb(${r}, ${g}, ${b})`,
-    backgroundColor: `rgba(${r}, ${g}, ${b}, 0.12)`,
-    borderColor: `rgba(${r}, ${g}, ${b}, 0.2)`,
-  }
-}
+import { getTrialBalance, getProfitAndLoss, getCashFlow, getAccountingPeriods } from '../api/accounting'
+import { currency, number, buildBadgeStyle } from '../lib/utils'
+import ReportExportButton from '../components/ReportExportButton'
 
 export default function Reports() {
   const [activeTab, setActiveTab] = useState('summary')
@@ -76,11 +54,46 @@ export default function Reports() {
     enabled: activeTab === 'members',
   })
 
+  const [accountingPeriod, setAccountingPeriod] = useState(null)
+
+  const { data: accountingPeriods } = useQuery({
+    queryKey: ['accounting-periods'],
+    queryFn: async () => {
+      // Try to get accounting periods, but handle if endpoint doesn't exist
+      try {
+        const { getAccountingPeriods } = await import('../api/accounting')
+        return await getAccountingPeriods()
+      } catch {
+        return []
+      }
+    },
+    enabled: activeTab === 'accounting',
+  })
+
+  const { data: trialBalance } = useQuery({
+    queryKey: ['trial-balance', accountingPeriod],
+    queryFn: () => getTrialBalance({ period_id: accountingPeriod }),
+    enabled: activeTab === 'accounting' && accountingPeriod !== null,
+  })
+
+  const { data: profitLoss } = useQuery({
+    queryKey: ['profit-loss', accountingPeriod],
+    queryFn: () => getProfitAndLoss({ period_id: accountingPeriod }),
+    enabled: activeTab === 'accounting' && accountingPeriod !== null,
+  })
+
+  const { data: cashFlow } = useQuery({
+    queryKey: ['cash-flow', accountingPeriod],
+    queryFn: () => getCashFlow({ period_id: accountingPeriod }),
+    enabled: activeTab === 'accounting' && accountingPeriod !== null,
+  })
+
   const tabs = [
     { id: 'summary', label: 'Summary' },
     { id: 'deposits', label: 'Deposits' },
     { id: 'expenses', label: 'Expenses' },
     { id: 'members', label: 'Members Performance' },
+    { id: 'accounting', label: 'Accounting Reports' },
   ]
 
   const summaryStatuses = summary?.status_counts?.statuses || []
@@ -98,7 +111,18 @@ export default function Reports() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-gray-900">Reports</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-gray-900">Reports</h1>
+        {activeTab !== 'accounting' && (
+          <ReportExportButton 
+            reportType={activeTab} 
+            filters={{
+              status: statusFilter || undefined,
+              period: activeTab === 'deposits' ? depositDataset : undefined,
+            }}
+          />
+        )}
+      </div>
 
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-8">
@@ -125,6 +149,9 @@ export default function Reports() {
 
           {summary && !isSummaryLoading && !isSummaryError && (
             <>
+              <div className="flex justify-end mb-4">
+                <ReportExportButton reportType="summary" />
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <SummaryCard title="Total Contributions" value={currency(summary.total_contributions)} />
                 <SummaryCard title="Total Expenses" value={currency(summary.total_expenses)} />
@@ -165,6 +192,9 @@ export default function Reports() {
 
           {depositReport && !isDepositsLoading && !isDepositsError && (
             <>
+              <div className="flex justify-end mb-4">
+                <ReportExportButton reportType="deposits" filters={{ period: depositDataset }} />
+              </div>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             {[
               { label: 'Today', value: depositReport.totals?.today },
@@ -261,6 +291,9 @@ export default function Reports() {
           {isExpensesError && <ErrorMessage error={expensesError} />}
           {expensesReport && !isExpensesLoading && !isExpensesError && (
             <>
+              <div className="flex justify-end mb-4">
+                <ReportExportButton reportType="expenses" />
+              </div>
           <div className="bg-white shadow rounded-lg p-6">
             <h3 className="text-lg font-semibold mb-4">Expense Categories</h3>
             <div className="space-y-3">
@@ -332,7 +365,9 @@ export default function Reports() {
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Members Performance</h2>
-            <select
+            <div className="flex gap-3">
+              <ReportExportButton reportType="members" filters={{ status: statusFilter || undefined }} />
+              <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
               className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
@@ -344,6 +379,7 @@ export default function Reports() {
                 </option>
               ))}
             </select>
+            </div>
           </div>
 
           {isMembersLoading && <Placeholder message="Loading members..." />}
@@ -405,6 +441,181 @@ export default function Reports() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {activeTab === 'accounting' && (
+        <div className="space-y-6">
+          <div className="bg-white shadow rounded-lg p-6">
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Accounting Period (Optional)
+              </label>
+              <select
+                value={accountingPeriod || ''}
+                onChange={(e) => setAccountingPeriod(e.target.value ? parseInt(e.target.value) : null)}
+                className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-md focus:ring-brand-500 focus:border-brand-500"
+              >
+                <option value="">All Periods</option>
+                {accountingPeriods?.map((period) => (
+                  <option key={period.id} value={period.id}>
+                    {period.period_name} ({period.start_date} to {period.end_date})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <button
+                onClick={() => setAccountingPeriod(null)}
+                className={`px-4 py-2 rounded-md text-sm font-medium ${
+                  accountingPeriod === null
+                    ? 'bg-brand-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Trial Balance
+              </button>
+              <button
+                onClick={() => setAccountingPeriod(null)}
+                className={`px-4 py-2 rounded-md text-sm font-medium ${
+                  accountingPeriod === null
+                    ? 'bg-brand-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Profit & Loss
+              </button>
+              <button
+                onClick={() => setAccountingPeriod(null)}
+                className={`px-4 py-2 rounded-md text-sm font-medium ${
+                  accountingPeriod === null
+                    ? 'bg-brand-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Cash Flow
+              </button>
+            </div>
+
+            {trialBalance && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-4">Trial Balance</h3>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Debit</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Credit</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {trialBalance.entries?.map((entry, idx) => (
+                        <tr key={idx}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">{entry.account_name}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                            {entry.debit > 0 ? currency(entry.debit) : '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                            {entry.credit > 0 ? currency(entry.credit) : '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="bg-gray-50">
+                      <tr>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">Total</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
+                          {currency(trialBalance.total_debits || 0)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-medium">
+                          {currency(trialBalance.total_credits || 0)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                {trialBalance.balanced && (
+                  <p className="mt-4 text-green-600 font-medium">✓ Trial balance is balanced</p>
+                )}
+              </div>
+            )}
+
+            {profitLoss && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-4">Profit & Loss Statement</h3>
+                <div className="space-y-4">
+                  <div className="bg-gray-50 p-4 rounded">
+                    <div className="flex justify-between">
+                      <span className="font-medium">Total Revenue</span>
+                      <span className="font-bold text-green-600">{currency(profitLoss.total_revenue || 0)}</span>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded">
+                    <div className="flex justify-between">
+                      <span className="font-medium">Total Expenses</span>
+                      <span className="font-bold text-red-600">{currency(profitLoss.total_expenses || 0)}</span>
+                    </div>
+                  </div>
+                  <div className="bg-blue-50 p-4 rounded border-2 border-blue-200">
+                    <div className="flex justify-between">
+                      <span className="font-bold">Net Income</span>
+                      <span
+                        className={`font-bold text-xl ${
+                          (profitLoss.net_income || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                        }`}
+                      >
+                        {currency(profitLoss.net_income || 0)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {cashFlow && (
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Cash Flow Statement</h3>
+                <div className="space-y-4">
+                  <div className="bg-gray-50 p-4 rounded">
+                    <div className="flex justify-between">
+                      <span>Net Income</span>
+                      <span>{currency(cashFlow.net_income || 0)}</span>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded">
+                    <div className="flex justify-between">
+                      <span>Cash from Operations</span>
+                      <span>{currency(cashFlow.cash_from_operations || 0)}</span>
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 p-4 rounded">
+                    <div className="flex justify-between">
+                      <span>Beginning Cash Balance</span>
+                      <span>{currency(cashFlow.beginning_cash_balance || 0)}</span>
+                    </div>
+                  </div>
+                  <div className="bg-blue-50 p-4 rounded border-2 border-blue-200">
+                    <div className="flex justify-between font-bold">
+                      <span>Ending Cash Balance</span>
+                      <span className="text-xl">{currency(cashFlow.ending_cash_balance || 0)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!trialBalance && !profitLoss && !cashFlow && accountingPeriod !== null && (
+              <p className="text-gray-500 text-center py-8">Select an accounting period to view reports</p>
+            )}
+
+            {!trialBalance && !profitLoss && !cashFlow && accountingPeriod === null && (
+              <p className="text-gray-500 text-center py-8">
+                Accounting reports will appear here. Please select an accounting period or create accounting data first.
+              </p>
+            )}
+          </div>
         </div>
       )}
     </div>

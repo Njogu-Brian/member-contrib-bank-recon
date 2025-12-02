@@ -168,5 +168,15 @@ class AccountingController extends Controller
 
         return response()->json($accounts);
     }
+
+    /**
+     * Get accounting periods
+     */
+    public function getAccountingPeriods(): JsonResponse
+    {
+        $periods = AccountingPeriod::orderBy('start_date', 'desc')->get();
+
+        return response()->json($periods);
+    }
 }
 

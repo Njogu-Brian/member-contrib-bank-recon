@@ -44,6 +44,8 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status
+    const config = error.config
+    
     // Don't redirect to login for public routes (like /s/:token)
     const isPublicRoute = window.location.pathname.startsWith('/s/') || 
                          window.location.pathname.startsWith('/public/') ||
@@ -63,13 +65,54 @@ api.interceptors.response.use(
       
       // Only remove token and redirect if NOT on a public route or auth pages
       if (!isPublicRoute) {
-        localStorage.removeItem('token')
-        // Only redirect to login if not already on a public route or auth page
-        if (window.location.pathname !== '/login' && 
-            window.location.pathname !== '/change-password' &&
-            window.location.pathname !== '/forgot-password' &&
-            window.location.pathname !== '/reset-password') {
-          window.location.href = '/login'
+        // Check if this is a session expiration message (not a general auth error)
+        const errorMessage = error.response?.data?.message || ''
+        const isSessionExpired = errorMessage.includes('session has expired') || 
+                                errorMessage.includes('inactivity') ||
+                                errorMessage.includes('expired') ||
+                                errorMessage.includes('Unauthenticated')
+        
+        // Check if this is a user-initiated action (not a background refetch)
+        const isUserAction = ['post', 'put', 'delete', 'patch'].includes(config?.method?.toLowerCase() || '')
+        
+        // IMPORTANT: Don't logout on GET requests (refetches) unless it's explicitly a session expiration
+        // This prevents logout when React Query refetches data after a mutation
+        if (isSessionExpired) {
+          // Definite session expiration - logout immediately
+          localStorage.removeItem('token')
+          localStorage.removeItem('token_timestamp')
+          sessionStorage.removeItem('session_active')
+          if (window.location.pathname !== '/login' && 
+              window.location.pathname !== '/change-password' &&
+              window.location.pathname !== '/forgot-password' &&
+              window.location.pathname !== '/reset-password') {
+            window.location.href = '/login'
+          }
+        } else if (isUserAction) {
+          // User-initiated action failed with 401 - this is a real auth issue
+          // But give a more graceful error message instead of immediate logout
+          console.error('Authentication failed for user action:', errorMessage)
+          // Only logout if this is NOT the first failure
+          const failureCount = parseInt(sessionStorage.getItem('auth_failure_count') || '0')
+          if (failureCount > 0) {
+            // Second failure - logout
+            localStorage.removeItem('token')
+            localStorage.removeItem('token_timestamp')
+            sessionStorage.removeItem('session_active')
+            sessionStorage.removeItem('auth_failure_count')
+            if (window.location.pathname !== '/login') {
+              window.location.href = '/login'
+            }
+          } else {
+            // First failure - just track it
+            sessionStorage.setItem('auth_failure_count', '1')
+            // Clear the count after 5 seconds (transient error recovery)
+            setTimeout(() => sessionStorage.removeItem('auth_failure_count'), 5000)
+          }
+        } else {
+          // GET request with 401 - just log and reject, don't logout
+          console.warn('Authentication error on background request:', errorMessage)
+          return Promise.reject(error)
         }
       }
       // For public routes, just reject the error without redirecting

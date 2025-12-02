@@ -10,8 +10,8 @@ use Illuminate\Validation\ValidationException;
 use OTPHP\TOTP;
 use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Encoding\Encoding;
-use Endroid\QrCode\ErrorCorrectionLevel;
-use Endroid\QrCode\RoundBlockSizeMode;
+use Endroid\QrCode\ErrorCorrectionLevel\ErrorCorrectionLevelMedium;
+use Endroid\QrCode\RoundBlockSizeMode\RoundBlockSizeModeMargin;
 use Endroid\QrCode\Writer\PngWriter;
 
 class MfaService
@@ -22,6 +22,21 @@ class MfaService
     public function getSecret(User $user): MfaSecret
     {
         return $this->createSecretForUser($user);
+    }
+
+    /**
+     * Get MFA setup data (secret and QR code)
+     */
+    public function getSetup(User $user): array
+    {
+        $secret = $this->createSecretForUser($user);
+        $qrCode = $this->getQrCode($user);
+
+        return [
+            'secret' => $secret->secret,
+            'qr_code' => $qrCode,
+            'enabled' => $secret->enabled,
+        ];
     }
 
     /**
@@ -43,10 +58,10 @@ class MfaService
             ->writer(new PngWriter())
             ->data($uri)
             ->encoding(new Encoding('UTF-8'))
-            ->errorCorrectionLevel(ErrorCorrectionLevel::Medium)
+            ->errorCorrectionLevel(new ErrorCorrectionLevelMedium())
             ->size(300)
             ->margin(10)
-            ->roundBlockSizeMode(RoundBlockSizeMode::Margin)
+            ->roundBlockSizeMode(new RoundBlockSizeModeMargin())
             ->build();
         
         return base64_encode($result->getString());

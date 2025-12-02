@@ -43,5 +43,31 @@ class MeetingController extends Controller
 
         return response()->json($vote);
     }
+
+    /**
+     * Mobile: Get meetings for authenticated user
+     */
+    public function mobileIndex(): JsonResponse
+    {
+        $meetings = $this->meetingService->list();
+        return response()->json(['data' => $meetings]);
+    }
+
+    /**
+     * Mobile: Vote on motion
+     */
+    public function mobileVote(Request $request, Motion $motion): JsonResponse
+    {
+        $validated = $request->validate([
+            'choice' => 'required|string|in:yes,no,abstain',
+        ]);
+
+        $vote = $this->meetingService->castVote($motion, $request->user()->id, $validated['choice']);
+
+        return response()->json([
+            'message' => 'Vote cast successfully',
+            'vote' => $vote,
+        ]);
+    }
 }
 

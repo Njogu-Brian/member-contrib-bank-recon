@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\Setting;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -19,12 +18,6 @@ class OcrParserService
 
     public function parsePdf(string $pdfPath): array
     {
-        // Check if OCR matching is enabled
-        $ocrEnabled = Setting::get('ocr_matching_enabled', '1');
-        if ($ocrEnabled !== '1' && $ocrEnabled !== 'true') {
-            throw new \Exception('OCR matching is disabled in system settings');
-        }
-        
         try {
             $absolutePath = Storage::disk('statements')->path($pdfPath);
             

@@ -30,3 +30,8 @@ export const sendContributionReminders = async (payload) => {
   return data
 }
 
+export const getWhatsAppLogs = async (params = {}) => {
+  const { data } = await api.get('/admin/notifications/whatsapp/logs', { params })
+  return data
+}
+

@@ -16,7 +16,12 @@ class Member extends Model
     protected $fillable = [
         'name',
         'phone',
+        'secondary_phone',
         'email',
+        'gender',
+        'next_of_kin_name',
+        'next_of_kin_phone',
+        'next_of_kin_relationship',
         'member_code',
         'member_number',
         'date_of_registration',

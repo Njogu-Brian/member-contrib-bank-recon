@@ -140,6 +140,84 @@ class DashboardController extends Controller
         }
     }
 
+    /**
+     * Mobile: Get dashboard data for authenticated user's member
+     */
+    public function mobileIndex(Request $request)
+    {
+        try {
+            $user = $request->user();
+            $member = $user->member;
+            
+            if (!$member) {
+                return response()->json([
+                    'wallet_balance' => 0,
+                    'total_contributions' => 0,
+                    'pending_contributions' => 0,
+                    'investments' => [],
+                    'recent_transactions' => [],
+                ]);
+            }
+
+            // Get member's wallet balance
+            $wallet = $member->wallet;
+            $walletBalance = $wallet ? $wallet->balance : 0;
+
+            // Get total contributions - handle case where wallet might not exist
+            $totalContributions = 0;
+            if ($wallet) {
+                $totalContributions = \App\Models\Contribution::where('wallet_id', $wallet->id)
+                    ->sum('amount');
+            }
+
+            // Get pending contributions (if any)
+            $pendingContributions = 0;
+            if ($wallet) {
+                $pendingContributions = \App\Models\Contribution::where('wallet_id', $wallet->id)
+                    ->where('status', 'pending')
+                    ->sum('amount');
+            }
+
+            // Get investments
+            $investments = \App\Models\Investment::where('member_id', $member->id)
+                ->with('investmentType')
+                ->get();
+
+            // Get recent transactions
+            $recentTransactions = \App\Models\Transaction::where('member_id', $member->id)
+                ->orderBy('tran_date', 'desc')
+                ->limit(10)
+                ->get();
+
+            // Return structure compatible with mobile dashboard expectations
+            return response()->json([
+                'statistics' => [
+                    'total_members' => 0, // Not applicable for mobile
+                    'unassigned_transactions' => 0,
+                    'draft_assignments' => 0,
+                    'auto_assigned' => 0,
+                    'total_contributions' => $totalContributions,
+                    'assigned_contributions' => $totalContributions,
+                    'unassigned_contributions' => 0,
+                    'statements_processed' => 0,
+                ],
+                'wallet_balance' => $walletBalance,
+                'total_contributions' => $totalContributions,
+                'pending_contributions' => $pendingContributions,
+                'contributions_by_week' => [],
+                'contributions_by_month' => [],
+                'investments' => $investments,
+                'recent_transactions' => $recentTransactions,
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Mobile dashboard error: ' . $e->getMessage());
+            return response()->json([
+                'message' => 'Error loading dashboard data',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
+    }
+
     protected function getContributionsByWeek()
     {
         try {

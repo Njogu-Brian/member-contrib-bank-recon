@@ -35,7 +35,10 @@ export default function Statements() {
   const reanalyzeMutation = useMutation({
     mutationFn: reanalyzeStatement,
     onSuccess: () => {
-      queryClient.invalidateQueries(['statements'])
+      // Delay the refetch slightly to ensure the backend has time to update
+      setTimeout(() => {
+        queryClient.invalidateQueries(['statements'])
+      }, 500)
       alert('Statement queued for re-analysis. Please wait for processing to complete.')
     },
     onError: (error) => {
@@ -46,7 +49,10 @@ export default function Statements() {
   const reanalyzeAllMutation = useMutation({
     mutationFn: reanalyzeAllStatements,
     onSuccess: (data) => {
-      queryClient.invalidateQueries(['statements'])
+      // Delay the refetch slightly to ensure the backend has time to update
+      setTimeout(() => {
+        queryClient.invalidateQueries(['statements'])
+      }, 500)
       alert(`${data.count} statements queued for re-analysis. Please wait for processing to complete.`)
     },
     onError: (error) => {

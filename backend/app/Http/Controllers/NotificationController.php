@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Jobs\SendContributionReminder;
 use App\Jobs\SendMonthlyStatement;
 use App\Models\Member;
+use App\Models\WhatsAppLog;
 use App\Services\WhatsAppService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -125,6 +126,35 @@ class NotificationController extends Controller
             'failed' => $failed,
             'total' => $members->count(),
         ]);
+    }
+
+    /**
+     * Get WhatsApp logs
+     */
+    public function getWhatsAppLogs(Request $request): JsonResponse
+    {
+        $query = WhatsAppLog::with('member')
+            ->orderBy('created_at', 'desc');
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->filled('member_id')) {
+            $query->where('member_id', $request->member_id);
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
+        $logs = $query->paginate($request->get('per_page', 50));
+
+        return response()->json($logs);
     }
 }
 

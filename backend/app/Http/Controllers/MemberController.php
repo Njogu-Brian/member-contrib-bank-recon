@@ -45,7 +45,12 @@ class MemberController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'phone' => 'nullable|string|max:20',
+            'secondary_phone' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:255',
+            'gender' => 'nullable|string|in:male,female,other',
+            'next_of_kin_name' => 'nullable|string|max:255',
+            'next_of_kin_phone' => 'nullable|string|max:255',
+            'next_of_kin_relationship' => 'nullable|string|max:255',
             'member_code' => 'nullable|string|max:50|unique:members',
             'member_number' => 'nullable|string|max:50',
             'notes' => 'nullable|string',
@@ -128,6 +133,22 @@ class MemberController extends Controller
         }
 
         return $this->exportStatementPdf($member, $entries, $data);
+    }
+
+    public function exportInvestmentReport(Member $member, Request $request)
+    {
+        $validated = $request->validate([
+            'format' => 'nullable|in:pdf,excel',
+        ]);
+
+        $format = $validated['format'] ?? 'pdf';
+        $investments = $member->investments()->orderBy('start_date', 'desc')->get();
+
+        if ($format === 'excel') {
+            return $this->exportInvestmentExcel($member, $investments);
+        }
+
+        return $this->exportInvestmentPdf($member, $investments);
     }
 
     public function exportBulkStatements(Request $request)
@@ -486,7 +507,12 @@ class MemberController extends Controller
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'phone' => 'nullable|string|max:20',
+            'secondary_phone' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:255',
+            'gender' => 'nullable|string|in:male,female,other',
+            'next_of_kin_name' => 'nullable|string|max:255',
+            'next_of_kin_phone' => 'nullable|string|max:255',
+            'next_of_kin_relationship' => 'nullable|string|max:255',
             'member_code' => 'nullable|string|max:50|unique:members,member_code,' . $member->id,
             'member_number' => 'nullable|string|max:50',
             'notes' => 'nullable|string',
@@ -561,6 +587,63 @@ class MemberController extends Controller
             'errors' => $errors,
             'message' => "Imported {$success} members" . (count($errors) > 0 ? " with " . count($errors) . " errors" : ""),
         ]);
+    }
+
+    protected function exportInvestmentPdf(Member $member, $investments)
+    {
+        $filename = $this->buildExportFilename($member->name . '-investments', null, 'pdf');
+        return $this->renderPdf('exports.member_investment_report', [
+            'member' => $member,
+            'investments' => $investments,
+            'generatedAt' => now(),
+        ], $filename);
+    }
+
+    protected function exportInvestmentExcel(Member $member, $investments)
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $sheet->setCellValue('A1', 'Investment Report');
+        $sheet->mergeCells('A1:E1');
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+
+        $sheet->setCellValue('A2', 'Member: ' . $member->name);
+        $sheet->mergeCells('A2:E2');
+        $sheet->setCellValue('A3', 'Generated: ' . now()->format('Y-m-d H:i:s'));
+        $sheet->mergeCells('A3:E3');
+
+        $headers = ['Date', 'Principal Amount', 'Interest Rate', 'Status', 'Notes'];
+        $sheet->fromArray($headers, null, 'A5');
+        $sheet->getStyle('A5:E5')->getFont()->setBold(true);
+
+        $row = 6;
+        $totalAmount = 0;
+        foreach ($investments as $investment) {
+            $sheet->setCellValue('A' . $row, $investment->start_date ? Carbon::parse($investment->start_date)->format('d-M-Y') : 'N/A');
+            $sheet->setCellValue('B' . $row, (float) ($investment->principal_amount ?? 0));
+            $sheet->setCellValue('C' . $row, (float) ($investment->expected_roi_rate ?? 0));
+            $sheet->setCellValue('D' . $row, ucfirst($investment->status ?? 'active'));
+            $sheet->setCellValue('E' . $row, $investment->description ?? '-');
+            $totalAmount += (float) ($investment->principal_amount ?? 0);
+            $row++;
+        }
+
+        // Add total row
+        $sheet->setCellValue('A' . $row, 'Total');
+        $sheet->getStyle('A' . $row)->getFont()->setBold(true);
+        $sheet->setCellValue('B' . $row, $totalAmount);
+        $sheet->getStyle('B' . $row)->getFont()->setBold(true);
+
+        foreach (range('A', 'E') as $column) {
+            $sheet->getColumnDimension($column)->setAutoSize(true);
+        }
+
+        $filename = $this->buildExportFilename($member->name . '-investments', null, 'xlsx');
+        $tempFile = tempnam(sys_get_temp_dir(), 'inv_excel_');
+        (new Xlsx($spreadsheet))->save($tempFile);
+
+        return response()->download($tempFile, $filename)->deleteFileAfterSend(true);
     }
 }
 

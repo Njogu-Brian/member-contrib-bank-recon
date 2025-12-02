@@ -1,0 +1,5 @@
+Extracted 327 transactions
+
+Text length: 0
+Tables found: 0
+Is Paybill: True

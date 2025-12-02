@@ -8,6 +8,24 @@
     const isPublicStatementRoute = pathname.startsWith('/s/') || pathname.startsWith('/public/')
     // Store in window so we can access it after imports
     window.__IS_PUBLIC_STATEMENT_ROUTE__ = isPublicStatementRoute
+    
+    // Session persistence fix: Clear token if browser was just opened (sessionStorage cleared)
+    // sessionStorage is cleared when browser closes, so if it doesn't exist, clear the token
+    if (!isPublicStatementRoute) {
+      const sessionActive = sessionStorage.getItem('session_active')
+      const token = localStorage.getItem('token')
+      
+      // If we have a token but no active session, the browser was just opened/closed
+      // Clear the token to enforce session expiration on browser close
+      if (token && !sessionActive) {
+        localStorage.removeItem('token')
+        localStorage.removeItem('token_timestamp')
+      } else if (token && sessionActive) {
+        // Token exists and session is active - keep the session active flag
+        // This handles page refreshes within the same browser session
+        sessionStorage.setItem('session_active', 'true')
+      }
+    }
   }
 })()
 

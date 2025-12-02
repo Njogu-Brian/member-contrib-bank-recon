@@ -10,9 +10,9 @@ use App\Http\Controllers\API\PaymentController;
 use App\Http\Controllers\API\ReportExportController;
 use App\Http\Controllers\API\NotificationPreferenceController;
 use App\Http\Controllers\API\WalletController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AuditController;
-use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DuplicateController;
 use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\ContributionStatusRuleController;
@@ -80,6 +80,57 @@ Route::prefix('v1')->group(function () {
 
             Route::get('/members', [MobileMemberController::class, 'index']);
             Route::get('/members/{member}', [MobileMemberController::class, 'show']);
+
+            // Mobile Wallet Routes
+            Route::get('/wallets', [WalletController::class, 'mobileIndex']);
+            Route::get('/wallets/{wallet}', [WalletController::class, 'show']);
+            Route::post('/wallets/{wallet}/contributions', [WalletController::class, 'mobileContribute']);
+
+            // Mobile Investment Routes
+            Route::get('/investments', [InvestmentController::class, 'mobileIndex']);
+            Route::post('/investments', [InvestmentController::class, 'mobileStore']);
+            Route::get('/investments/{investment}', [InvestmentController::class, 'show']);
+            Route::get('/investments/{investment}/roi', [InvestmentController::class, 'mobileRoi']);
+
+            // Mobile Dashboard Route
+            Route::get('/dashboard', [DashboardController::class, 'mobileIndex']);
+
+            // Mobile Voting Route
+            Route::post('/motions/{motion}/vote', [MeetingController::class, 'mobileVote']);
+
+            // Mobile Announcements (read-only access)
+            Route::get('/announcements', [AnnouncementController::class, 'mobileIndex']);
+
+            // Mobile Meetings (read-only access)
+            Route::get('/meetings', [MeetingController::class, 'mobileIndex']);
+
+            // Mobile Notifications
+            Route::get('/notifications', [NotificationPreferenceController::class, 'mobileLog']);
+            Route::get('/notifications/preferences', [NotificationPreferenceController::class, 'mobileShow']);
+            Route::put('/notifications/preferences', [NotificationPreferenceController::class, 'mobileUpdate']);
+
+            // Mobile Profile Management
+            Route::get('/profile', [MobileAuthController::class, 'getProfile']);
+            Route::put('/profile', [MobileAuthController::class, 'updateProfile']);
+            Route::post('/profile/photo', [MobileAuthController::class, 'uploadProfilePhoto']);
+
+            // Mobile Statement Export
+            Route::get('/members/{member}/statement/export', [MemberController::class, 'exportStatement']);
+            Route::get('/members/{member}/investment-report/export', [MemberController::class, 'exportInvestmentReport']);
+
+            // Mobile MFA Setup
+            Route::get('/mfa/setup', [MobileAuthController::class, 'getMfaSetup']);
+            Route::post('/mfa/verify', [MobileAuthController::class, 'verifyMfa']);
+
+            // Mobile KYC Documents
+            Route::post('/kyc/documents/front-id', [MobileAuthController::class, 'uploadFrontId']);
+            Route::post('/kyc/documents/back-id', [MobileAuthController::class, 'uploadBackId']);
+            Route::post('/kyc/documents/kra-pin', [MobileAuthController::class, 'uploadKraPin']);
+            Route::post('/kyc/documents/profile-photo', [MobileAuthController::class, 'uploadKycProfilePhoto']);
+
+            // Mobile Reports
+            Route::get('/reports/investment', [MobileAuthController::class, 'downloadInvestmentReport']);
+            Route::get('/reports/statement', [MobileAuthController::class, 'downloadStatementReport']);
         });
     });
 
@@ -111,6 +162,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/members/bulk-upload', [MemberController::class, 'bulkUpload']);
         Route::get('/members/{member}/statement', [MemberController::class, 'statement']);
         Route::get('/members/{member}/statement/export', [MemberController::class, 'exportStatement']);
+        Route::get('/members/{member}/investment-report/export', [MemberController::class, 'exportInvestmentReport']);
         Route::get('/members/statements/export', [MemberController::class, 'exportBulkStatements']);
         Route::post('/members/{member}/activate', [KycController::class, 'activateMember']);
 
@@ -162,6 +214,11 @@ Route::prefix('v1')->group(function () {
         Route::get('/report-exports', [ReportExportController::class, 'index']);
         Route::post('/report-exports', [ReportExportController::class, 'store']);
 
+        // Scheduled Reports
+        Route::apiResource('scheduled-reports', \App\Http\Controllers\ScheduledReportController::class);
+        Route::post('/scheduled-reports/{scheduledReport}/run-now', [\App\Http\Controllers\ScheduledReportController::class, 'runNow']);
+        Route::post('/scheduled-reports/{scheduledReport}/toggle-status', [\App\Http\Controllers\ScheduledReportController::class, 'toggleStatus']);
+
         // Contribution status rules
         Route::get('/contribution-statuses', [ContributionStatusRuleController::class, 'index']);
         Route::post('/contribution-statuses', [ContributionStatusRuleController::class, 'store']);
@@ -212,6 +269,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/reports/expenses', [ReportController::class, 'expenses']);
         Route::get('/reports/members', [ReportController::class, 'members']);
         Route::get('/reports/transactions', [ReportController::class, 'transactions']);
+        Route::get('/reports/{type}/export', [ReportController::class, 'export'])->where('type', 'summary|contributions|deposits|expenses|members|transactions');
 
         // Accounting
         Route::post('/accounting/journal-entries', [AccountingController::class, 'createJournalEntry']);
@@ -221,6 +279,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/accounting/profit-loss', [AccountingController::class, 'getProfitAndLoss']);
         Route::get('/accounting/cash-flow', [AccountingController::class, 'getCashFlow']);
         Route::get('/accounting/chart-of-accounts', [AccountingController::class, 'getChartOfAccounts']);
+        Route::get('/accounting/periods', [AccountingController::class, 'getAccountingPeriods']);
 
         // Duplicates
         Route::get('/duplicates', [DuplicateController::class, 'index']);
@@ -234,6 +293,7 @@ Route::prefix('v1')->group(function () {
 
         // Notifications
         Route::post('/notifications/whatsapp/send', [\App\Http\Controllers\NotificationController::class, 'sendWhatsApp']);
+        Route::get('/notifications/whatsapp/logs', [\App\Http\Controllers\NotificationController::class, 'getWhatsAppLogs']);
         Route::post('/statements/send-monthly', [\App\Http\Controllers\NotificationController::class, 'sendMonthlyStatements']);
         Route::post('/contributions/send-reminders', [\App\Http\Controllers\NotificationController::class, 'sendContributionReminders']);
 

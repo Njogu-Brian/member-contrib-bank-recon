@@ -12,6 +12,7 @@ use App\Models\Transaction;
 use App\Services\AccountingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 
 class ReportController extends Controller
@@ -379,6 +380,81 @@ class ReportController extends Controller
         }
         
         return response()->json($query->orderBy('tran_date', 'desc')->paginate($request->get('per_page', 50)));
+    }
+
+    /**
+     * Export report in specified format
+     */
+    public function export(Request $request, string $type)
+    {
+        $validated = $request->validate([
+            'format' => 'required|in:pdf,excel,csv',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date',
+            'status' => 'nullable|string',
+            'period' => 'nullable|string',
+            'category' => 'nullable|string',
+        ]);
+
+        $format = $validated['format'];
+        $filters = array_filter([
+            'start_date' => $validated['start_date'] ?? null,
+            'end_date' => $validated['end_date'] ?? null,
+            'status' => $validated['status'] ?? null,
+            'period' => $validated['period'] ?? null,
+            'category' => $validated['category'] ?? null,
+        ], fn($value) => $value !== null);
+
+        try {
+            $exportService = app(\App\Services\ReportExportService::class);
+            
+            // Generate report data
+            $reportData = $exportService->generateReport($type, $filters);
+            
+            // Export to requested format
+            $filePath = $exportService->exportReport($type, $reportData, $format);
+            
+            // Return file as download (binary response)
+            $fileContent = Storage::disk('public')->get($filePath);
+            $mimeType = match ($format) {
+                'pdf' => 'application/pdf',
+                'excel' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'csv' => 'text/csv',
+                default => 'application/octet-stream',
+            };
+            
+            return response($fileContent, 200, [
+                'Content-Type' => $mimeType,
+                'Content-Disposition' => 'attachment; filename="' . $this->generateExportFilename($type, $format) . '"',
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Report export failed', [
+                'type' => $type,
+                'format' => $format,
+                'error' => $e->getMessage(),
+            ]);
+            
+            return response()->json([
+                'message' => 'Failed to export report: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Generate export filename
+     */
+    protected function generateExportFilename(string $type, string $format): string
+    {
+        $extensions = [
+            'pdf' => 'pdf',
+            'excel' => 'xlsx',
+            'csv' => 'csv',
+        ];
+        
+        $extension = $extensions[$format] ?? 'pdf';
+        $date = now()->format('Y-m-d');
+        
+        return "{$type}-report-{$date}.{$extension}";
     }
 }
 

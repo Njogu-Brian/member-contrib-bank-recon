@@ -16,6 +16,7 @@ import {
   HiOutlineCloudArrowUp,
   HiOutlineSparkles,
   HiOutlineChatBubbleLeftRight,
+  HiOutlineClock,
 } from 'react-icons/hi2'
 
 export const NAVIGATION = [
@@ -67,6 +68,12 @@ export const NAVIGATION = [
         roles: [ROLES.SUPER_ADMIN, ROLES.TREASURER, ROLES.ACCOUNTANT],
       },
       { label: 'Reports', icon: HiOutlineChartBar, path: '/reports', roles: [] },
+      {
+        label: 'Scheduled Reports',
+        icon: HiOutlineClock,
+        path: '/scheduled-reports',
+        roles: [ROLES.SUPER_ADMIN, ROLES.TREASURER, ROLES.ACCOUNTANT],
+      },
       {
         label: 'Accounting',
         icon: HiOutlineChartBar,

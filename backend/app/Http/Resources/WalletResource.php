@@ -21,6 +21,16 @@ class WalletResource extends JsonResource
                 'name' => $this->member?->name,
                 'member_code' => $this->member?->member_code,
             ],
+            'contributions' => $this->contributions->map(function ($contribution) {
+                return [
+                    'id' => $contribution->id,
+                    'amount' => $contribution->amount,
+                    'source' => $contribution->source,
+                    'status' => $contribution->status,
+                    'created_at' => $contribution->contributed_at ?? $contribution->created_at,
+                    'reference' => $contribution->reference,
+                ];
+            })->values(),
             'updated_at' => $this->updated_at,
         ];
     }

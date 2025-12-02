@@ -403,7 +403,7 @@ export default function StatementTransactions() {
   }
 
   const transactions = transactionsData?.data || []
-  const pagination = transactionsData?.meta || {}
+  const pagination = transactionsData?.meta || transactionsData || {}
   const metrics = statementData.metrics || {}
   const assignmentBreakdown = metrics.assignment_breakdown || {}
   const selectableTransactionIds = transactions
@@ -834,7 +834,7 @@ export default function StatementTransactions() {
               </tbody>
             </table>
           </div>
-          {pagination && (
+          {(pagination.last_page > 1 || pagination.total > 0 || transactions.length > 0) && (
             <div className="border-t border-gray-200 bg-gray-50 px-4 py-3 sm:px-6">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="flex items-center gap-3">
@@ -856,10 +856,10 @@ export default function StatementTransactions() {
                 </div>
                 <Pagination
                   pagination={{
-                    current_page: pagination.current_page || 1,
-                    last_page: pagination.last_page || 1,
+                    current_page: pagination.current_page || page,
+                    last_page: pagination.last_page || Math.ceil((pagination.total || transactions.length) / perPage),
                     per_page: perPage,
-                    total: pagination.total || 0,
+                    total: pagination.total || transactions.length,
                   }}
                   onPageChange={(newPage) => setPage(newPage)}
                 />

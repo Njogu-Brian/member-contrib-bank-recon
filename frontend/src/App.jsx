@@ -38,6 +38,7 @@ import MfaSetup from './pages/MfaSetup'
 import KycManagement from './pages/KycManagement'
 import Accounting from './pages/Accounting'
 import MpesaReconciliation from './pages/MpesaReconciliation'
+import ScheduledReports from './pages/ScheduledReports'
 import FullScreenLoader from './components/FullScreenLoader'
 import { useAuthContext } from './context/AuthContext'
 import { useSettings } from './context/SettingsContext'
@@ -233,6 +234,14 @@ function App() {
           }
         />
         <Route path="reports" element={<Reports />} />
+        <Route
+          path="scheduled-reports"
+          element={
+            <ProtectedRoute roles={[ROLES.SUPER_ADMIN, ROLES.TREASURER, ROLES.ACCOUNTANT]}>
+              <ScheduledReports />
+            </ProtectedRoute>
+          }
+        />
         <Route path="audit" element={<Audit />} />
         <Route
           path="ui-kit"

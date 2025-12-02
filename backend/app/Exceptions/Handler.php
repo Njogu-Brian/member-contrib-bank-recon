@@ -26,7 +26,20 @@ class Handler extends ExceptionHandler
     public function register(): void
     {
         $this->reportable(function (Throwable $e) {
-            //
+            // Log all exceptions with context
+            if ($this->shouldReport($e)) {
+                \Illuminate\Support\Facades\Log::error('Application Exception', [
+                    'exception' => get_class($e),
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'trace' => $e->getTraceAsString(),
+                    'url' => request()->fullUrl(),
+                    'method' => request()->method(),
+                    'ip' => request()->ip(),
+                    'user_id' => auth()->id(),
+                ]);
+            }
         });
     }
 
