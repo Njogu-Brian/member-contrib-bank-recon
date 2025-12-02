@@ -250,6 +250,11 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('expenses', ExpenseController::class);
         Route::post('/expenses/{expense}/approve', [ExpenseController::class, 'approve']);
         Route::post('/expenses/{expense}/reject', [ExpenseController::class, 'reject']);
+        
+        // Invoices
+        Route::apiResource('invoices', InvoiceController::class);
+        Route::post('/invoices/{invoice}/mark-paid', [InvoiceController::class, 'markAsPaid']);
+        Route::post('/invoices/{invoice}/cancel', [InvoiceController::class, 'cancel']);
 
         // Manual Contributions
         Route::apiResource('manual-contributions', ManualContributionController::class);
@@ -269,6 +274,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/reports/contributions', [ReportController::class, 'contributions']);
         Route::get('/reports/deposits', [ReportController::class, 'deposits']);
         Route::get('/reports/expenses', [ReportController::class, 'expenses']);
+        Route::get('/reports/defaulters', [ReportController::class, 'defaulters']);
         Route::get('/reports/members', [ReportController::class, 'members']);
         Route::get('/reports/transactions', [ReportController::class, 'transactions']);
         Route::get('/reports/{type}/export', [ReportController::class, 'export'])->where('type', 'summary|contributions|deposits|expenses|members|transactions');

@@ -79,6 +79,9 @@ class PaymentService
                 $payment->contribution()->associate($contribution);
                 $payment->save();
 
+                // Mark pending invoices as paid (oldest first, up to payment amount)
+                $this->markInvoicesAsPaid($member, $payment);
+
                 // Queue reconciliation job
                 ReconcileMpesaTransaction::dispatch($payment);
             }
@@ -127,6 +130,39 @@ class PaymentService
             ->exists();
 
         return $recentPayment;
+    }
+    
+    /**
+     * Mark invoices as paid with payment
+     */
+    protected function markInvoicesAsPaid(Member $member, Payment $payment): void
+    {
+        $remainingAmount = $payment->amount;
+        
+        // Get pending invoices ordered by due date (oldest first)
+        $pendingInvoices = \App\Models\Invoice::where('member_id', $member->id)
+            ->where('status', 'pending')
+            ->orderBy('due_date', 'asc')
+            ->get();
+        
+        foreach ($pendingInvoices as $invoice) {
+            if ($remainingAmount <= 0) {
+                break;
+            }
+            
+            if ($remainingAmount >= $invoice->amount) {
+                // Full payment
+                $invoice->markAsPaid($payment);
+                $remainingAmount -= $invoice->amount;
+            } else {
+                // Partial payment - mark as paid if it covers at least 50%
+                if ($remainingAmount >= ($invoice->amount * 0.5)) {
+                    $invoice->markAsPaid($payment);
+                    $remainingAmount = 0;
+                }
+                break;
+            }
+        }
     }
 
     public function generateReceipt(int $paymentId, array $data = []): PaymentReceipt
