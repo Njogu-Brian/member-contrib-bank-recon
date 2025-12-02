@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Member;
+use App\Services\StatementBalanceCalculator;
 use Carbon\Carbon;
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -216,29 +217,34 @@ class MemberController extends Controller
             ->with(['member', 'splits', 'bankStatement'])
             ->when($startDate, fn ($q) => $q->where('tran_date', '>=', $startDate))
             ->when($endDate, fn ($q) => $q->where('tran_date', '<=', $endDate))
-            ->orderBy('tran_date', 'desc')
+            ->whereNotIn('assignment_status', ['unassigned', 'duplicate'])
+            ->where('is_archived', false)
+            ->orderBy('tran_date', 'asc')
             ->get();
 
         $manualContributions = $member->manualContributions()
             ->when($startDate, fn ($q) => $q->where('contribution_date', '>=', $startDate))
             ->when($endDate, fn ($q) => $q->where('contribution_date', '<=', $endDate))
-            ->orderBy('contribution_date', 'desc')
+            ->orderBy('contribution_date', 'asc')
             ->get();
 
         $expenses = $member->expenses()
+            ->where('approval_status', 'approved')
             ->when($startDate, fn ($q) => $q->where('expense_date', '>=', $startDate))
             ->when($endDate, fn ($q) => $q->where('expense_date', '<=', $endDate))
-            ->orderBy('expense_date', 'desc')
+            ->orderBy('expense_date', 'asc')
             ->get();
 
         $splits = $member->transactionSplits()
             ->with(['transaction' => function ($query) {
                 $query->select('id', 'bank_statement_id', 'tran_date', 'particulars', 'transaction_code')
-                      ->with('bankStatement:id,filename');
+                      ->with('bankStatement:id,filename')
+                      ->where('is_archived', false);
             }])
             ->whereHas('transaction', function ($query) use ($startDate, $endDate) {
                 $query->when($startDate, fn ($q) => $q->where('tran_date', '>=', $startDate))
-                      ->when($endDate, fn ($q) => $q->where('tran_date', '<=', $endDate));
+                      ->when($endDate, fn ($q) => $q->where('tran_date', '<=', $endDate))
+                      ->where('is_archived', false);
             })
             ->get();
 
@@ -254,7 +260,8 @@ class MemberController extends Controller
                     'date' => $t->tran_date,
                     'type' => $t->splits->isNotEmpty() ? 'shared_contribution' : 'contribution',
                     'description' => $t->particulars,
-                    'amount' => $ownerAmount,
+                    'credit' => $ownerAmount,
+                    'debit' => 0,
                     'reference' => 'Transaction #' . $t->id,
                     'transaction_id' => $t->id,
                     'member_id' => $member->id,
@@ -268,7 +275,8 @@ class MemberController extends Controller
                 'date' => $mc->contribution_date,
                 'type' => 'manual_contribution',
                 'description' => 'Manual Contribution - ' . $mc->payment_method,
-                'amount' => $mc->amount,
+                'credit' => $mc->amount,
+                'debit' => 0,
                 'reference' => 'Manual #' . $mc->id,
                 'transaction_id' => null,
                 'member_id' => $member->id,
@@ -281,7 +289,8 @@ class MemberController extends Controller
                 'date' => $e->expense_date,
                 'type' => 'expense',
                 'description' => $e->description . ' (' . $e->category . ')',
-                'amount' => -$e->pivot->amount,
+                'credit' => 0,
+                'debit' => $e->pivot->amount,
                 'reference' => 'Expense #' . $e->id,
                 'transaction_id' => null,
                 'member_id' => $member->id,

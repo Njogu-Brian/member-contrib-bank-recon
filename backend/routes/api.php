@@ -248,6 +248,8 @@ Route::prefix('v1')->group(function () {
 
         // Expenses
         Route::apiResource('expenses', ExpenseController::class);
+        Route::post('/expenses/{expense}/approve', [ExpenseController::class, 'approve']);
+        Route::post('/expenses/{expense}/reject', [ExpenseController::class, 'reject']);
 
         // Manual Contributions
         Route::apiResource('manual-contributions', ManualContributionController::class);

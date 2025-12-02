@@ -45,6 +45,9 @@ class ExpenseController extends Controller
             'member_ids.*' => 'exists:members,id',
         ]);
 
+        $validated['requested_by'] = auth()->id();
+        $validated['approval_status'] = 'pending';
+        
         $expense = Expense::create($validated);
         
         // Assign to members
@@ -97,5 +100,67 @@ class ExpenseController extends Controller
 
         return response()->json(['message' => 'Expense deleted successfully']);
     }
+    
+    public function approve(Request $request, Expense $expense)
+    {
+        if ($expense->isApproved()) {
+            return response()->json(['message' => 'Expense is already approved'], 422);
+        }
+        
+        if ($expense->isRejected()) {
+            return response()->json(['message' => 'Cannot approve a rejected expense'], 422);
+        }
+        
+        // Prevent self-approval
+        if ($expense->requested_by === auth()->id()) {
+            return response()->json(['message' => 'You cannot approve your own expense request'], 422);
+        }
+        
+        $expense->update([
+            'approval_status' => 'approved',
+            'approved_by' => auth()->id(),
+            'approved_at' => now(),
+            'rejection_reason' => null,
+            'rejected_by' => null,
+            'rejected_at' => null,
+        ]);
+        
+        $expense->load(['requestedBy', 'approvedBy']);
+        
+        return response()->json([
+            'message' => 'Expense approved successfully',
+            'expense' => $expense,
+        ]);
+    }
+    
+    public function reject(Request $request, Expense $expense)
+    {
+        $validated = $request->validate([
+            'reason' => 'required|string|max:500',
+        ]);
+        
+        if ($expense->isApproved()) {
+            return response()->json(['message' => 'Cannot reject an approved expense'], 422);
+        }
+        
+        if ($expense->isRejected()) {
+            return response()->json(['message' => 'Expense is already rejected'], 422);
+        }
+        
+        $expense->update([
+            'approval_status' => 'rejected',
+            'rejected_by' => auth()->id(),
+            'rejected_at' => now(),
+            'rejection_reason' => $validated['reason'],
+        ]);
+        
+        $expense->load(['requestedBy', 'rejectedBy']);
+        
+        return response()->json([
+            'message' => 'Expense rejected successfully',
+            'expense' => $expense,
+        ]);
+    }
 }
+
 

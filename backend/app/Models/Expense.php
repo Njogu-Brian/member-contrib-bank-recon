@@ -20,6 +20,13 @@ class Expense extends Model
         'amount_per_member',
         'budget_month_id',
         'expense_category_id',
+        'approval_status',
+        'requested_by',
+        'approved_by',
+        'approved_at',
+        'rejection_reason',
+        'rejected_by',
+        'rejected_at',
     ];
 
     protected $casts = [
@@ -27,6 +34,8 @@ class Expense extends Model
         'expense_date' => 'date',
         'assign_to_all_members' => 'boolean',
         'amount_per_member' => 'decimal:2',
+        'approved_at' => 'datetime',
+        'rejected_at' => 'datetime',
     ];
 
     public function transaction()
@@ -50,5 +59,36 @@ class Expense extends Model
     {
         return $this->belongsTo(ExpenseCategory::class);
     }
+    
+    public function requestedBy()
+    {
+        return $this->belongsTo(User::class, 'requested_by');
+    }
+    
+    public function approvedBy()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+    
+    public function rejectedBy()
+    {
+        return $this->belongsTo(User::class, 'rejected_by');
+    }
+    
+    public function isPending(): bool
+    {
+        return $this->approval_status === 'pending';
+    }
+    
+    public function isApproved(): bool
+    {
+        return $this->approval_status === 'approved';
+    }
+    
+    public function isRejected(): bool
+    {
+        return $this->approval_status === 'rejected';
+    }
 }
+
 
