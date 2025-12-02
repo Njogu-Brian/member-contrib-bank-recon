@@ -27,25 +27,25 @@ export default function Accounting() {
   const { data: ledger } = useQuery({
     queryKey: ['general-ledger', selectedPeriod],
     queryFn: () => getGeneralLedger({ period_id: selectedPeriod }),
-    enabled: activeTab === 'general-ledger' && selectedPeriod,
+    enabled: activeTab === 'general-ledger' && !!selectedPeriod,
   })
 
   const { data: trialBalance } = useQuery({
     queryKey: ['trial-balance', selectedPeriod],
     queryFn: () => getTrialBalance({ period_id: selectedPeriod }),
-    enabled: activeTab === 'trial-balance' && selectedPeriod,
+    enabled: activeTab === 'trial-balance' && !!selectedPeriod,
   })
 
   const { data: profitLoss } = useQuery({
     queryKey: ['profit-loss', selectedPeriod],
     queryFn: () => getProfitAndLoss({ period_id: selectedPeriod }),
-    enabled: activeTab === 'profit-loss' && selectedPeriod,
+    enabled: activeTab === 'profit-loss' && !!selectedPeriod,
   })
 
   const { data: cashFlow } = useQuery({
     queryKey: ['cash-flow', selectedPeriod],
     queryFn: () => getCashFlow({ period_id: selectedPeriod }),
-    enabled: activeTab === 'cash-flow' && selectedPeriod,
+    enabled: activeTab === 'cash-flow' && !!selectedPeriod,
   })
 
   const tabs = [

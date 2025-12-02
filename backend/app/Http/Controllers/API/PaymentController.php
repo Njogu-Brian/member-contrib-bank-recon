@@ -68,6 +68,11 @@ class PaymentController extends Controller
                 'per_page',
                 'page',
             ]);
+            
+            // Remove empty status filter (can cause issues)
+            if (isset($filters['status']) && $filters['status'] === '') {
+                unset($filters['status']);
+            }
 
             $logs = $this->reconciliationService->getReconciliationLogs($filters);
 
@@ -75,6 +80,7 @@ class PaymentController extends Controller
         } catch (\Exception $e) {
             \Log::error('Reconciliation logs error: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
+                'request' => $request->all(),
             ]);
 
             return response()->json([
