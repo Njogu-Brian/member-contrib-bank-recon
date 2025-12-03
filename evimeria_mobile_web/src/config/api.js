@@ -5,10 +5,10 @@ export const API_CONFIG = {
 
 export const API_ENDPOINTS = {
   // Auth
-  LOGIN: '/mobile/login',
-  REGISTER: '/mobile/register',
-  LOGOUT: '/mobile/logout',
-  VERIFY_MFA: '/mobile/verify-mfa',
+  LOGIN: '/mobile/auth/login',
+  REGISTER: '/mobile/auth/register',
+  LOGOUT: '/mobile/auth/logout',
+  VERIFY_MFA: '/mobile/auth/verify-mfa',
   
   // Dashboard
   DASHBOARD: '/mobile/dashboard',
