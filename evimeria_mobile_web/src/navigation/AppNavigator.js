@@ -5,22 +5,22 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAuth } from '../context/AuthContext';
 
 // Auth Screens
-import LoginScreen from '../screens/Auth/LoginScreen';
-import RegisterScreen from '../screens/Auth/RegisterScreen';
-import MFAScreen from '../screens/Auth/MFAScreen';
+import LoginScreen from '../screens/Auth/LoginScreen.js';
+import RegisterScreen from '../screens/Auth/RegisterScreen.js';
+import MFAScreen from '../screens/Auth/MFAScreen.js';
 
 // Main Screens
-import DashboardScreen from '../screens/Dashboard/DashboardScreen';
-import ContributionsScreen from '../screens/Contributions/ContributionsScreen';
-import WalletScreen from '../screens/Wallet/WalletScreen';
-import InvestmentsScreen from '../screens/Investments/InvestmentsScreen';
-import ProfileScreen from '../screens/Profile/ProfileScreen';
+import DashboardScreen from '../screens/Dashboard/DashboardScreen.js';
+import ContributionsScreen from '../screens/Contributions/ContributionsScreen.js';
+import WalletScreen from '../screens/Wallet/WalletScreen.js';
+import InvestmentsScreen from '../screens/Investments/InvestmentsScreen.js';
+import ProfileScreen from '../screens/Profile/ProfileScreen.js';
 
 // Additional Screens
-import StatementScreen from '../screens/Wallet/StatementScreen';
-import PaymentScreen from '../screens/Contributions/PaymentScreen';
-import AnnouncementsScreen from '../screens/Announcements/AnnouncementsScreen';
-import MeetingsScreen from '../screens/Meetings/MeetingsScreen';
+import StatementScreen from '../screens/Wallet/StatementScreen.js';
+import PaymentScreen from '../screens/Contributions/PaymentScreen.js';
+import AnnouncementsScreen from '../screens/Announcements/AnnouncementsScreen.js';
+import MeetingsScreen from '../screens/Meetings/MeetingsScreen.js';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
