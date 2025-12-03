@@ -1,5 +1,5 @@
 export const API_CONFIG = {
-  baseURL: 'https://evimeria.breysomsolutions.co.ke/api/v1',
+  baseURL: 'http://localhost:8000/api/v1',
   timeout: 30000,
 };
 

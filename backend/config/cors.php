@@ -4,6 +4,8 @@ return (function () {
     $defaultOrigins = [
         'http://localhost:5173',
         'http://127.0.0.1:5173',
+        'http://localhost:19006',
+        'http://localhost:8081',
     ];
 
     $envOrigins = array_filter(array_map('trim', explode(',', env('FRONTEND_URLS', env('FRONTEND_URL', '')))));
