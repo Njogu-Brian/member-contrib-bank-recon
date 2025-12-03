@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getMember, updateMember, getMemberStatement, exportMemberStatement } from '../api/members'
 import { getMemberAuditResults } from '../api/audit'
@@ -33,6 +33,8 @@ const buildStatusBadgeStyle = (hex) => {
 export default function MemberProfile() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const highlightTransactionId = searchParams.get('highlight')
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(25)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -52,18 +54,8 @@ export default function MemberProfile() {
   const [exportingFormat, setExportingFormat] = useState(null)
   const [actionMenuOpen, setActionMenuOpen] = useState(null)
   const actionMenuRef = useRef(null)
+  const highlightedRowRef = useRef(null)
   const queryClient = useQueryClient()
-
-  // Close action menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (actionMenuRef.current && !actionMenuRef.current.contains(event.target)) {
-        setActionMenuOpen(null)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
 
   const { data: member, isLoading } = useQuery({
     queryKey: ['member', id],
@@ -93,6 +85,32 @@ export default function MemberProfile() {
     queryFn: () => getMemberStatement(id, { month: selectedMonthDetail?.monthKey, per_page: 500 }),
     enabled: !!selectedMonthDetail?.monthKey,
   })
+
+  // Close action menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (actionMenuRef.current && !actionMenuRef.current.contains(event.target)) {
+        setActionMenuOpen(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Scroll to and highlight transaction if specified in URL
+  useEffect(() => {
+    if (highlightTransactionId && highlightedRowRef.current && statementData) {
+      setTimeout(() => {
+        highlightedRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 500)
+      // Remove highlight param after 5 seconds
+      setTimeout(() => {
+        const params = new URLSearchParams(searchParams)
+        params.delete('highlight')
+        setSearchParams(params, { replace: true })
+      }, 5000)
+    }
+  }, [highlightTransactionId, statementData, searchParams, setSearchParams])
 
   const resetTransferState = () => {
     setShowTransferModal(false)
@@ -180,10 +198,17 @@ export default function MemberProfile() {
   const pagination = statementData?.pagination || { current_page: 1, last_page: 1 }
   const monthlyTotals = statementData?.monthly_totals || []
   const statementEntries = statementData?.statement || []
+  
+  // Helper to get amount from entry (handles both amount property and credit/debit)
+  const getEntryAmount = (entry) => {
+    if (entry.amount !== undefined) return Number(entry.amount)
+    return Number(entry.credit || 0) - Number(entry.debit || 0)
+  }
+  
   const monthDetailEntries = selectedMonthDetail
-    ? (monthDetailData?.statement || []).filter((entry) => Number(entry.amount) > 0)
+    ? (monthDetailData?.statement || []).filter((entry) => getEntryAmount(entry) > 0)
     : []
-  const monthDetailTotal = monthDetailEntries.reduce((sum, entry) => sum + Number(entry.amount || 0), 0)
+  const monthDetailTotal = monthDetailEntries.reduce((sum, entry) => sum + getEntryAmount(entry), 0)
 
   const handleTransactionTransfer = (entry) => {
     if (!entry.transaction_id || !entry.member_id) {
@@ -376,14 +401,26 @@ export default function MemberProfile() {
       {/* Member Info Card */}
       <div className="bg-white shadow rounded-lg p-6">
         <h2 className="text-xl font-semibold mb-4">Member Information</h2>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div>
             <label className="text-sm font-medium text-gray-500">Phone</label>
             <p className="text-gray-900">{member.phone || '-'}</p>
           </div>
           <div>
+            <label className="text-sm font-medium text-gray-500">Alternative Phone</label>
+            <p className="text-gray-900">{member.secondary_phone || '-'}</p>
+          </div>
+          <div>
             <label className="text-sm font-medium text-gray-500">Email</label>
             <p className="text-gray-900">{member.email || '-'}</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-500">ID Number</label>
+            <p className="text-gray-900 font-semibold">{member.id_number || '-'}</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-500">Church</label>
+            <p className="text-gray-900">{member.church || '-'}</p>
           </div>
           <div>
             <label className="text-sm font-medium text-gray-500">Member Code</label>
@@ -407,6 +444,12 @@ export default function MemberProfile() {
               </span>
             </p>
           </div>
+          {member.profile_completed_at && (
+            <div>
+              <label className="text-sm font-medium text-gray-500">Profile Completed</label>
+              <p className="text-gray-900">{formatDate(member.profile_completed_at)}</p>
+            </div>
+          )}
         </div>
         {member.notes && (
           <div className="mt-4">
@@ -418,7 +461,15 @@ export default function MemberProfile() {
 
       {/* Contribution Summary */}
       <div className="bg-white shadow rounded-lg p-6">
-        <h2 className="text-xl font-semibold mb-4">Contribution Summary</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Contribution Summary</h2>
+          {member.date_of_registration && (
+            <div className="text-sm text-gray-600">
+              <span className="font-medium">Member Since:</span>{' '}
+              {new Date(member.date_of_registration).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+            </div>
+          )}
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
             <label className="text-sm font-medium text-gray-500">Total Contributions</label>
@@ -427,9 +478,12 @@ export default function MemberProfile() {
             </p>
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-500">Expected Contributions</label>
+            <label className="text-sm font-medium text-gray-500">Total Invoices</label>
             <p className="text-2xl font-bold text-gray-900">
               {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(member.expected_contributions || 0)}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Based on issued invoices
             </p>
           </div>
           <div>
@@ -459,7 +513,15 @@ export default function MemberProfile() {
             <div>
               <label className="text-sm font-medium text-gray-500">Total Expenses</label>
               <p className="text-2xl font-bold text-red-600">
-                {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(statementData.summary.total_expenses)}
+                {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(Number(statementData?.summary?.total_expenses || 0))}
+              </p>
+            </div>
+          )}
+          {statementData?.summary?.pending_invoices > 0 && (
+            <div>
+              <label className="text-sm font-medium text-gray-500">Pending Invoices</label>
+              <p className="text-2xl font-bold text-orange-600">
+                {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(Number(statementData?.summary?.pending_invoices || 0))}
               </p>
             </div>
           )}
@@ -544,13 +606,13 @@ export default function MemberProfile() {
                       >
                         <td className="px-4 py-2 text-gray-900">{month.label}</td>
                         <td className="px-4 py-2 text-right text-gray-900">
-                          {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(month.contributions)}
+                          {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(Number(month.contributions || 0))}
                         </td>
                         <td className="px-4 py-2 text-right text-red-600">
-                          {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(month.expenses)}
+                          {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(Number(month.expenses || 0))}
                         </td>
-                        <td className={`px-4 py-2 text-right font-medium ${month.net >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(month.net)}
+                        <td className={`px-4 py-2 text-right font-medium ${(month.net || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(Number(month.net || 0))}
                         </td>
                       </tr>
                     ))}
@@ -579,8 +641,14 @@ export default function MemberProfile() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {statementEntries.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50">
+                    {statementEntries.map((item, idx) => {
+                      const isHighlighted = highlightTransactionId && item.transaction_id && item.transaction_id.toString() === highlightTransactionId
+                      return (
+                      <tr 
+                        key={idx} 
+                        ref={isHighlighted ? highlightedRowRef : null}
+                        className={`hover:bg-gray-50 transition-colors duration-300 ${isHighlighted ? 'bg-yellow-100 ring-2 ring-yellow-400' : ''}`}
+                      >
                         <td className="px-2 py-2 text-sm text-gray-500 whitespace-nowrap">
                           {new Date(item.date).toLocaleDateString('en-GB')}
                         </td>
@@ -592,6 +660,8 @@ export default function MemberProfile() {
                               ? 'bg-purple-100 text-purple-800'
                               : item.type === 'expense'
                               ? 'bg-red-100 text-red-800'
+                              : item.type === 'invoice'
+                              ? 'bg-orange-100 text-orange-800'
                               : 'bg-blue-100 text-blue-800'
                           }`}>
                             {item.type === 'contribution'
@@ -600,6 +670,8 @@ export default function MemberProfile() {
                               ? 'Shared'
                               : item.type === 'expense'
                               ? 'Expense'
+                              : item.type === 'invoice'
+                              ? 'Invoice'
                               : 'Manual'}
                           </span>
                         </td>
@@ -631,9 +703,9 @@ export default function MemberProfile() {
                           </div>
                         </td>
                         <td className={`px-2 py-2 text-sm font-semibold text-right whitespace-nowrap ${
-                          item.amount >= 0 ? 'text-green-600' : 'text-red-600'
+                          getEntryAmount(item) >= 0 ? 'text-green-600' : 'text-red-600'
                         }`}>
-                          {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(item.amount)}
+                          {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(getEntryAmount(item))}
                         </td>
                         <td className="px-2 py-2 text-right">
                           {item.transaction_id && !item.is_split ? (
@@ -677,7 +749,8 @@ export default function MemberProfile() {
                           )}
                         </td>
                       </tr>
-                    ))}
+                    )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -741,7 +814,7 @@ export default function MemberProfile() {
                           <td className="px-6 py-4 text-sm text-gray-900">{item.description}</td>
                           <td className="px-6 py-4 text-sm text-gray-500">{item.reference || '-'}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right text-red-600">
-                            {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(item.amount)}
+                            {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(Math.abs(getEntryAmount(item)))}
                           </td>
                         </tr>
                       ))}
@@ -795,10 +868,10 @@ export default function MemberProfile() {
                       <div className="px-4 py-2 border-b bg-gray-50 flex items-center justify-between">
                         <p className="text-sm font-semibold text-gray-700">{view.label || 'View'}</p>
                         <div className="flex gap-4 text-xs text-gray-500">
-                          <span>Expected: {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(view.expected)}</span>
-                          <span>Actual: {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(view.actual)}</span>
-                          <span className={view.difference >= 0 ? 'text-green-600' : 'text-red-600'}>
-                            Diff: {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(view.difference)}
+                          <span>Expected: {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(Number(view.expected || 0))}</span>
+                          <span>Actual: {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(Number(view.actual || 0))}</span>
+                          <span className={(view.difference || 0) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                            Diff: {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(Number(view.difference || 0))}
                           </span>
                         </div>
                       </div>
@@ -830,15 +903,15 @@ export default function MemberProfile() {
                                   </button>
                                 </td>
                                 <td className="px-4 py-2 text-sm text-right text-gray-900">
-                                  {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(month.expected)}
+                                  {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(Number(month.expected || 0))}
                                 </td>
                                 <td className="px-4 py-2 text-sm text-right text-gray-900">
-                                  {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(month.actual)}
+                                  {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(Number(month.actual || 0))}
                                 </td>
                                 <td className={`px-4 py-2 text-sm text-right font-medium ${
-                                  month.difference >= 0 ? 'text-green-600' : 'text-red-600'
+                                  (month.difference || 0) >= 0 ? 'text-green-600' : 'text-red-600'
                                 }`}>
-                                  {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(month.difference)}
+                                  {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(Number(month.difference || 0))}
                                 </td>
                                 <td className="px-4 py-2 text-sm text-gray-900">
                                   {month.matches ? (
@@ -905,7 +978,7 @@ export default function MemberProfile() {
                     </span>
                     <span className="font-semibold text-gray-900">
                       Total:{' '}
-                      {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(monthDetailTotal)}
+                      {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(Number(monthDetailTotal || 0))}
                     </span>
                   </div>
                   {monthDetailEntries.length ? (
@@ -948,7 +1021,7 @@ export default function MemberProfile() {
                               </td>
                               <td className="px-4 py-2 text-right font-medium text-green-600">
                                 {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(
-                                  Number(entry.amount || 0)
+                                  getEntryAmount(entry)
                                 )}
                               </td>
                             </tr>
@@ -1153,11 +1226,38 @@ export default function MemberProfile() {
                     />
                   </div>
                   <div>
+                    <label className="block text-sm font-medium text-gray-700">Alternative Phone</label>
+                    <input
+                      type="text"
+                      value={formData.secondary_phone || ''}
+                      onChange={(e) => setFormData({ ...formData, secondary_phone: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
                     <label className="block text-sm font-medium text-gray-700">Email</label>
                     <input
                       type="email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">ID Number</label>
+                    <input
+                      type="text"
+                      value={formData.id_number || ''}
+                      onChange={(e) => setFormData({ ...formData, id_number: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Church</label>
+                    <input
+                      type="text"
+                      value={formData.church || ''}
+                      onChange={(e) => setFormData({ ...formData, church: e.target.value })}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     />
                   </div>

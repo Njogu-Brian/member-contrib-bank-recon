@@ -103,8 +103,21 @@ class MemberController extends Controller
             ['path' => $request->url(), 'query' => $request->query()]
         );
 
+        // Calculate first transaction date if not set
+        $firstTransactionDate = $member->date_of_registration;
+        if (!$firstTransactionDate && $data['collection']->isNotEmpty()) {
+            $firstTransaction = $data['collection']
+                ->filter(fn($entry) => in_array($entry['type'], ['contribution', 'shared_contribution', 'manual_contribution']))
+                ->sortBy('date')
+                ->first();
+            $firstTransactionDate = $firstTransaction['date'] ?? null;
+        }
+
+        $memberData = $member->toArray();
+        $memberData['date_of_registration'] = $firstTransactionDate;
+
         return response()->json([
-            'member' => $member,
+            'member' => $memberData,
             'statement' => $paginatedStatement->items(),
             'summary' => $data['summary'],
             'pagination' => [
@@ -248,6 +261,48 @@ class MemberController extends Controller
             })
             ->get();
 
+        // Get invoices and aggregate by month
+        $invoices = $member->invoices()
+            ->when($startDate, fn ($q) => $q->where('issue_date', '>=', $startDate))
+            ->when($endDate, fn ($q) => $q->where('issue_date', '<=', $endDate))
+            ->orderBy('issue_date', 'asc')
+            ->get();
+
+        // Group invoices by month (using week start date to determine month)
+        $monthlyInvoices = $invoices->groupBy(function ($invoice) {
+            // Get the week start date and extract the month
+            $weekParts = explode('-W', $invoice->period);
+            if (count($weekParts) === 2) {
+                $year = $weekParts[0];
+                $week = $weekParts[1];
+                $weekStart = Carbon::now()->setISODate($year, $week)->startOfWeek();
+                return $weekStart->format('Y-m');
+            }
+            // Fallback to issue_date month
+            return Carbon::parse($invoice->issue_date)->format('Y-m');
+        })->map(function ($monthInvoices, $monthKey) use ($member) {
+            $total = $monthInvoices->sum('amount');
+            $firstInvoice = $monthInvoices->first();
+            $monthDate = Carbon::createFromFormat('Y-m', $monthKey)->endOfMonth();
+            
+            return [
+                'date' => $monthDate->toDateString(),
+                'type' => 'invoice',
+                'description' => 'Weekly contribution invoices for ' . $monthDate->format('F Y') . ' (' . $monthInvoices->count() . ' weeks)',
+                'credit' => 0,
+                'debit' => $total,
+                'reference' => 'Invoice #' . $firstInvoice->invoice_number . ' + ' . ($monthInvoices->count() - 1) . ' more',
+                'transaction_id' => null,
+                'member_id' => $member->id,
+                'member_name' => $member->name,
+                'is_split' => false,
+                'statement_id' => null,
+                'statement_name' => null,
+                'invoice_ids' => $monthInvoices->pluck('id')->toArray(),
+                'invoice_count' => $monthInvoices->count(),
+            ];
+        });
+
         $statementCollection = collect()
             ->merge($transactions->map(function ($t) use ($member) {
                 $distributed = $t->splits->sum('amount');
@@ -318,6 +373,7 @@ class MemberController extends Controller
                     'statement_name' => optional($transaction->bankStatement)->filename,
                 ];
             })->filter())
+            ->merge($monthlyInvoices->values())
             ->sortByDesc('date')
             ->values();
 
@@ -325,20 +381,27 @@ class MemberController extends Controller
             ->groupBy(fn ($entry) => Carbon::parse($entry['date'])->format('Y-m'))
             ->sortKeysDesc()
             ->map(function ($group, $label) {
-                $contributions = $group->where('amount', '>=', 0)->sum('amount');
-                $expensesSum = $group->where('amount', '<', 0)->sum('amount');
-                $net = $group->sum('amount');
+                // Calculate amount for each entry (handles both amount and credit/debit properties)
+                $getAmount = fn($entry) => $entry['amount'] ?? ($entry['credit'] - $entry['debit']);
+                
+                $contributions = $group->sum(fn($entry) => max(0, $getAmount($entry)));
+                $expensesSum = $group->sum(fn($entry) => min(0, $getAmount($entry)));
+                $net = $group->sum(fn($entry) => $getAmount($entry));
 
                 return [
                     'month_key' => $label,
                     'label' => Carbon::createFromFormat('Y-m', $label)->format('M Y'),
                     'contributions' => round($contributions, 2),
-                    'expenses' => round($expensesSum, 2),
+                    'expenses' => round(abs($expensesSum), 2),
                     'net' => round($net, 2),
                 ];
             })
             ->values();
 
+        // Calculate total invoices and pending invoices
+        $totalInvoices = $member->invoices()->sum('amount');
+        $pendingInvoices = $member->invoices()->whereIn('status', ['pending', 'overdue'])->sum('amount');
+        
         $summary = [
             'total_contributions' => $member->total_contributions,
             'expected_contributions' => $member->expected_contributions,
@@ -346,6 +409,8 @@ class MemberController extends Controller
             'contribution_status_label' => $member->contribution_status_label,
             'contribution_status_color' => $member->contribution_status_color,
             'total_expenses' => round($expenses->sum(fn ($expense) => $expense->pivot->amount ?? 0), 2),
+            'total_invoices' => round($totalInvoices, 2),
+            'pending_invoices' => round($pendingInvoices, 2),
         ];
 
         return [
@@ -384,6 +449,33 @@ class MemberController extends Controller
 
     protected function exportStatementPdf(Member $member, Collection $entries, array $data)
     {
+        // Calculate first transaction date if not set
+        if (!$member->date_of_registration && $data['collection']->isNotEmpty()) {
+            $firstTransaction = $data['collection']
+                ->filter(fn($entry) => in_array($entry['type'], ['contribution', 'shared_contribution', 'manual_contribution']))
+                ->sortBy('date')
+                ->first();
+            if ($firstTransaction) {
+                $member->date_of_registration = $firstTransaction['date'];
+            }
+        }
+
+        // Get logo path and app name
+        $logoPath = null;
+        $appName = 'Evimeria Initiative';
+        $appTagline = '1000 For A 1000';
+        
+        try {
+            $settingLogoPath = \App\Models\Setting::get('logo_path');
+            if ($settingLogoPath && \Illuminate\Support\Facades\Storage::disk('public')->exists($settingLogoPath)) {
+                $logoPath = \Illuminate\Support\Facades\Storage::disk('public')->path($settingLogoPath);
+            }
+            
+            $appName = \App\Models\Setting::get('app_name', 'Evimeria Initiative');
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Error getting settings for PDF: ' . $e->getMessage());
+        }
+
         $filename = $this->buildExportFilename($member->name, $data['filters']['month'] ?? null, 'pdf');
         return $this->renderPdf('exports.member_statement', [
             'member' => $member,
@@ -392,11 +484,25 @@ class MemberController extends Controller
             'monthlyTotals' => $data['monthly_totals'],
             'rangeLabel' => $data['range_label'],
             'generatedAt' => now(),
+            'logoPath' => $logoPath,
+            'appName' => $appName,
+            'appTagline' => $appTagline,
         ], $filename);
     }
 
     protected function exportStatementExcel(Member $member, Collection $entries, array $data)
     {
+        // Calculate first transaction date if not set
+        if (!$member->date_of_registration && $data['collection']->isNotEmpty()) {
+            $firstTransaction = $data['collection']
+                ->filter(fn($entry) => in_array($entry['type'], ['contribution', 'shared_contribution', 'manual_contribution']))
+                ->sortBy('date')
+                ->first();
+            if ($firstTransaction) {
+                $member->date_of_registration = $firstTransaction['date'];
+            }
+        }
+
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
 
@@ -408,18 +514,26 @@ class MemberController extends Controller
         $sheet->mergeCells('A2:F2');
         $sheet->setCellValue('A3', 'Period: ' . $data['range_label']);
         $sheet->mergeCells('A3:F3');
+        $registrationDate = $member->date_of_registration ? Carbon::parse($member->date_of_registration)->format('d-M-Y') : '-';
+        $sheet->setCellValue('A4', 'Registration Date: ' . $registrationDate);
+        $sheet->mergeCells('A4:F4');
 
         $headers = ['Date', 'Type', 'Description', 'Reference', 'Amount (KES)'];
-        $sheet->fromArray($headers, null, 'A5');
-        $sheet->getStyle('A5:E5')->getFont()->setBold(true);
+        $sheet->fromArray($headers, null, 'A6');
+        $sheet->getStyle('A6:E6')->getFont()->setBold(true);
 
-        $row = 6;
+        $row = 7;
         foreach ($entries as $entry) {
+            // Handle both 'amount' property and 'credit'/'debit' properties
+            $amount = isset($entry['amount']) 
+                ? (float) $entry['amount'] 
+                : (float) (($entry['credit'] ?? 0) - ($entry['debit'] ?? 0));
+            
             $sheet->setCellValue('A' . $row, Carbon::parse($entry['date'])->format('d-M-Y'));
             $sheet->setCellValue('B' . $row, ucwords(str_replace('_', ' ', $entry['type'])));
             $sheet->setCellValue('C' . $row, $entry['description']);
             $sheet->setCellValue('D' . $row, $entry['reference'] ?? '-');
-            $sheet->setCellValue('E' . $row, (float) $entry['amount']);
+            $sheet->setCellValue('E' . $row, $amount);
             $row++;
         }
 

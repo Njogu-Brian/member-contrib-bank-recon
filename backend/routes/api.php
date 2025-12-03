@@ -18,10 +18,13 @@ use App\Http\Controllers\ExpenseController;
 use App\Http\Controllers\ContributionStatusRuleController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\ManualContributionController;
+use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\InvoiceReportController;
 use App\Http\Controllers\MeetingAttendanceUploadController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\PublicMemberStatementController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SmsController;
 use App\Http\Controllers\StatementController;
 use App\Http\Controllers\TransactionController;
@@ -59,6 +62,10 @@ Route::prefix('v1')->group(function () {
         // Shortened path: /s/{token} for SMS links
         Route::get('/statement/{token}', [PublicMemberStatementController::class, 'show']);
         Route::get('/statement/{token}/pdf', [PublicMemberStatementController::class, 'exportPdf']);
+        
+        // Public profile management
+        Route::get('/profile/{token}/status', [ProfileController::class, 'checkProfileStatus']);
+        Route::post('/profile/{token}/update', [ProfileController::class, 'updateProfile']);
     });
 
     Route::prefix('webhooks')->group(function () {
@@ -255,6 +262,13 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('invoices', InvoiceController::class);
         Route::post('/invoices/{invoice}/mark-paid', [InvoiceController::class, 'markAsPaid']);
         Route::post('/invoices/{invoice}/cancel', [InvoiceController::class, 'cancel']);
+        Route::post('/invoices/bulk-match', [InvoiceController::class, 'bulkMatch']);
+        
+        // Invoice Reports
+        Route::get('/invoice-reports/outstanding', [InvoiceReportController::class, 'outstandingInvoices']);
+        Route::get('/invoice-reports/payment-collection', [InvoiceReportController::class, 'paymentCollection']);
+        Route::get('/invoice-reports/member-compliance', [InvoiceReportController::class, 'memberCompliance']);
+        Route::get('/invoice-reports/weekly-summary', [InvoiceReportController::class, 'weeklySummary']);
 
         // Manual Contributions
         Route::apiResource('manual-contributions', ManualContributionController::class);

@@ -56,13 +56,14 @@ class ProcessBankStatement implements ShouldQueue
                     }
                 }
 
-                // If no transaction code, check for duplicates using date + amount + particulars
+                // Check for duplicates using value_date + particulars + credit ONLY
+                // Do NOT use remarks, debit, or transaction_code for duplicate detection
                 if (empty($normalized['transaction_code'])) {
                     $normalizedParticularsKey = $this->normalizeParticularsForDuplicate($normalized['particulars'] ?? '');
+                    $valueDate = $normalized['value_date'] ?? $normalized['tran_date'];
                     $possibleDuplicate = Transaction::query()
-                        ->whereDate('tran_date', $normalized['tran_date'])
+                        ->whereDate('value_date', $valueDate)
                         ->where('credit', $normalized['credit'])
-                        ->where('debit', $normalized['debit'])
                         ->where('bank_statement_id', '!=', $this->bankStatement->id)
                         ->get()
                         ->first(function ($existing) use ($normalizedParticularsKey) {
@@ -205,13 +206,13 @@ class ProcessBankStatement implements ShouldQueue
     {
         $normalizedParticulars = $this->normalizeParticularsForDuplicate($transaction['particulars'] ?? '');
 
+        // Duplicate detection based ONLY on: value_date + narrative/particulars + credit
+        // Do NOT use remarks, debit, or transaction_code
         $hashString = sprintf(
-            '%s|%s|%s|%s|%s',
-            $transaction['tran_date'],
+            '%s|%s|%s',
+            $transaction['value_date'] ?? $transaction['tran_date'],
             $normalizedParticulars,
-            $transaction['credit'],
-            $transaction['debit'],
-            $transaction['transaction_code'] ?? ''
+            $transaction['credit']
         );
 
         return hash('sha256', $hashString);

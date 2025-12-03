@@ -6,8 +6,13 @@ use App\Models\BankStatement;
 use App\Models\Member;
 use App\Models\Transaction;
 use App\Models\ManualContribution;
+use App\Models\Invoice;
+use App\Models\Expense;
+use App\Models\Meeting;
+use App\Models\Announcement;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
@@ -112,6 +117,94 @@ class DashboardController extends Controller
                 ->limit(5)
                 ->get();
 
+            // Invoice metrics (with error handling)
+            $totalInvoices = 0;
+            $pendingInvoices = 0;
+            $paidInvoices = 0;
+            $overdueInvoices = 0;
+            $invoiceCount = 0;
+            $pendingInvoiceCount = 0;
+            $collectionRate = 0;
+            
+            try {
+                $totalInvoices = Invoice::sum('amount');
+                $pendingInvoices = Invoice::whereIn('status', ['pending', 'overdue'])->sum('amount');
+                $paidInvoices = Invoice::where('status', 'paid')->sum('amount');
+                $overdueInvoices = Invoice::where('status', 'overdue')->sum('amount');
+                $invoiceCount = Invoice::count();
+                $pendingInvoiceCount = Invoice::whereIn('status', ['pending', 'overdue'])->count();
+                $collectionRate = $totalInvoices > 0 ? ($paidInvoices / $totalInvoices) * 100 : 0;
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning('Error getting invoice metrics: ' . $e->getMessage());
+            }
+
+            // Expense metrics (with error handling)
+            $totalExpenses = 0;
+            $pendingExpenses = 0;
+            $monthlyExpenses = 0;
+            
+            try {
+                $totalExpenses = Expense::where('approval_status', 'approved')->sum('amount');
+                $pendingExpenses = Expense::where('approval_status', 'pending')->count();
+                $monthlyExpenses = Expense::where('approval_status', 'approved')
+                    ->whereMonth('expense_date', now()->month)
+                    ->whereYear('expense_date', now()->year)
+                    ->sum('amount');
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning('Error getting expense metrics: ' . $e->getMessage());
+            }
+
+            // Engagement metrics (with error handling)
+            $upcomingMeetings = 0;
+            $activeAnnouncements = 0;
+            
+            try {
+                $upcomingMeetings = Meeting::where('scheduled_for', '>=', now())->count();
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning('Error getting upcoming meetings: ' . $e->getMessage());
+            }
+            
+            try {
+                $activeAnnouncements = Announcement::where('is_active', true)->count();
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning('Error getting active announcements: ' . $e->getMessage());
+            }
+
+            // Member status breakdown (with error handling)
+            $memberStatusBreakdown = [];
+            try {
+                $memberStatusBreakdown = Member::select('contribution_status_label', DB::raw('count(*) as count'))
+                    ->where('is_active', true)
+                    ->groupBy('contribution_status_label')
+                    ->get()
+                    ->mapWithKeys(fn($item) => [$item->contribution_status_label ?? 'Unknown' => $item->count]);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning('Error getting member status breakdown: ' . $e->getMessage());
+            }
+
+            // Weekly invoice vs payment trend (last 8 weeks) - with error handling
+            $invoicePaymentTrend = [];
+            try {
+                for ($i = 7; $i >= 0; $i--) {
+                    $weekStart = Carbon::now()->subWeeks($i)->startOfWeek();
+                    $weekEnd = Carbon::now()->subWeeks($i)->endOfWeek();
+                    $weekPeriod = $weekStart->format('Y-\WW');
+                    
+                    $invoiced = Invoice::where('period', $weekPeriod)->sum('amount');
+                    $paid = Invoice::where('period', $weekPeriod)
+                        ->where('status', 'paid')
+                        ->sum('amount');
+                    
+                    $invoicePaymentTrend[] = [
+                        'week' => $weekStart->format('M d'),
+                        'invoiced' => (float) $invoiced,
+                        'paid' => (float) $paid,
+                    ];
+                }
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning('Error getting invoice payment trend: ' . $e->getMessage());
+            }
+
             return response()->json([
                 'statistics' => [
                     'total_members' => $totalMembers,
@@ -122,11 +215,28 @@ class DashboardController extends Controller
                     'assigned_contributions' => $assignedContributions,
                     'unassigned_contributions' => $allTransactionContributions - $assignedContributions,
                     'statements_processed' => $statementsProcessed,
+                    // Invoice metrics
+                    'total_invoices' => $totalInvoices,
+                    'pending_invoices' => $pendingInvoices,
+                    'paid_invoices' => $paidInvoices,
+                    'overdue_invoices' => $overdueInvoices,
+                    'invoice_count' => $invoiceCount,
+                    'pending_invoice_count' => $pendingInvoiceCount,
+                    'collection_rate' => round($collectionRate, 2),
+                    // Expense metrics
+                    'total_expenses' => $totalExpenses,
+                    'pending_expenses' => $pendingExpenses,
+                    'monthly_expenses' => $monthlyExpenses,
+                    // Engagement metrics
+                    'upcoming_meetings' => $upcomingMeetings,
+                    'active_announcements' => $activeAnnouncements,
                 ],
                 'contributions_by_week' => $weeksData,
                 'contributions_by_month' => $monthsData,
                 'recent_transactions' => $recentTransactions,
                 'recent_statements' => $recentStatements,
+                'member_status_breakdown' => $memberStatusBreakdown,
+                'invoice_payment_trend' => $invoicePaymentTrend,
             ]);
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Dashboard index error: ' . $e->getMessage(), [

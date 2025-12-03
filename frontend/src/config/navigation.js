@@ -11,6 +11,7 @@ import {
   HiOutlineMegaphone,
   HiOutlineCalendarDays,
   HiOutlineBanknotes,
+  HiOutlineReceiptPercent,
   HiOutlineShieldExclamation,
   HiOutlineCog6Tooth,
   HiOutlineCloudArrowUp,
@@ -54,6 +55,12 @@ export const NAVIGATION = [
         icon: HiOutlineBanknotes,
         path: '/manual-contributions',
         roles: [ROLES.SUPER_ADMIN, ROLES.TREASURER, ROLES.GROUP_TREASURER],
+      },
+      {
+        label: 'Invoices',
+        icon: HiOutlineReceiptPercent,
+        path: '/invoices',
+        roles: [ROLES.SUPER_ADMIN, ROLES.TREASURER, ROLES.GROUP_TREASURER, ROLES.ACCOUNTANT],
       },
       {
         label: 'Budgets',

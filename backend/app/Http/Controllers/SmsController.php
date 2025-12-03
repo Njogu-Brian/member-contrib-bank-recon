@@ -55,6 +55,15 @@ class SmsController extends Controller
                     continue;
                 }
 
+                // Get invoice data for this member
+                $totalInvoices = $member->invoices()->sum('amount');
+                $pendingInvoices = $member->invoices()->whereIn('status', ['pending', 'overdue'])->sum('amount');
+                $overdueInvoices = $member->invoices()->where('status', 'overdue')->sum('amount');
+                $paidInvoices = $member->invoices()->where('status', 'paid')->sum('amount');
+                $invoiceCount = $member->invoices()->count();
+                $pendingInvoiceCount = $member->invoices()->whereIn('status', ['pending', 'overdue'])->count();
+                $oldestInvoice = $member->invoices()->whereIn('status', ['pending', 'overdue'])->orderBy('due_date', 'asc')->first();
+
                 $memberData = [
                     'id' => $member->id,
                     'name' => $member->name,
@@ -63,8 +72,15 @@ class SmsController extends Controller
                     'member_code' => $member->member_code,
                     'member_number' => $member->member_number,
                     'total_contributions' => (float) ($member->total_contributions ?? 0),
-                    'expected_contributions' => (float) ($member->expected_contributions ?? 0),
                     'contribution_status' => $member->contribution_status_label ?? 'Unknown',
+                    'total_invoices' => (float) $totalInvoices,
+                    'pending_invoices' => (float) $pendingInvoices,
+                    'overdue_invoices' => (float) $overdueInvoices,
+                    'paid_invoices' => (float) $paidInvoices,
+                    'invoice_count' => $invoiceCount,
+                    'pending_invoice_count' => $pendingInvoiceCount,
+                    'oldest_invoice_number' => $oldestInvoice->invoice_number ?? '',
+                    'oldest_invoice_due_date' => $oldestInvoice ? $oldestInvoice->due_date->format('M d, Y') : '',
                 ];
 
                 $recipients[] = [

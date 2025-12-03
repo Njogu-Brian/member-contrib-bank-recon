@@ -417,31 +417,6 @@ export default function Layout() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-r from-brand-600 to-indigo-600 px-4 py-8 text-white shadow-lg lg:px-10">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-sm uppercase tracking-widest text-white/70">Today’s status</p>
-              <h1 className="mt-2 text-2xl font-semibold leading-tight">
-                Welcome back, {user?.first_name ?? user?.name?.split(' ')[0] ?? 'team'} 👋
-              </h1>
-              <p className="mt-1 text-white/80">
-                Track contributions, reconcile statements, and manage governance from one command
-                center.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              {quickActions.map((action) => (
-                <button
-                  key={action.label}
-                  onClick={() => navigate(action.path)}
-                  className="rounded-2xl bg-white/10 px-4 py-2 text-sm font-medium backdrop-blur hover:bg-white/20"
-                >
-                  {action.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
 
 
         <main className="px-4 py-6 lg:px-10 lg:py-10">

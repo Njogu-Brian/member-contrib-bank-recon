@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { getTransactions, autoAssign, transferTransaction, archiveTransaction, unarchiveTransaction, bulkArchiveTransactions, bulkAssign, splitTransaction } from '../api/transactions'
 import { getMembers } from '../api/members'
 import MemberSearchModal from '../components/MemberSearchModal'
 import Pagination from '../components/Pagination'
+import PageHeader from '../components/PageHeader'
 import { HiEllipsisVertical, HiOutlineChevronDown } from 'react-icons/hi2'
 
 export default function Transactions({
@@ -13,6 +15,7 @@ export default function Transactions({
   titleOverride,
   showAutoAssign = true,
 }) {
+  const navigate = useNavigate()
   const [filters, setFilters] = useState({
     status: initialStatus,
     search: '',
@@ -505,16 +508,23 @@ export default function Transactions({
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">{pageTitle}</h1>
-        {!isArchivedView && (
-          <div className="flex flex-wrap gap-2">
+      <PageHeader
+        title={pageTitle}
+        description="View and manage all financial transactions"
+        metric={pagination?.total || 0}
+        metricLabel="Total Transactions"
+        gradient="from-green-600 to-emerald-600"
+      />
+
+      {!isArchivedView && (
+        <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="flex flex-wrap gap-3">
             <button
               onClick={handleAutoAssign}
               disabled={autoAssignMutation.isPending}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-all"
             >
-              {autoAssignMutation.isPending ? 'Processing...' : 'Auto Assign'}
+              {autoAssignMutation.isPending ? 'Processing...' : '✨ Auto Assign'}
             </button>
             <button
               onClick={() => {
@@ -525,10 +535,10 @@ export default function Transactions({
                 setShowAssignModal(true)
               }}
               disabled={bulkAssignMutation.isPending || selectedTransactions.length === 0}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-md text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               title={selectedTransactions.length === 0 ? 'Select transactions using checkboxes to enable bulk assign' : ''}
             >
-              {bulkAssignMutation.isPending ? 'Assigning...' : `Bulk Assign${selectedTransactions.length > 0 ? ` (${selectedTransactions.length})` : ''}`}
+              {bulkAssignMutation.isPending ? 'Assigning...' : `👥 Bulk Assign${selectedTransactions.length > 0 ? ` (${selectedTransactions.length})` : ''}`}
             </button>
             <button
               onClick={() => {
@@ -539,10 +549,10 @@ export default function Transactions({
                 handleBulkArchive()
               }}
               disabled={bulkArchiveMutation.isPending || selectedTransactions.length === 0}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-md text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               title={selectedTransactions.length === 0 ? 'Select transactions using checkboxes to enable bulk archive' : ''}
             >
-              {bulkArchiveMutation.isPending ? 'Archiving...' : `Bulk Archive${selectedTransactions.length > 0 ? ` (${selectedTransactions.length})` : ''}`}
+              {bulkArchiveMutation.isPending ? 'Archiving...' : `🗄️ Bulk Archive${selectedTransactions.length > 0 ? ` (${selectedTransactions.length})` : ''}`}
             </button>
             {selectedTransactions.length > 0 && (
               <button
@@ -554,8 +564,8 @@ export default function Transactions({
               </button>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="bg-white shadow rounded-lg p-4">
         <div className={`grid grid-cols-1 ${isArchivedView ? 'md:grid-cols-3' : 'md:grid-cols-4'} gap-4`}>
@@ -574,6 +584,7 @@ export default function Transactions({
               <option value="auto_assigned">Auto Assigned</option>
               <option value="manual_assigned">Manual Assigned</option>
               <option value="draft">Draft</option>
+              <option value="duplicate">Duplicate</option>
             </select>
           </div>
           <div>
@@ -812,7 +823,12 @@ export default function Transactions({
                           </span>
                         )}
                         {tx.member?.name && (
-                          <span className="text-xs text-gray-500">{tx.member.name}</span>
+                          <button
+                            onClick={() => navigate(`/members/${tx.member.id}?highlight=${tx.id}`)}
+                            className="text-xs text-indigo-600 hover:text-indigo-900 hover:underline"
+                          >
+                            {tx.member.name}
+                          </button>
                         )}
                       </div>
                     </td>
@@ -832,9 +848,19 @@ export default function Transactions({
                       {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(tx.credit || tx.debit || 0)}
                     </td>
                     <td className="px-2 py-2 text-sm text-gray-500 hidden md:table-cell">
-                      <div className="max-w-xs truncate" title={tx.member?.name}>
-                        {tx.member?.name || '-'}
-                      </div>
+                      {tx.member?.id ? (
+                        <button
+                          onClick={() => navigate(`/members/${tx.member.id}?highlight=${tx.id}`)}
+                          className="max-w-xs truncate text-indigo-600 hover:text-indigo-900 hover:underline text-left"
+                          title={`View ${tx.member.name}'s statement`}
+                        >
+                          {tx.member.name}
+                        </button>
+                      ) : (
+                        <div className="max-w-xs truncate">
+                          -
+                        </div>
+                      )}
                     </td>
                     <td className="px-2 py-2 hidden lg:table-cell">
                       <span className={`inline-flex px-1.5 py-0.5 text-xs font-semibold rounded-full ${

@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import api from '../api/axios'
 import StatementHeader from '../components/StatementHeader'
+import ProfileUpdateModal from '../components/ProfileUpdateModal'
 
 const formatCurrency = (value) =>
   Number(value ?? 0).toLocaleString('en-KE', {
@@ -25,6 +26,9 @@ export default function PublicStatement() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [page, setPage] = useState(parseInt(searchParams.get('page') || '1', 10))
   const [perPage, setPerPage] = useState(parseInt(searchParams.get('per_page') || '25', 10))
+  const [showProfileModal, setShowProfileModal] = useState(false)
+  const [profileData, setProfileData] = useState(null)
+  const [profileIncompleteError, setProfileIncompleteError] = useState(null)
 
   // Ensure we have a token
   if (!token) {
@@ -39,7 +43,7 @@ export default function PublicStatement() {
     )
   }
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['public-statement', token, page, perPage],
     queryFn: async () => {
       const params = new URLSearchParams({ page, per_page: perPage })
@@ -70,6 +74,21 @@ export default function PublicStatement() {
           } catch {
             errorData = { message: `HTTP error! status: ${response.status}` }
           }
+          
+          // Special handling for profile incomplete error
+          if (response.status === 403 && errorData.requires_profile_update) {
+            // Fetch profile data to pre-populate modal
+            const profileResponse = await fetch(
+              `${window.location.origin}/api/v1/public/profile/${token}/status`
+            )
+            if (profileResponse.ok) {
+              const profileInfo = await profileResponse.json()
+              setProfileData(profileInfo.member)
+            }
+            setProfileIncompleteError(errorData)
+            setShowProfileModal(true)
+          }
+          
           const error = new Error(errorData.message || `HTTP error! status: ${response.status}`)
           error.status = response.status
           error.response = { data: errorData, status: response.status }
@@ -89,6 +108,13 @@ export default function PublicStatement() {
     retry: false,
   })
 
+  const handleProfileUpdate = async (updatedData) => {
+    // Profile updated successfully, refetch statement
+    setShowProfileModal(false)
+    setProfileIncompleteError(null)
+    await refetch()
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -100,7 +126,7 @@ export default function PublicStatement() {
     )
   }
 
-  if (error) {
+  if (error && !profileIncompleteError) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-6 text-center">
@@ -117,15 +143,46 @@ export default function PublicStatement() {
     )
   }
 
+  // Show profile update modal if profile is incomplete
+  if (profileIncompleteError) {
+    return (
+      <>
+        <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white shadow-2xl rounded-2xl p-8 text-center">
+            <div className="text-indigo-600 text-6xl mb-4">👤</div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-3">Profile Incomplete</h1>
+            <p className="text-gray-600 mb-6 text-lg">
+              {profileIncompleteError.message}
+            </p>
+            <div className="bg-indigo-50 rounded-lg p-4 mb-6">
+              <p className="text-sm text-indigo-800 font-medium">
+                Please complete your profile to access your member statement.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowProfileModal(true)}
+              className="w-full px-6 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg text-lg"
+            >
+              Complete Profile Now
+            </button>
+          </div>
+        </div>
+        <ProfileUpdateModal
+          isOpen={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+          onUpdate={handleProfileUpdate}
+          token={token}
+          initialData={profileData}
+        />
+      </>
+    )
+  }
+
   const { member, statement, summary, pagination, monthly_totals } = data || {}
 
   const handlePageChange = (newPage) => {
     setPage(newPage)
     setSearchParams({ ...Object.fromEntries(searchParams), page: newPage })
-  }
-
-  const handlePrint = () => {
-    window.print()
   }
 
   const handleDownloadPDF = async () => {
@@ -175,7 +232,6 @@ export default function PublicStatement() {
       <StatementHeader 
         member={member} 
         isPublic={true}
-        onPrint={handlePrint}
         onDownloadPDF={handleDownloadPDF}
       />
 

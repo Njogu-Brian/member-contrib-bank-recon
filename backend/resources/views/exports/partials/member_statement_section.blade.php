@@ -3,8 +3,9 @@
     $memberNumber = $member->member_code ?? $member->member_number ?? '-';
     $email = $member->email ?? '-';
     $phone = $member->phone ?? '-';
+    $idNumber = $member->id_number ?? '-';
+    $church = $member->church ?? $member->resident_church ?? '-';
     $membershipType = $member->membership_type ?? 'Member';
-    $residentChurch = $member->resident_church ?? '-';
     $statusLabel = $member->is_active ? 'Active' : 'Inactive';
     $summaryData = $summary ?? [];
     $totalContributions = $summaryData['total_contributions'] ?? 0;
@@ -21,11 +22,15 @@
     <div class="branding">
         <div class="brand-lockup">
             <div class="brand-icon">
-                @include('exports.partials.evimeria_logo')
+                @if(isset($logoPath) && $logoPath && file_exists($logoPath))
+                    <img src="{{ $logoPath }}" alt="Logo" style="max-height: 60px; max-width: 60px; object-fit: contain;">
+                @else
+                    @include('exports.partials.evimeria_logo')
+                @endif
             </div>
             <div class="brand-text">
-                <div class="brand-name">Evimeria Initiative</div>
-                <div class="brand-tagline">1000 For A 1000</div>
+                <div class="brand-name">{{ $appName ?? 'Evimeria Initiative' }}</div>
+                <div class="brand-tagline">{{ $appTagline ?? '1000 For A 1000' }}</div>
             </div>
         </div>
     </div>
@@ -37,20 +42,20 @@
         <tr>
             <td class="label">Name:</td>
             <td>{{ $member->name }}</td>
-            <td class="label">Email:</td>
-            <td>{{ $email }}</td>
-        </tr>
-        <tr>
-            <td class="label">Member No:</td>
-            <td>{{ $memberNumber }}</td>
             <td class="label">Phone:</td>
             <td>{{ $phone }}</td>
         </tr>
         <tr>
-            <td class="label">Membership Type:</td>
-            <td>{{ $membershipType }}</td>
-            <td class="label">Resident Church:</td>
-            <td>{{ $residentChurch }}</td>
+            <td class="label">Member No:</td>
+            <td>{{ $memberNumber }}</td>
+            <td class="label">ID Number:</td>
+            <td><strong>{{ $idNumber }}</strong></td>
+        </tr>
+        <tr>
+            <td class="label">Email:</td>
+            <td>{{ $email }}</td>
+            <td class="label">Church:</td>
+            <td>{{ $church }}</td>
         </tr>
         <tr>
             <td class="label">Registration Date:</td>
@@ -81,7 +86,10 @@
         <tbody>
             @forelse ($sortedEntries as $entry)
                 @php
-                    $amount = (float) ($entry['amount'] ?? 0);
+                    // Handle both 'amount' property and 'credit'/'debit' properties
+                    $amount = isset($entry['amount']) 
+                        ? (float) $entry['amount'] 
+                        : (float) (($entry['credit'] ?? 0) - ($entry['debit'] ?? 0));
                     $isDebit = $amount < 0;
                     $debit = $isDebit ? abs($amount) : 0;
                     $credit = $isDebit ? 0 : $amount;
@@ -121,7 +129,7 @@
     </div>
 
     <div class="footer-text">
-        Statement generated electronically by Evimeria Contributions System.
+        Statement generated electronically by {{ $appName ?? 'Evimeria Initiative' }} Contributions System.
     </div>
 </div>
 

@@ -18,17 +18,16 @@
     <div class="statement">
         <div class="branding">
             <div class="brand-lockup">
-                @if($logoUrl)
-                    <div class="brand-icon">
-                        <img src="{{ $logoUrl }}" alt="Logo" style="max-width: 120px; max-height: 80px;">
-                    </div>
-                @else
-                    <div class="brand-icon">
+                <div class="brand-icon">
+                    @if(isset($logoPath) && $logoPath && file_exists($logoPath))
+                        <img src="{{ $logoPath }}" alt="Logo" style="max-height: 60px; max-width: 60px; object-fit: contain;">
+                    @else
                         @include('exports.partials.evimeria_logo')
-                    </div>
-                @endif
+                    @endif
+                </div>
                 <div class="brand-text">
-                    <div class="brand-tagline">Member Contribution Statement</div>
+                    <div class="brand-name">{{ $appName ?? 'Evimeria Initiative' }}</div>
+                    <div class="brand-tagline">{{ $appTagline ?? '1000 For A 1000' }}</div>
                 </div>
             </div>
         </div>

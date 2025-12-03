@@ -58,6 +58,16 @@ class PublicMemberStatementController extends Controller
             ], 410); // 410 Gone
         }
 
+        // Check if profile is complete - if not, require update first
+        if (!$member->isProfileComplete()) {
+            return response()->json([
+                'error' => 'Profile Incomplete',
+                'message' => 'Please complete your profile before viewing your statement.',
+                'requires_profile_update' => true,
+                'missing_fields' => $member->getMissingProfileFields(),
+            ], 403); // 403 Forbidden
+        }
+
         // Update access tracking
         $member->increment('public_share_access_count');
         $member->update(['public_share_last_accessed_at' => now()]);
@@ -147,6 +157,16 @@ class PublicMemberStatementController extends Controller
             ], 410); // 410 Gone
         }
 
+        // Check if profile is complete - if not, require update first
+        if (!$member->isProfileComplete()) {
+            return response()->json([
+                'error' => 'Profile Incomplete',
+                'message' => 'Please complete your profile before downloading your statement.',
+                'requires_profile_update' => true,
+                'missing_fields' => $member->getMissingProfileFields(),
+            ], 403); // 403 Forbidden
+        }
+
         $validated = $request->validate([
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date',
@@ -156,10 +176,21 @@ class PublicMemberStatementController extends Controller
         $data = $this->buildStatementData($member, $validated);
         $entries = $data['collection'];
 
-        // Get logo URL if available
-        $logoUrl = null;
-        if (Setting::get('logo_path')) {
-            $logoUrl = \Illuminate\Support\Facades\Storage::disk('public')->url(Setting::get('logo_path'));
+        // Get logo path and app settings for PDF
+        $logoPath = null;
+        $appName = 'Evimeria Initiative';
+        $appTagline = '1000 For A 1000';
+        
+        try {
+            $settingLogoPath = Setting::get('logo_path');
+            if ($settingLogoPath && \Illuminate\Support\Facades\Storage::disk('public')->exists($settingLogoPath)) {
+                $logoPath = \Illuminate\Support\Facades\Storage::disk('public')->path($settingLogoPath);
+            }
+            
+            $appName = Setting::get('app_name', 'Evimeria Initiative');
+            $appTagline = Setting::get('app_tagline', '1000 For A 1000');
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Error getting settings for PDF: ' . $e->getMessage());
         }
 
         // Get contact phone for footer
@@ -179,7 +210,9 @@ class PublicMemberStatementController extends Controller
             ),
             'generatedAt' => now(),
             'printDate' => now(),
-            'logoUrl' => $logoUrl,
+            'logoPath' => $logoPath,
+            'appName' => $appName,
+            'appTagline' => $appTagline,
             'contactPhone' => $contactPhone,
         ], $filename);
     }

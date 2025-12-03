@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { getDuplicates, reanalyzeDuplicates } from '../api/duplicates'
 import { getStatements } from '../api/statements'
 import Pagination from '../components/Pagination'
+import PageHeader from '../components/PageHeader'
 
 export default function DuplicateTransactions() {
+  const navigate = useNavigate()
   const [filters, setFilters] = useState({
     statement_id: '',
     search: '',
@@ -59,14 +61,16 @@ export default function DuplicateTransactions() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Duplicate Transactions</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Transactions flagged as duplicates based on matching date, description, and amount.
-          </p>
-        </div>
-        <div className="flex space-x-3">
+      <PageHeader
+        title="Duplicate Transactions"
+        description="Transactions flagged as duplicates based on value date, narrative, and amount"
+        metric={pagination?.total || 0}
+        metricLabel="Total Duplicates"
+        gradient="from-red-600 to-orange-600"
+      />
+
+      <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="flex flex-wrap gap-3 justify-end">
           <button
             onClick={() => {
               if (confirm('Reanalyze all duplicate transactions? This will re-check all statements.')) {
@@ -74,9 +78,9 @@ export default function DuplicateTransactions() {
               }
             }}
             disabled={reanalyzeMutation.isPending}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-all"
           >
-            {reanalyzeMutation.isPending ? 'Reanalyzing...' : 'Reanalyze All'}
+            {reanalyzeMutation.isPending ? 'Reanalyzing...' : '🔄 Reanalyze All'}
           </button>
           {filters.statement_id && (
             <button
@@ -86,15 +90,17 @@ export default function DuplicateTransactions() {
                 }
               }}
               disabled={reanalyzeMutation.isPending}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-all"
             >
-              {reanalyzeMutation.isPending ? 'Reanalyzing...' : 'Reanalyze Statement'}
+              {reanalyzeMutation.isPending ? 'Reanalyzing...' : '🔄 Reanalyze Statement'}
             </button>
           )}
         </div>
       </div>
 
-      <div className="bg-white shadow rounded-lg p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-white rounded-xl shadow-sm p-6">
+        <h3 className="text-sm font-semibold text-gray-900 mb-4">Filters</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700">Statement</label>
           <select
@@ -126,9 +132,10 @@ export default function DuplicateTransactions() {
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
           />
         </div>
+        </div>
       </div>
 
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -147,83 +154,182 @@ export default function DuplicateTransactions() {
             <tbody className="bg-white divide-y divide-gray-200">
               {duplicates.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="px-6 py-6 text-center text-gray-500">
-                    No duplicates were recorded for the current filters.
+                  <td colSpan={3} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center">
+                      <div className="text-6xl mb-4">✅</div>
+                      <p className="text-lg font-medium text-gray-900">No Duplicates Found</p>
+                      <p className="text-sm text-gray-500 mt-2">
+                        All transactions are unique based on value date, narrative, and amount.
+                      </p>
+                      <button
+                        onClick={() => {
+                          if (confirm('Reanalyze all statements to check for duplicates?')) {
+                            reanalyzeMutation.mutate(null)
+                          }
+                        }}
+                        className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                      >
+                        🔄 Reanalyze for Duplicates
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )}
 
               {duplicates.map((item) => (
-                <tr key={item.id}>
+                <tr key={item.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 align-top text-sm text-gray-900 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold">Duplicate</p>
-                        <p className="text-xs text-gray-500">Reason: {item.reason || 'N/A'}</p>
+                    <button
+                      onClick={() => navigate(`/statements/${item.bank_statement_id}/transactions`)}
+                      className="w-full text-left p-3 rounded-lg hover:bg-red-50 transition-colors border border-red-200"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <p className="font-semibold text-red-700">Duplicate Entry 🔴</p>
+                          <p className="text-xs text-gray-500">Reason: {item.duplicate_reason || 'N/A'}</p>
+                        </div>
+                        <span className="text-xs text-blue-600 font-medium">
+                          View in Statement →
+                        </span>
                       </div>
-                      <span className="text-xs text-gray-500">
-                        {item.created_at ? new Date(item.created_at).toLocaleString() : ''}
-                      </span>
-                    </div>
-                    <div className="text-xs text-gray-500">Date</div>
-                    <div>{item.duplicate.tran_date || 'Unknown'}</div>
-                    <div className="text-xs text-gray-500">Particulars</div>
-                    <div className="whitespace-pre-wrap">{item.duplicate.particulars}</div>
-                    <div className="text-xs text-gray-500">Amount</div>
-                    <div className="font-semibold">Ksh {Number(item.duplicate.credit || 0).toLocaleString()}</div>
-                    {item.duplicate.page_number && (
-                      <div className="text-xs text-gray-500">Page {item.duplicate.page_number}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 align-top text-sm text-gray-900 space-y-2">
-                    {item.original_transaction ? (
-                      <>
-                        <div className="flex items-center justify-between">
-                          <p className="font-semibold">
-                            Tx #{item.original_transaction.id}
-                          </p>
-                          <span className="text-xs text-gray-500 capitalize">
-                            {item.original_transaction.assignment_status?.replace('_', ' ') || 'unassigned'}
-                          </span>
-                        </div>
-                        <div className="text-xs text-gray-500">Date</div>
-                        <div>{item.original_transaction.tran_date || 'Unknown'}</div>
-                        <div className="text-xs text-gray-500">Particulars</div>
-                        <div className="whitespace-pre-wrap">
-                          {item.original_transaction.particulars}
-                        </div>
-                        <div className="text-xs text-gray-500">Amount</div>
-                        <div className="font-semibold">
-                          Ksh {Number(item.original_transaction.credit || 0).toLocaleString()}
-                        </div>
-                        {item.original_transaction.member && (
-                          <div className="text-xs text-gray-500">
-                            Member: {item.original_transaction.member.name}
+                      <div className="space-y-1">
+                          <div>
+                            <span className="text-xs text-gray-500">Date: </span>
+                            <span className="font-medium">
+                              {item.tran_date ? new Date(item.tran_date).toLocaleDateString('en-GB', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric'
+                              }) : 'Unknown'}
+                            </span>
+                          </div>
+                        {item.particulars_snapshot && (
+                          <div>
+                            <span className="text-xs text-gray-500">Particulars: </span>
+                            <div className="text-sm mt-1 max-h-12 overflow-hidden">{item.particulars_snapshot}</div>
                           </div>
                         )}
-                      </>
-                    ) : (
-                      <p className="text-sm text-gray-500">
-                        Original transaction could not be found. It may have been deleted.
-                      </p>
-                    )}
+                        <div>
+                          <span className="text-xs text-gray-500">Amount: </span>
+                          <span className="font-semibold text-red-600">
+                            {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(Number(item.credit || 0))}
+                          </span>
+                        </div>
+                        {item.page_number && (
+                          <div className="text-xs text-gray-500">Page {item.page_number}</div>
+                        )}
+                      </div>
+                    </button>
                   </td>
                   <td className="px-6 py-4 align-top text-sm text-gray-900 space-y-2">
-                    {item.statement ? (
-                      <>
-                        <p className="font-semibold">{item.statement.filename}</p>
-                        <p className="text-xs text-gray-500">
-                          Uploaded {item.statement.uploaded_at ? new Date(item.statement.uploaded_at).toLocaleString() : ''}
-                        </p>
-                        <Link
-                          to={`/statements/${item.statement.id}`}
-                          className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
+                    {item.transaction ? (
+                      item.transaction.member_id ? (
+                        <button
+                          onClick={() => navigate(`/members/${item.transaction.member_id}?highlight=${item.transaction_id}`)}
+                          className="w-full text-left p-3 rounded-lg hover:bg-green-50 transition-colors border border-green-200"
                         >
-                          View Statement
-                        </Link>
-                      </>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="font-semibold text-green-700">
+                              Transaction #{item.transaction_id}
+                            </p>
+                            <span className="text-xs text-green-700 font-medium">
+                              View Member →
+                            </span>
+                          </div>
+                          <div className="space-y-1">
+                            <div>
+                              <span className="text-xs text-gray-500">Date: </span>
+                              <span className="font-medium">
+                                {new Date(item.transaction.tran_date).toLocaleDateString('en-GB', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric'
+                                })}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-xs text-gray-500">Particulars: </span>
+                              <div className="text-sm mt-1 max-h-12 overflow-hidden">{item.transaction.particulars}</div>
+                            </div>
+                            <div>
+                              <span className="text-xs text-gray-500">Amount: </span>
+                              <span className="font-semibold text-green-600">
+                                {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(
+                                  Number(item.transaction.credit || 0)
+                                )}
+                              </span>
+                            </div>
+                            {item.transaction.member && (
+                              <div className="text-xs text-green-600 font-medium mt-2">
+                                ✓ Assigned to: {item.transaction.member.name}
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      ) : (
+                        <div className="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="font-semibold text-gray-700">
+                              Transaction #{item.transaction_id}
+                            </p>
+                            <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-200 text-gray-700">
+                              {item.transaction.assignment_status || 'unassigned'}
+                            </span>
+                          </div>
+                          <div className="space-y-1">
+                            <div>
+                              <span className="text-xs text-gray-500">Date: </span>
+                              <span>{new Date(item.transaction.tran_date).toLocaleDateString('en-GB', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric'
+                              })}</span>
+                            </div>
+                            <div>
+                              <span className="text-xs text-gray-500">Particulars: </span>
+                              <div className="text-sm mt-1 max-h-12 overflow-hidden">{item.transaction.particulars}</div>
+                            </div>
+                            <div>
+                              <span className="text-xs text-gray-500">Amount: </span>
+                              <span className="font-semibold">
+                                {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(
+                                  Number(item.transaction.credit || 0)
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )
                     ) : (
-                      <p className="text-sm text-gray-500">Statement deleted</p>
+                      <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
+                        <p className="text-sm text-amber-800">
+                          ⚠️ Original transaction not found. It may have been deleted or archived.
+                        </p>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 align-top text-sm text-gray-900">
+                    {item.statement ? (
+                      <Link
+                        to={`/statements/${item.statement.id}/transactions`}
+                        className="block p-3 rounded-lg hover:bg-indigo-50 transition-colors border border-indigo-200"
+                      >
+                        <p className="font-semibold text-indigo-700">{item.statement.filename}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Uploaded: {new Date(item.statement.created_at).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                          })}
+                        </p>
+                        <div className="text-xs text-indigo-600 font-medium mt-2">
+                          View Transactions →
+                        </div>
+                      </Link>
+                    ) : (
+                      <div className="p-3 rounded-lg bg-gray-50">
+                        <p className="text-sm text-gray-500">Statement not found</p>
+                      </div>
                     )}
                   </td>
                 </tr>

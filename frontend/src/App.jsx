@@ -13,6 +13,7 @@ import ArchivedTransactions from './pages/ArchivedTransactions'
 import DraftTransactions from './pages/DraftTransactions'
 import Expenses from './pages/Expenses'
 import ManualContributions from './pages/ManualContributions'
+import Invoices from './pages/Invoices'
 import MemberProfile from './pages/MemberProfile'
 import Settings from './pages/Settings'
 import Reports from './pages/Reports'
@@ -192,6 +193,7 @@ function App() {
           }
         />
         <Route path="manual-contributions" element={<ManualContributions />} />
+        <Route path="invoices" element={<Invoices />} />
         <Route path="wallets" element={<Wallets />} />
         <Route path="investments" element={<Investments />} />
         <Route path="announcements" element={<Announcements />} />

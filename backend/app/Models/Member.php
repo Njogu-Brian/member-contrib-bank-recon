@@ -19,6 +19,7 @@ class Member extends Model
         'secondary_phone',
         'email',
         'id_number',
+        'church',
         'gender',
         'next_of_kin_name',
         'next_of_kin_phone',
@@ -38,6 +39,7 @@ class Member extends Model
         'kyc_rejection_reason',
         'activated_at',
         'activated_by',
+        'profile_completed_at',
     ];
 
     protected $casts = [
@@ -45,6 +47,7 @@ class Member extends Model
         'date_of_registration' => 'date',
         'kyc_approved_at' => 'datetime',
         'activated_at' => 'datetime',
+        'profile_completed_at' => 'datetime',
     ];
 
     protected $appends = [
@@ -74,6 +77,11 @@ class Member extends Model
         return $this->belongsToMany(Expense::class, 'expense_members')
                     ->withPivot('amount')
                     ->withTimestamps();
+    }
+
+    public function invoices()
+    {
+        return $this->hasMany(Invoice::class);
     }
 
     public function kycDocuments()
@@ -144,42 +152,10 @@ class Member extends Model
 
     public function getExpectedContributionsAttribute()
     {
-        $startDate = Setting::get('contribution_start_date');
-        $weeklyAmount = (float) Setting::get('weekly_contribution_amount', 1000);
-
-        if (!$startDate) {
-            return 0;
-        }
-
-        $start = Carbon::parse($startDate)->startOfWeek();
-        $now = Carbon::now();
-        $endOfFirstWeek = $start->copy()->endOfWeek();
-        
-        // If current date is before the end of the first week, no contributions are expected yet
-        // We need to wait for a full week to complete before expecting any contribution
-        if ($now->lt($endOfFirstWeek)) {
-            return 0;
-        }
-
-        // Count only full weeks that have completely passed
-        // Start counting from the Monday after the first week ends
-        // So if start date is Monday, first week ends Sunday, contributions start counting from next Monday
-        $firstContributionWeekStart = $endOfFirstWeek->copy()->addDay()->startOfWeek();
-        
-        // If we haven't reached the start of the first contribution week, return 0
-        if ($now->lt($firstContributionWeekStart)) {
-            return 0;
-        }
-
-        // Count full weeks from the first contribution week start
-        // diffInWeeks with false parameter means don't round up
-        $weeks = max(0, floor($firstContributionWeekStart->diffInDays($now) / 7));
-        
-        // Add 1 week because the first week should count after it completes
-        // If we're in week 1 after start, we expect 1 week's contribution
-        $weeks += 1;
-
-        return $weeks * $weeklyAmount;
+        // Expected contributions = Total invoices issued for this member
+        // This merges the invoice and expected contributions modules into one
+        // Invoices represent what the member should have paid
+        return $this->invoices()->sum('amount');
     }
 
     protected function resolveContributionStatusRule(): ?ContributionStatusRule
@@ -301,6 +277,46 @@ class Member extends Model
         } while (static::where('public_share_token', $token)->exists());
 
         return $token;
+    }
+
+    /**
+     * Check if member profile is complete
+     * Required fields: name, phone, email, id_number, church
+     */
+    public function isProfileComplete(): bool
+    {
+        return !empty($this->name) &&
+               !empty($this->phone) &&
+               !empty($this->email) &&
+               !empty($this->id_number) &&
+               !empty($this->church);
+    }
+
+    /**
+     * Get list of missing profile fields
+     */
+    public function getMissingProfileFields(): array
+    {
+        $missing = [];
+        
+        if (empty($this->name)) $missing[] = 'name';
+        if (empty($this->phone)) $missing[] = 'phone';
+        if (empty($this->email)) $missing[] = 'email';
+        if (empty($this->id_number)) $missing[] = 'id_number';
+        if (empty($this->church)) $missing[] = 'church';
+        
+        return $missing;
+    }
+
+    /**
+     * Mark profile as completed
+     */
+    public function markProfileComplete(): void
+    {
+        if ($this->isProfileComplete() && !$this->profile_completed_at) {
+            $this->profile_completed_at = now();
+            $this->saveQuietly();
+        }
     }
 }
 

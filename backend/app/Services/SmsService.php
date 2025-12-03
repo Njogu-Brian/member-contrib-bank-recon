@@ -179,16 +179,30 @@ class SmsService
             '{total_contributions}' => isset($data['total_contributions']) 
                 ? number_format($data['total_contributions'], 2) 
                 : '0.00',
-            '{expected_contributions}' => isset($data['expected_contributions']) 
-                ? number_format($data['expected_contributions'], 2) 
-                : '0.00',
             '{contribution_status}' => $data['contribution_status'] ?? 'Unknown',
-            '{contribution_difference}' => isset($data['total_contributions'], $data['expected_contributions'])
-                ? number_format($data['total_contributions'] - $data['expected_contributions'], 2)
+            '{contribution_difference}' => isset($data['total_contributions'], $data['total_invoices'])
+                ? number_format($data['total_contributions'] - $data['total_invoices'], 2)
                 : '0.00',
             '{statement_link}' => $baseUrl && isset($data['id'])
                 ? $this->generatePublicStatementLink($data['id'], $baseUrl)
                 : '',
+            // Invoice placeholders
+            '{total_invoices}' => isset($data['total_invoices']) 
+                ? number_format($data['total_invoices'], 2) 
+                : '0.00',
+            '{pending_invoices}' => isset($data['pending_invoices']) 
+                ? number_format($data['pending_invoices'], 2) 
+                : '0.00',
+            '{overdue_invoices}' => isset($data['overdue_invoices']) 
+                ? number_format($data['overdue_invoices'], 2) 
+                : '0.00',
+            '{paid_invoices}' => isset($data['paid_invoices']) 
+                ? number_format($data['paid_invoices'], 2) 
+                : '0.00',
+            '{invoice_count}' => $data['invoice_count'] ?? '0',
+            '{pending_invoice_count}' => $data['pending_invoice_count'] ?? '0',
+            '{oldest_invoice_number}' => $data['oldest_invoice_number'] ?? '',
+            '{oldest_invoice_due_date}' => $data['oldest_invoice_due_date'] ?? '',
         ];
 
         $processed = $message;

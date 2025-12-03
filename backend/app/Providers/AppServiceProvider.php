@@ -3,7 +3,11 @@
 namespace App\Providers;
 
 use App\Models\Member;
+use App\Models\Transaction;
+use App\Models\ManualContribution;
 use App\Observers\MemberObserver;
+use App\Observers\TransactionObserver;
+use App\Observers\ManualContributionObserver;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Config;
 use Carbon\Carbon;
@@ -54,6 +58,8 @@ class AppServiceProvider extends ServiceProvider
 
         // Register model observers
         Member::observe(MemberObserver::class);
+        Transaction::observe(TransactionObserver::class);
+        ManualContribution::observe(ManualContributionObserver::class);
     }
 }
 

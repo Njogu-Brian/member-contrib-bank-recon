@@ -38,12 +38,23 @@
 
     .brand-icon {
         width: 120px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
     .brand-icon svg {
         width: 100%;
         height: auto;
         display: block;
+    }
+
+    .brand-icon img {
+        max-width: 100%;
+        max-height: 80px;
+        height: auto;
+        display: block;
+        object-fit: contain;
     }
 
     .brand-text {

@@ -4,11 +4,21 @@ import { getMembers } from '../api/members'
 
 export default function MemberSearchModal({ isOpen, onClose, onSelect, title = 'Select Member', preSelectedId = null }) {
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [selectedMemberId, setSelectedMemberId] = useState(preSelectedId ? preSelectedId.toString() : '')
 
+  // Debounce search term - only trigger API call after user stops typing for 400ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 400)
+
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
   const { data: membersData, isLoading } = useQuery({
-    queryKey: ['members', 'search', searchTerm],
-    queryFn: () => getMembers({ search: searchTerm, per_page: 100 }),
+    queryKey: ['members', 'search', debouncedSearchTerm],
+    queryFn: () => getMembers({ search: debouncedSearchTerm, per_page: 100 }),
     enabled: isOpen,
   })
 

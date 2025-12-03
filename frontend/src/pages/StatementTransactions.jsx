@@ -21,6 +21,7 @@ export default function StatementTransactions() {
   const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(25)
+  const [searchInput, setSearchInput] = useState('') // Local state for immediate UI update
   const [filters, setFilters] = useState({
     status: '',
     search: '',
@@ -41,6 +42,16 @@ export default function StatementTransactions() {
   const [activeShareIndex, setActiveShareIndex] = useState(null)
   const [actionMenuOpen, setActionMenuOpen] = useState(null)
   const actionMenuRef = useRef(null)
+
+  // Debounce search input - only trigger API call after user stops typing for 500ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilters(prev => ({ ...prev, search: searchInput }))
+      setPage(1)
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [searchInput])
 
   const { data: statementData, isLoading: statementLoading } = useQuery({
     queryKey: ['statement', id],
@@ -526,17 +537,15 @@ export default function StatementTransactions() {
               <option value="auto_assigned">Auto Assigned</option>
               <option value="manual_assigned">Manual Assigned</option>
               <option value="draft">Draft</option>
+              <option value="duplicate">Duplicate</option>
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Search</label>
             <input
               type="text"
-              value={filters.search}
-              onChange={(e) => {
-                setFilters({ ...filters, search: e.target.value })
-                setPage(1)
-              }}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search transactions..."
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             />
@@ -714,7 +723,12 @@ export default function StatementTransactions() {
                       </div>
                       <div className="lg:hidden mt-1 flex flex-wrap gap-1">
                         {transaction.member?.name && (
-                          <span className="text-xs text-gray-500">{transaction.member.name}</span>
+                          <button
+                            onClick={() => navigate(`/members/${transaction.member.id}?highlight=${transaction.id}`)}
+                            className="text-xs text-indigo-600 hover:text-indigo-900 hover:underline"
+                          >
+                            {transaction.member.name}
+                          </button>
                         )}
                         <span className={`inline-flex px-1.5 py-0.5 text-xs font-semibold rounded-full ${
                           transaction.assignment_status === 'auto_assigned' ? 'bg-green-100 text-green-800' :
@@ -734,12 +748,16 @@ export default function StatementTransactions() {
                     </td>
                     <td className="px-2 py-2 text-sm text-gray-900 hidden lg:table-cell">
                       {transaction.member ? (
-                        <div>
-                          <div className="font-medium max-w-xs truncate" title={transaction.member.name}>{transaction.member.name}</div>
+                        <button
+                          onClick={() => navigate(`/members/${transaction.member.id}?highlight=${transaction.id}`)}
+                          className="text-left hover:bg-gray-50 rounded p-1 -m-1"
+                          title={`View ${transaction.member.name}'s statement`}
+                        >
+                          <div className="font-medium max-w-xs truncate text-indigo-600 hover:text-indigo-900 hover:underline">{transaction.member.name}</div>
                           {transaction.member.phone && (
                             <div className="text-xs text-gray-500">{transaction.member.phone}</div>
                           )}
-                        </div>
+                        </button>
                       ) : (
                         <span className="text-gray-400">Unassigned</span>
                       )}

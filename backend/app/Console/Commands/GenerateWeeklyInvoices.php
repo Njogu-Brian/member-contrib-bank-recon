@@ -16,7 +16,22 @@ class GenerateWeeklyInvoices extends Command
     public function handle()
     {
         $weeklyAmount = (float) Setting::get('weekly_contribution_amount', 1000);
+        $invoiceStartDate = Setting::get('contribution_start_date');
+        
+        if (!$invoiceStartDate) {
+            $this->error('Invoice start date (contribution_start_date) not set in settings. Please configure it first.');
+            return 1;
+        }
+        
+        $startDate = Carbon::parse($invoiceStartDate);
         $currentWeek = Carbon::now()->format('Y-\WW');
+        $currentWeekStart = Carbon::now()->startOfWeek();
+        
+        // Only generate invoices if we're past the start date
+        if ($currentWeekStart->lt($startDate)) {
+            $this->info("Current week starts before invoice start date. Invoices will begin from {$startDate->format('M d, Y')}");
+            return 0;
+        }
         
         // Check if invoices already generated for this week
         if (!$this->option('force')) {
@@ -27,6 +42,7 @@ class GenerateWeeklyInvoices extends Command
             }
         }
         
+        // Get active members
         $members = Member::where('is_active', true)->get();
         $generated = 0;
         
@@ -34,6 +50,7 @@ class GenerateWeeklyInvoices extends Command
         $issueDate = Carbon::now()->startOfWeek();
         
         foreach ($members as $member) {
+            // All active members get invoices from the global start date
             // Skip if invoice already exists for this member and period
             if (!$this->option('force')) {
                 $exists = Invoice::where('member_id', $member->id)

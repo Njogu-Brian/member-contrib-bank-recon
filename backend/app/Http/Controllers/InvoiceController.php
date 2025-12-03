@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Invoice;
 use App\Models\Member;
 use App\Models\Payment;
+use App\Services\InvoicePaymentMatcher;
 use Illuminate\Http\Request;
 
 class InvoiceController extends Controller
@@ -13,11 +14,11 @@ class InvoiceController extends Controller
     {
         $query = Invoice::with(['member', 'payment']);
 
-        if ($request->has('member_id')) {
+        if ($request->has('member_id') && $request->member_id !== '') {
             $query->where('member_id', $request->member_id);
         }
 
-        if ($request->has('status')) {
+        if ($request->has('status') && $request->status !== '') {
             $query->where('status', $request->status);
         }
 
@@ -126,6 +127,19 @@ class InvoiceController extends Controller
         return response()->json([
             'message' => 'Invoice cancelled successfully',
             'invoice' => $invoice,
+        ]);
+    }
+
+    /**
+     * Bulk match all payments to invoices
+     */
+    public function bulkMatch(InvoicePaymentMatcher $matcher)
+    {
+        $result = $matcher->bulkMatchPayments();
+
+        return response()->json([
+            'message' => 'Bulk matching completed',
+            'result' => $result,
         ]);
     }
 }

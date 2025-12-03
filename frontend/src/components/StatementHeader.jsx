@@ -24,7 +24,25 @@ export default function StatementHeader({ member, isPublic = false, onPrint, onD
         })
         if (response.ok) {
           const data = await response.json()
-          if (data.logo_url) setLogoUrl(data.logo_url)
+          // Fix logo URL to use the correct backend origin
+          if (data.logo_url) {
+            // If logo_url is relative or points to localhost without port, fix it
+            let fixedLogoUrl = data.logo_url
+            if (fixedLogoUrl.startsWith('http://localhost/')) {
+              // Replace with backend URL
+              const backendUrl = import.meta.env.VITE_API_BASE_URL 
+                ? import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '') 
+                : 'http://localhost'
+              fixedLogoUrl = fixedLogoUrl.replace('http://localhost', backendUrl)
+            } else if (fixedLogoUrl.startsWith('/storage/')) {
+              // Prepend backend origin
+              const backendUrl = import.meta.env.VITE_API_BASE_URL 
+                ? import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '') 
+                : window.location.origin
+              fixedLogoUrl = backendUrl + fixedLogoUrl
+            }
+            setLogoUrl(fixedLogoUrl)
+          }
           if (data.app_name) setAppName(data.app_name)
           return data
         }
@@ -71,25 +89,17 @@ export default function StatementHeader({ member, isPublic = false, onPrint, onD
             </div>
           </div>
           
-          {/* Action Buttons - Stack on mobile, horizontal on desktop (hidden in print) */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 print:hidden">
-            {onPrint && (
-              <button
-                onClick={onPrint}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 w-full sm:w-auto"
-              >
-                Print
-              </button>
-            )}
-            {onDownloadPDF && (
+          {/* Action Buttons - Hidden in print */}
+          {onDownloadPDF && (
+            <div className="print:hidden">
               <button
                 onClick={onDownloadPDF}
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 w-full sm:w-auto"
+                className="px-6 py-3 text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-lg transition-all w-full sm:w-auto"
               >
-                Download PDF
+                📥 Download PDF
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Member Info - Bank Statement Style */}

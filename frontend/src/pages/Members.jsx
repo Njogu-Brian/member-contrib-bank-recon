@@ -164,28 +164,44 @@ export default function Members() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">Members</h1>
-        <div className="flex flex-wrap gap-3 justify-end">
+      {/* Modern Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl shadow-xl p-8 text-white">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Members</h1>
+            <p className="text-blue-100 text-lg">
+              Manage your organization's members and track their contributions
+            </p>
+          </div>
+          <div className="hidden lg:block text-right">
+            <div className="text-sm text-blue-200">Total Active</div>
+            <div className="text-4xl font-bold">{data?.total || 0}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Actions Bar */}
+      <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="flex flex-wrap gap-3 justify-between items-center">
           <div className="flex space-x-2">
             <button
               onClick={() => openExportModal('pdf')}
               disabled={!!bulkExportingFormat}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-60"
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 transition-colors"
             >
               {bulkExportingFormat === 'pdf' ? 'Exporting PDF…' : 'Export All (PDF)'}
             </button>
             <button
               onClick={() => openExportModal('excel')}
               disabled={!!bulkExportingFormat}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-60"
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-60 transition-colors"
             >
               {bulkExportingFormat === 'excel' ? 'Exporting Excel…' : 'Export All (Excel)'}
             </button>
           </div>
-          <label className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer">
+          <label className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 cursor-pointer transition-colors">
             <input type="file" accept=".csv" className="hidden" onChange={handleBulkUpload} />
-            Bulk Upload
+            📤 Bulk Upload
           </label>
           <button
             onClick={() => {
@@ -193,25 +209,23 @@ export default function Members() {
               resetForm()
               setShowModal(true)
             }}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-lg text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 transition-all"
           >
-            Add Member
+            + Add Member
           </button>
         </div>
       </div>
 
-      <div className="bg-white shadow rounded-lg">
-        <div className="p-4 border-b">
-          <input
-            type="text"
-            placeholder="Search members..."
-            value={searchInput}
-            onChange={(e) => {
-              setSearchInput(e.target.value)
-            }}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-          />
-        </div>
+      {/* Search */}
+      <input
+        type="text"
+        placeholder="🔍 Search members by name, phone, or email..."
+        value={searchInput}
+        onChange={(e) => setSearchInput(e.target.value)}
+        className="w-full px-6 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-lg bg-white shadow-sm"
+      />
+
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">

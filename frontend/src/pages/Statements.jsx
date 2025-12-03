@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getStatements, uploadStatement, deleteStatement, reanalyzeStatement, reanalyzeAllStatements } from '../api/statements'
 import Pagination from '../components/Pagination'
+import PageHeader from '../components/PageHeader'
 
 export default function Statements() {
   const navigate = useNavigate()
@@ -97,9 +98,16 @@ export default function Statements() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">Bank Statements</h1>
-        <div className="flex space-x-3">
+      <PageHeader
+        title="Bank Statements"
+        description="Upload and process bank statements for automatic transaction matching"
+        metric={data?.total || 0}
+        metricLabel="Total Statements"
+        gradient="from-purple-600 to-indigo-600"
+      />
+
+      <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="flex flex-wrap gap-3 justify-end">
           <button
             onClick={() => {
               if (confirm('This will re-analyze all completed and failed statements. Continue?')) {
@@ -107,7 +115,7 @@ export default function Statements() {
               }
             }}
             disabled={reanalyzeAllMutation.isPending}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-md text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 transition-all"
           >
             {reanalyzeAllMutation.isPending ? 'Processing...' : 'Re-analyze All'}
           </button>

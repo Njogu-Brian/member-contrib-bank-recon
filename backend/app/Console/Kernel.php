@@ -12,6 +12,30 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
+        // Generate weekly invoices every Monday at 00:00
+        $schedule->command('invoices:generate-weekly')
+            ->weeklyOn(1, '00:00')
+            ->withoutOverlapping()
+            ->onSuccess(function () {
+                \Log::info('Weekly invoices generated successfully');
+            })
+            ->onFailure(function () {
+                \Log::error('Failed to generate weekly invoices');
+            });
+
+        // Send invoice reminders (time and frequency configured in settings)
+        // Note: Command itself checks frequency, we run it daily and let it decide
+        $reminderTime = \App\Models\Setting::get('invoice_reminder_time', '09:00');
+        $schedule->command('invoices:send-reminders')
+            ->dailyAt($reminderTime)
+            ->withoutOverlapping()
+            ->onSuccess(function () {
+                \Log::info('Invoice reminders processed successfully');
+            })
+            ->onFailure(function () {
+                \Log::error('Failed to process invoice reminders');
+            });
+
         // Process scheduled reports - check every hour for reports that need to run
         $schedule->call(function () {
             \App\Models\ScheduledReport::where('is_active', true)

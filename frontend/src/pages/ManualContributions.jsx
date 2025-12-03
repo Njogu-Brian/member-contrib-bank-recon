@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getManualContributions, createManualContribution, updateManualContribution, deleteManualContribution, importExcel } from '../api/manualContributions'
-import { getMembers } from '../api/members'
 import Pagination from '../components/Pagination'
+import MemberSearchModal from '../components/MemberSearchModal'
+import PageHeader from '../components/PageHeader'
 
 export default function ManualContributions() {
   const [showModal, setShowModal] = useState(false)
+  const [showMemberSearch, setShowMemberSearch] = useState(false)
+  const [selectedMember, setSelectedMember] = useState(null)
   const [page, setPage] = useState(1)
   const [editingContribution, setEditingContribution] = useState(null)
   const [formData, setFormData] = useState({
@@ -20,11 +23,6 @@ export default function ManualContributions() {
   const { data, isLoading } = useQuery({
     queryKey: ['manual-contributions', page],
     queryFn: () => getManualContributions({ page }),
-  })
-
-  const { data: membersData } = useQuery({
-    queryKey: ['members'],
-    queryFn: () => getMembers(),
   })
 
   const createMutation = useMutation({
@@ -72,6 +70,7 @@ export default function ManualContributions() {
       payment_method: 'cash',
       notes: '',
     })
+    setSelectedMember(null)
   }
 
   const handleEdit = (contribution) => {
@@ -83,11 +82,22 @@ export default function ManualContributions() {
       payment_method: contribution.payment_method,
       notes: contribution.notes || '',
     })
+    setSelectedMember(contribution.member)
     setShowModal(true)
+  }
+
+  const handleMemberSelect = (member) => {
+    setSelectedMember(member)
+    setFormData({ ...formData, member_id: member.id })
+    setShowMemberSearch(false)
   }
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    if (!formData.member_id) {
+      alert('Please select a member')
+      return
+    }
     if (editingContribution) {
       updateMutation.mutate({ id: editingContribution.id, data: formData })
     } else {
@@ -101,21 +111,28 @@ export default function ManualContributions() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">Manual Contributions</h1>
+      <PageHeader
+        title="Manual Contributions"
+        description="Record cash and offline contributions manually"
+        metric={data?.total || 0}
+        metricLabel="Total Records"
+        gradient="from-purple-600 to-pink-600"
+      />
+
+      <div className="bg-white rounded-xl shadow-sm p-4 flex justify-end">
         <button
           onClick={() => {
             setEditingContribution(null)
             resetForm()
             setShowModal(true)
           }}
-          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+          className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-lg text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 transition-all"
         >
-          Add Contribution
+          + Add Contribution
         </button>
       </div>
 
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -179,17 +196,26 @@ export default function ManualContributions() {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Member *</label>
-                    <select
-                      required
-                      value={formData.member_id}
-                      onChange={(e) => setFormData({ ...formData, member_id: e.target.value })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    >
-                      <option value="">Select a member...</option>
-                      {membersData?.data?.map((member) => (
-                        <option key={member.id} value={member.id}>{member.name}</option>
-                      ))}
-                    </select>
+                    <div className="mt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowMemberSearch(true)}
+                        className="w-full flex items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-left shadow-sm hover:bg-gray-50 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 sm:text-sm"
+                      >
+                        <span className={selectedMember ? 'text-gray-900' : 'text-gray-500'}>
+                          {selectedMember ? selectedMember.name : 'Click to search and select a member...'}
+                        </span>
+                        <svg className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                      {selectedMember && (
+                        <p className="mt-1 text-xs text-gray-500">
+                          {[selectedMember.phone, selectedMember.email, selectedMember.member_code].filter(Boolean).join(' • ')}
+                        </p>
+                      )}
+                      <input type="hidden" required value={formData.member_id} />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Amount *</label>
@@ -262,6 +288,14 @@ export default function ManualContributions() {
           </div>
         </div>
       )}
+
+      <MemberSearchModal
+        isOpen={showMemberSearch}
+        onClose={() => setShowMemberSearch(false)}
+        onSelect={handleMemberSelect}
+        title="Select Member"
+        preSelectedId={formData.member_id}
+      />
     </div>
   )
 }

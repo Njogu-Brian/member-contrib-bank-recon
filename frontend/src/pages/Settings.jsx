@@ -51,6 +51,12 @@ export default function Settings() {
         contact_phone: settings.contact_phone || '',
         logo: null,
         favicon: null,
+        invoice_reminder_enabled: settings.invoice_reminder_enabled || 'true',
+        invoice_reminder_frequency: settings.invoice_reminder_frequency || 'daily',
+        invoice_reminder_time: settings.invoice_reminder_time || '09:00',
+        invoice_reminder_days_before_due: settings.invoice_reminder_days_before_due || '2',
+        invoice_reminder_overdue_message: settings.invoice_reminder_overdue_message || '',
+        invoice_reminder_due_soon_message: settings.invoice_reminder_due_soon_message || '',
       })
       // Update previews with URLs (try both lowercase and capitalized versions, normalize for dev server)
       setLogoPreview(normalizeUrl(settings.logo_url || settings.Logo_url))
@@ -234,16 +240,6 @@ export default function Settings() {
               Branding
             </button>
             <button
-              onClick={() => setActiveTab('contributions')}
-              className={`px-6 py-3 text-sm font-medium border-b-2 ${
-                activeTab === 'contributions'
-                  ? 'border-brand-500 text-brand-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Contributions
-            </button>
-            <button
               onClick={() => setActiveTab('statuses')}
               className={`px-6 py-3 text-sm font-medium border-b-2 ${
                 activeTab === 'statuses'
@@ -252,6 +248,16 @@ export default function Settings() {
               }`}
             >
               Status Rules
+            </button>
+            <button
+              onClick={() => setActiveTab('invoices')}
+              className={`px-6 py-3 text-sm font-medium border-b-2 ${
+                activeTab === 'invoices'
+                  ? 'border-brand-500 text-brand-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Invoices
             </button>
             {Object.keys(categories).length > 0 && (
               <>
@@ -408,59 +414,173 @@ export default function Settings() {
             </div>
           )}
 
-          {/* Contributions Tab */}
-          {activeTab === 'contributions' && (
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold mb-4">Contribution Settings</h2>
-              <form onSubmit={handleSubmit} className="space-y-4">
+
+          {/* Status Rules Tab */}
+          {activeTab === 'statuses' && (
+            <div>
+              <StatusRulesSection />
+            </div>
+          )}
+
+          {/* Invoice Reminders Tab */}
+          {activeTab === 'invoices' && (
+            <div className="p-6">
+              <h2 className="text-xl font-semibold mb-6">Invoice & Contribution Settings</h2>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Invoice Generation Settings */}
+                <div className="border-b pb-6">
+                  <h3 className="text-lg font-medium mb-4">Invoice Generation</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Invoice Start Date *
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={formData.contribution_start_date}
+                        onChange={(e) => setFormData({ ...formData, contribution_start_date: e.target.value })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      />
+                      <p className="mt-1 text-sm text-gray-500">
+                        <strong>All members</strong> will be invoiced from this date forward, regardless of when they joined.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Weekly Invoice Amount (KES) *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        required
+                        value={formData.weekly_contribution_amount}
+                        onChange={(e) => setFormData({ ...formData, weekly_contribution_amount: parseFloat(e.target.value) || 0 })}
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      />
+                      <p className="mt-1 text-sm text-gray-500">
+                        Weekly invoice amount per member (default: 1000). Annual total: KES {(formData.weekly_contribution_amount || 1000) * 52}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Contact Phone Number
+                      </label>
+                      <input
+                        type="text"
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        placeholder="e.g., +254 700 000 000"
+                        value={formData.contact_phone}
+                        onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
+                      />
+                      <p className="mt-1 text-sm text-gray-500">
+                        Contact number for member inquiries (appears on statements).
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Invoice Reminder Settings */}
+                <div className="border-b pb-6">
+                  <h3 className="text-lg font-medium mb-4">Automated Reminders</h3>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Contribution Start Date *
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={formData.invoice_reminder_enabled === 'true'}
+                      onChange={(e) => setFormData({ ...formData, invoice_reminder_enabled: e.target.checked ? 'true' : 'false' })}
+                      className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span className="ml-2 text-sm font-medium text-gray-700">Enable Invoice Reminders</span>
                   </label>
-                  <input
-                    type="date"
-                    required
-                    value={formData.contribution_start_date}
-                    onChange={(e) => setFormData({ ...formData, contribution_start_date: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  />
-                  <p className="mt-1 text-sm text-gray-500">
-                    The date from which weekly contributions will be calculated
-                  </p>
+                  <p className="mt-1 text-sm text-gray-500">Send automated SMS reminders for pending and overdue invoices</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Reminder Frequency</label>
+                    <select
+                      value={formData.invoice_reminder_frequency || 'daily'}
+                      onChange={(e) => setFormData({ ...formData, invoice_reminder_frequency: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    >
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly (Mondays)</option>
+                      <option value="bi_weekly">Bi-Weekly (Every 2 weeks)</option>
+                      <option value="monthly">Monthly (1st of month)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Reminder Time</label>
+                    <input
+                      type="time"
+                      value={formData.invoice_reminder_time || '09:00'}
+                      onChange={(e) => setFormData({ ...formData, invoice_reminder_time: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Days Before Due (for "Due Soon" reminders)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="30"
+                      value={formData.invoice_reminder_days_before_due || '2'}
+                      onChange={(e) => setFormData({ ...formData, invoice_reminder_days_before_due: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    />
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Weekly Contribution Amount (KES) *
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Overdue Invoice Message Template
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    required
-                    value={formData.weekly_contribution_amount}
-                    onChange={(e) => setFormData({ ...formData, weekly_contribution_amount: parseFloat(e.target.value) || 0 })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    <span className="text-xs text-gray-600">Available placeholders:</span>
+                    <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">{'{{member_name}}'}</code>
+                    <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">{'{{invoice_number}}'}</code>
+                    <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">{'{{invoice_amount}}'}</code>
+                    <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">{'{{days_overdue}}'}</code>
+                    <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">{'{{total_outstanding}}'}</code>
+                    <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">{'{{app_name}}'}</code>
+                  </div>
+                  <textarea
+                    value={formData.invoice_reminder_overdue_message || ''}
+                    onChange={(e) => setFormData({ ...formData, invoice_reminder_overdue_message: e.target.value })}
+                    rows={4}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    placeholder="OVERDUE INVOICE: Invoice #{{invoice_number}} for KES {{invoice_amount}} is {{days_overdue}} days overdue..."
                   />
-                  <p className="mt-1 text-sm text-gray-500">
-                    The expected weekly contribution amount per member (default: 1000)
-                  </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Contact Phone Number
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Due Soon Invoice Message Template
                   </label>
-                  <input
-                    type="text"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    placeholder="e.g., +254 700 000 000"
-                    value={formData.contact_phone}
-                    onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    <span className="text-xs text-gray-600">Available placeholders:</span>
+                    <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">{'{{member_name}}'}</code>
+                    <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">{'{{invoice_number}}'}</code>
+                    <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">{'{{invoice_amount}}'}</code>
+                    <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">{'{{days_until_due}}'}</code>
+                    <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">{'{{due_date}}'}</code>
+                    <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">{'{{total_pending}}'}</code>
+                    <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">{'{{app_name}}'}</code>
+                  </div>
+                  <textarea
+                    value={formData.invoice_reminder_due_soon_message || ''}
+                    onChange={(e) => setFormData({ ...formData, invoice_reminder_due_soon_message: e.target.value })}
+                    rows={4}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    placeholder="REMINDER: Invoice #{{invoice_number}} for KES {{invoice_amount}} is due in {{days_until_due}} days..."
                   />
-                  <p className="mt-1 text-sm text-gray-500">
-                    This phone number will appear in the statement footer for member inquiries.
-                  </p>
+                </div>
                 </div>
 
                 <div className="pt-4 border-t">
@@ -469,17 +589,10 @@ export default function Settings() {
                     disabled={updateMutation.isPending}
                     className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
                   >
-                    {updateMutation.isPending ? 'Saving...' : 'Save Settings'}
+                    {updateMutation.isPending ? 'Saving...' : 'Save Invoice Settings'}
                   </button>
                 </div>
               </form>
-            </div>
-          )}
-
-          {/* Status Rules Tab */}
-          {activeTab === 'statuses' && (
-            <div>
-              <StatusRulesSection />
             </div>
           )}
 
