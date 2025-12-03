@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Text, TextInput, Button, Surface } from 'react-native-paper';
 import { useAuth } from '../../context/AuthContext';
-import { theme, spacing } from '../../theme';
+import { theme, spacing, borderRadius } from '../../theme';
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');

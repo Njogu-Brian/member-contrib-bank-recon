@@ -9,7 +9,7 @@ import { Text, TextInput, Button, Surface, RadioButton } from 'react-native-pape
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
 import { API_ENDPOINTS } from '../../config/api';
-import { theme, spacing } from '../../theme';
+import { theme, spacing, borderRadius } from '../../theme';
 
 export default function PaymentScreen({ navigation }) {
   const [amount, setAmount] = useState('');

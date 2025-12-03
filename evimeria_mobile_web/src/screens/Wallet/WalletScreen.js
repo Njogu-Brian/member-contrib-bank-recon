@@ -11,7 +11,7 @@ import { useQuery } from '@tanstack/react-query';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import api from '../../services/api';
 import { API_ENDPOINTS } from '../../config/api';
-import { theme, spacing } from '../../theme';
+import { theme, spacing, borderRadius } from '../../theme';
 
 export default function WalletScreen({ navigation }) {
   const { data: wallet, isLoading, refetch } = useQuery({

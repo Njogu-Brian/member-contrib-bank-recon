@@ -4,7 +4,7 @@ import { Text, Card, ActivityIndicator, DataTable } from 'react-native-paper';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../services/api';
 import { API_ENDPOINTS } from '../../config/api';
-import { theme, spacing } from '../../theme';
+import { theme, spacing, borderRadius } from '../../theme';
 
 export default function StatementScreen() {
   const { data: statement, isLoading, refetch } = useQuery({
