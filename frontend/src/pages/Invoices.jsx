@@ -11,7 +11,11 @@ export default function Invoices() {
   const [filters, setFilters] = useState({
     status: '',
     member_id: '',
+    invoice_type: '',
     overdue_only: false,
+    month: '',
+    sort_by: 'issue_date',
+    sort_order: 'desc',
   })
   const [showModal, setShowModal] = useState(false)
   const [editingInvoice, setEditingInvoice] = useState(null)
@@ -213,8 +217,8 @@ export default function Invoices() {
 
       {/* Filters */}
       <div className="bg-white rounded-xl shadow-sm p-6">
-        <h3 className="text-sm font-semibold text-gray-900 mb-4">Filters</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <h3 className="text-sm font-semibold text-gray-900 mb-4">🔍 Filters & Sorting</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Status</label>
             <select
@@ -232,6 +236,39 @@ export default function Invoices() {
               <option value="cancelled">Cancelled</option>
             </select>
           </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Invoice Type</label>
+            <select
+              value={filters.invoice_type}
+              onChange={(e) => {
+                setFilters({ ...filters, invoice_type: e.target.value })
+                setPage(1)
+              }}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            >
+              <option value="">All Types</option>
+              <option value="weekly_contribution">📅 Weekly Contributions</option>
+              <option value="registration_fee">✅ Registration Fees</option>
+              <option value="annual_subscription">📆 Annual Subscriptions</option>
+              <option value="software_acquisition">💻 Software Acquisition</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Month/Year</label>
+            <input
+              type="month"
+              value={filters.month}
+              onChange={(e) => {
+                setFilters({ ...filters, month: e.target.value })
+                setPage(1)
+              }}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              placeholder="Select month"
+            />
+          </div>
+          
           <div>
             <label className="block text-sm font-medium text-gray-700">Member</label>
             <select
@@ -248,6 +285,29 @@ export default function Invoices() {
               ))}
             </select>
           </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Sort By</label>
+            <select
+              value={`${filters.sort_by}_${filters.sort_order}`}
+              onChange={(e) => {
+                const [sort_by, sort_order] = e.target.value.split('_')
+                setFilters({ ...filters, sort_by, sort_order })
+                setPage(1)
+              }}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            >
+              <option value="issue_date_desc">📅 Issue Date (Newest)</option>
+              <option value="issue_date_asc">📅 Issue Date (Oldest)</option>
+              <option value="due_date_desc">⏰ Due Date (Latest)</option>
+              <option value="due_date_asc">⏰ Due Date (Earliest)</option>
+              <option value="invoice_number_desc">🔢 Invoice # (Desc)</option>
+              <option value="invoice_number_asc">🔢 Invoice # (Asc)</option>
+              <option value="amount_desc">💰 Amount (High-Low)</option>
+              <option value="amount_asc">💰 Amount (Low-High)</option>
+            </select>
+          </div>
+          
           <div className="flex items-end">
             <label className="flex items-center">
               <input
@@ -268,14 +328,14 @@ export default function Invoices() {
       {/* Invoices Table */}
       <div className="bg-white rounded-xl shadow-lg overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+          <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice #</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue Date</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Period</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
@@ -288,14 +348,40 @@ export default function Invoices() {
                 </td>
               </tr>
             ) : (
-              invoices.map((invoice) => (
-                <tr key={invoice.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {invoice.invoice_number}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {invoice.member?.name || '-'}
-                  </td>
+              invoices.map((invoice) => {
+                // Invoice type badge colors
+                const typeColors = {
+                  'weekly_contribution': 'bg-blue-100 text-blue-800 border-blue-300',
+                  'registration_fee': 'bg-green-100 text-green-800 border-green-300',
+                  'annual_subscription': 'bg-purple-100 text-purple-800 border-purple-300',
+                  'software_acquisition': 'bg-orange-100 text-orange-800 border-orange-300',
+                  'custom': 'bg-gray-100 text-gray-800 border-gray-300',
+                }
+                
+                const typeLabels = {
+                  'weekly_contribution': '📅 Weekly',
+                  'registration_fee': '✅ Registration',
+                  'annual_subscription': '📆 Annual',
+                  'software_acquisition': '💻 Software',
+                  'custom': '📝 Custom',
+                }
+                
+                const typeColor = typeColors[invoice.invoice_type] || typeColors.custom
+                const typeLabel = typeLabels[invoice.invoice_type] || 'Invoice'
+                
+                return (
+                  <tr key={invoice.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {invoice.invoice_number}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${typeColor}`}>
+                        {typeLabel}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {invoice.member?.name || '-'}
+                    </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(invoice.amount)}
                   </td>
@@ -304,9 +390,6 @@ export default function Invoices() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(invoice.due_date).toLocaleDateString('en-GB')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {invoice.period || '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(invoice.status)}`}>
@@ -331,7 +414,8 @@ export default function Invoices() {
                     )}
                   </td>
                 </tr>
-              ))
+                )
+              })
             )}
           </tbody>
         </table>

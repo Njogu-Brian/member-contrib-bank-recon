@@ -125,6 +125,7 @@ class DashboardController extends Controller
             $invoiceCount = 0;
             $pendingInvoiceCount = 0;
             $collectionRate = 0;
+            $invoicesByType = [];
             
             try {
                 $totalInvoices = Invoice::sum('amount');
@@ -134,6 +135,24 @@ class DashboardController extends Controller
                 $invoiceCount = Invoice::count();
                 $pendingInvoiceCount = Invoice::whereIn('status', ['pending', 'overdue'])->count();
                 $collectionRate = $totalInvoices > 0 ? ($paidInvoices / $totalInvoices) * 100 : 0;
+                
+                // Invoice breakdown by type
+                $invoicesByType = Invoice::select('invoice_type', 
+                    DB::raw('COUNT(*) as count'),
+                    DB::raw('SUM(amount) as total'),
+                    DB::raw('SUM(CASE WHEN status = "paid" THEN amount ELSE 0 END) as paid'),
+                    DB::raw('SUM(CASE WHEN status IN ("pending", "overdue") THEN amount ELSE 0 END) as pending')
+                )
+                ->groupBy('invoice_type')
+                ->get()
+                ->mapWithKeys(function ($item) {
+                    return [$item->invoice_type => [
+                        'count' => $item->count,
+                        'total' => $item->total,
+                        'paid' => $item->paid,
+                        'pending' => $item->pending,
+                    ]];
+                });
             } catch (\Exception $e) {
                 \Illuminate\Support\Facades\Log::warning('Error getting invoice metrics: ' . $e->getMessage());
             }
@@ -223,6 +242,7 @@ class DashboardController extends Controller
                     'invoice_count' => $invoiceCount,
                     'pending_invoice_count' => $pendingInvoiceCount,
                     'collection_rate' => round($collectionRate, 2),
+                    'invoices_by_type' => $invoicesByType,
                     // Expense metrics
                     'total_expenses' => $totalExpenses,
                     'pending_expenses' => $pendingExpenses,

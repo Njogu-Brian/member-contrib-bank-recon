@@ -528,6 +528,138 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Invoice Types Breakdown */}
+      {stats.invoices_by_type && Object.keys(stats.invoices_by_type).length > 0 && (
+        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl shadow-lg p-6 border border-indigo-200">
+          <h3 className="text-xl font-bold text-gray-900 mb-6">📋 Invoice Types Breakdown</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {stats.invoices_by_type.weekly_contribution && (
+              <div className="bg-white rounded-xl p-4 border-2 border-blue-200 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-2xl">📅</span>
+                  <span className="text-xs font-semibold text-blue-600 bg-blue-100 px-2 py-1 rounded-full">
+                    {stats.invoices_by_type.weekly_contribution.count}
+                  </span>
+                </div>
+                <h4 className="font-semibold text-gray-900 text-sm mb-1">Weekly Contributions</h4>
+                <p className="text-xs text-gray-500 mb-2">Recurring weekly</p>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600">Total:</span>
+                    <span className="font-semibold text-gray-900">
+                      {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', notation: 'compact' }).format(
+                        stats.invoices_by_type.weekly_contribution.total || 0
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-green-600">Paid:</span>
+                    <span className="font-semibold text-green-700">
+                      {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', notation: 'compact' }).format(
+                        stats.invoices_by_type.weekly_contribution.paid || 0
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {stats.invoices_by_type.registration_fee && (
+              <div className="bg-white rounded-xl p-4 border-2 border-green-200 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-2xl">✅</span>
+                  <span className="text-xs font-semibold text-green-600 bg-green-100 px-2 py-1 rounded-full">
+                    {stats.invoices_by_type.registration_fee.count}
+                  </span>
+                </div>
+                <h4 className="font-semibold text-gray-900 text-sm mb-1">Registration Fees</h4>
+                <p className="text-xs text-gray-500 mb-2">One-time charge</p>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600">Total:</span>
+                    <span className="font-semibold text-gray-900">
+                      {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', notation: 'compact' }).format(
+                        stats.invoices_by_type.registration_fee.total || 0
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-green-600">Paid:</span>
+                    <span className="font-semibold text-green-700">
+                      {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', notation: 'compact' }).format(
+                        stats.invoices_by_type.registration_fee.paid || 0
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {stats.invoices_by_type.software_acquisition && (
+              <div className="bg-white rounded-xl p-4 border-2 border-orange-200 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-2xl">💻</span>
+                  <span className="text-xs font-semibold text-orange-600 bg-orange-100 px-2 py-1 rounded-full">
+                    {stats.invoices_by_type.software_acquisition.count}
+                  </span>
+                </div>
+                <h4 className="font-semibold text-gray-900 text-sm mb-1">Software Acquisition</h4>
+                <p className="text-xs text-gray-500 mb-2">Development cost</p>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600">Total:</span>
+                    <span className="font-semibold text-gray-900">
+                      {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', notation: 'compact' }).format(
+                        stats.invoices_by_type.software_acquisition.total || 0
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-green-600">Paid:</span>
+                    <span className="font-semibold text-green-700">
+                      {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', notation: 'compact' }).format(
+                        stats.invoices_by_type.software_acquisition.paid || 0
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {stats.invoices_by_type.annual_subscription && (
+              <div className="bg-white rounded-xl p-4 border-2 border-purple-200 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-2xl">📆</span>
+                  <span className="text-xs font-semibold text-purple-600 bg-purple-100 px-2 py-1 rounded-full">
+                    {stats.invoices_by_type.annual_subscription.count}
+                  </span>
+                </div>
+                <h4 className="font-semibold text-gray-900 text-sm mb-1">Annual Subscriptions</h4>
+                <p className="text-xs text-gray-500 mb-2">Yearly fee</p>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-600">Total:</span>
+                    <span className="font-semibold text-gray-900">
+                      {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', notation: 'compact' }).format(
+                        stats.invoices_by_type.annual_subscription.total || 0
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-green-600">Paid:</span>
+                    <span className="font-semibold text-green-700">
+                      {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', notation: 'compact' }).format(
+                        stats.invoices_by_type.annual_subscription.paid || 0
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Alerts & Notifications */}
       {(stats.unassigned_transactions > 0 || stats.overdue_invoices > 0 || stats.pending_expenses > 0) && (
         <div className="bg-amber-50 border-l-4 border-amber-400 rounded-xl p-6">

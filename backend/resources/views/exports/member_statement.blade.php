@@ -12,6 +12,9 @@
         'summary' => $summary,
         'rangeLabel' => $rangeLabel,
         'generatedAt' => $generatedAt,
+        'logoPath' => $logoPath ?? null,
+        'appName' => $appName ?? 'Evimeria Initiative',
+        'appTagline' => $appTagline ?? '1000 For A 1000',
         'pageBreak' => false,
     ])
 </body>

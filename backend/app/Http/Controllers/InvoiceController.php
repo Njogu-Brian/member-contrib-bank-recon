@@ -21,9 +21,19 @@ class InvoiceController extends Controller
         if ($request->has('status') && $request->status !== '') {
             $query->where('status', $request->status);
         }
+        
+        // Invoice type filter
+        if ($request->has('invoice_type') && $request->invoice_type !== '') {
+            $query->where('invoice_type', $request->invoice_type);
+        }
 
-        if ($request->has('period')) {
+        if ($request->has('period') && $request->period !== '') {
             $query->where('period', $request->period);
+        }
+        
+        // Month filter (Y-m format like 2024-11)
+        if ($request->has('month') && $request->month !== '') {
+            $query->whereRaw('DATE_FORMAT(issue_date, "%Y-%m") = ?', [$request->month]);
         }
 
         if ($request->has('overdue_only') && $request->boolean('overdue_only')) {
@@ -35,9 +45,22 @@ class InvoiceController extends Controller
                   });
             });
         }
+        
+        // Sorting
+        $sortBy = $request->get('sort_by', 'issue_date');
+        $sortOrder = $request->get('sort_order', 'desc');
+        
+        // Validate sort column
+        $allowedSortColumns = ['issue_date', 'due_date', 'invoice_number', 'amount', 'status'];
+        if (!in_array($sortBy, $allowedSortColumns)) {
+            $sortBy = 'issue_date';
+        }
+        
+        // Validate sort order
+        $sortOrder = in_array($sortOrder, ['asc', 'desc']) ? $sortOrder : 'desc';
 
         return response()->json(
-            $query->orderBy('due_date', 'desc')
+            $query->orderBy($sortBy, $sortOrder)
                 ->paginate($request->get('per_page', 25))
         );
     }

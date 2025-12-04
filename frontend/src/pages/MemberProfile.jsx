@@ -167,8 +167,10 @@ export default function MemberProfile() {
       setFormData({
         name: member.name || '',
         phone: member.phone || '',
+        secondary_phone: member.secondary_phone || '',
         email: member.email || '',
-        member_code: member.member_code || '',
+        id_number: member.id_number || '',
+        church: member.church || '',
         member_number: member.member_number || '',
         notes: member.notes || '',
         is_active: member.is_active ?? true,

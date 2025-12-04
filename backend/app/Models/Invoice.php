@@ -10,6 +10,13 @@ class Invoice extends Model
 {
     use HasFactory;
 
+    // Invoice type constants
+    const TYPE_WEEKLY = 'weekly_contribution';
+    const TYPE_REGISTRATION = 'registration_fee';
+    const TYPE_ANNUAL = 'annual_subscription';
+    const TYPE_SOFTWARE = 'software_acquisition';
+    const TYPE_CUSTOM = 'custom';
+
     protected $fillable = [
         'member_id',
         'invoice_number',
@@ -20,6 +27,8 @@ class Invoice extends Model
         'paid_at',
         'payment_id',
         'period',
+        'invoice_type',
+        'invoice_year',
         'description',
         'metadata',
     ];
@@ -30,6 +39,7 @@ class Invoice extends Model
         'issue_date' => 'date',
         'paid_at' => 'date',
         'metadata' => 'array',
+        'invoice_year' => 'integer',
     ];
 
     public function member()
@@ -75,18 +85,62 @@ class Invoice extends Model
     }
 
     /**
-     * Generate unique invoice number
+     * Generate unique invoice number based on type
      */
-    public static function generateInvoiceNumber(): string
+    public static function generateInvoiceNumber(string $type = self::TYPE_WEEKLY, ?Carbon $issueDate = null): string
     {
-        $prefix = 'INV';
-        $date = Carbon::now()->format('Ymd');
-        $lastInvoice = static::whereDate('created_at', Carbon::today())
+        // Different prefixes for different invoice types
+        $prefixes = [
+            self::TYPE_WEEKLY => 'INV',
+            self::TYPE_REGISTRATION => 'REG',
+            self::TYPE_ANNUAL => 'SUB',
+            self::TYPE_SOFTWARE => 'SFT',
+            self::TYPE_CUSTOM => 'CST',
+        ];
+        
+        $prefix = $prefixes[$type] ?? 'INV';
+        $date = $issueDate ? $issueDate->format('Ymd') : Carbon::now()->format('Ymd');
+        
+        // Get last invoice of this type created today
+        $lastInvoice = static::where('invoice_type', $type)
+            ->whereDate('created_at', Carbon::today())
             ->orderBy('id', 'desc')
             ->first();
         
         $sequence = $lastInvoice ? (intval(substr($lastInvoice->invoice_number, -4)) + 1) : 1;
         
         return sprintf('%s-%s-%04d', $prefix, $date, $sequence);
+    }
+    
+    /**
+     * Get human-readable invoice type label
+     */
+    public function getTypeLabel(): string
+    {
+        $labels = [
+            self::TYPE_WEEKLY => 'Weekly Contribution',
+            self::TYPE_REGISTRATION => 'Registration Fee',
+            self::TYPE_ANNUAL => 'Annual Subscription',
+            self::TYPE_SOFTWARE => 'Software Acquisition',
+            self::TYPE_CUSTOM => 'Custom Invoice',
+        ];
+        
+        return $labels[$this->invoice_type] ?? 'Invoice';
+    }
+    
+    /**
+     * Get invoice type badge color
+     */
+    public function getTypeBadgeColor(): string
+    {
+        $colors = [
+            self::TYPE_WEEKLY => 'blue',
+            self::TYPE_REGISTRATION => 'green',
+            self::TYPE_ANNUAL => 'purple',
+            self::TYPE_SOFTWARE => 'orange',
+            self::TYPE_CUSTOM => 'gray',
+        ];
+        
+        return $colors[$this->invoice_type] ?? 'gray';
     }
 }

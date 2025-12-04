@@ -15,12 +15,29 @@
     </style>
 </head>
 <body>
+    @php
+        // Prepare logo for watermark and header
+        $logoBase64 = null;
+        if (isset($logoPath) && $logoPath && file_exists($logoPath)) {
+            $imageData = base64_encode(file_get_contents($logoPath));
+            $imageType = pathinfo($logoPath, PATHINFO_EXTENSION);
+            $logoBase64 = 'data:image/' . $imageType . ';base64,' . $imageData;
+        }
+    @endphp
+    
     <div class="statement">
+        <!-- Watermark Logo (behind content) -->
+        @if($logoBase64)
+            <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: -1; opacity: 0.08; width: 100%; text-align: center;">
+                <img src="{{ $logoBase64 }}" alt="Watermark" style="max-width: 500px; max-height: 500px; object-fit: contain;">
+            </div>
+        @endif
+        
         <div class="branding">
             <div class="brand-lockup">
                 <div class="brand-icon">
-                    @if(isset($logoPath) && $logoPath && file_exists($logoPath))
-                        <img src="{{ $logoPath }}" alt="Logo" style="max-height: 60px; max-width: 60px; object-fit: contain;">
+                    @if($logoBase64)
+                        <img src="{{ $logoBase64 }}" alt="Logo" style="max-height: 80px; max-width: 80px; object-fit: contain;">
                     @else
                         @include('exports.partials.evimeria_logo')
                     @endif

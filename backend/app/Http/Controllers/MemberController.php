@@ -472,6 +472,7 @@ class MemberController extends Controller
             }
             
             $appName = \App\Models\Setting::get('app_name', 'Evimeria Initiative');
+            $appTagline = \App\Models\Setting::get('app_tagline', '1000 For A 1000');
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::warning('Error getting settings for PDF: ' . $e->getMessage());
         }

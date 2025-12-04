@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Member;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Cache;
 
 class ProfileController extends Controller
 {
@@ -13,23 +15,39 @@ class ProfileController extends Controller
      */
     public function checkProfileStatus($token)
     {
-        $member = Member::where('public_share_token', $token)->firstOrFail();
+        // Rate limiting: max 30 requests per minute per IP
+        $key = 'profile-status:' . request()->ip() . ':' . $token;
+        if (RateLimiter::tooManyAttempts($key, 30)) {
+            return response()->json([
+                'error' => 'Too many requests',
+                'message' => 'Please wait a moment before trying again.',
+            ], 429);
+        }
+        RateLimiter::hit($key, 60); // 1 minute window
 
-        return response()->json([
-            'is_complete' => $member->isProfileComplete(),
-            'missing_fields' => $member->getMissingProfileFields(),
-            'profile_completed_at' => $member->profile_completed_at,
-            'member' => [
-                'name' => $member->name,
-                'phone' => $member->phone,
-                'secondary_phone' => $member->secondary_phone,
-                'email' => $member->email,
-                'id_number' => $member->id_number,
-                'church' => $member->church,
-                'member_code' => $member->member_code,
-                'member_number' => $member->member_number,
-            ],
-        ]);
+        // Cache profile status for 5 minutes to reduce database load
+        $cacheKey = 'profile-status:' . $token;
+        $data = Cache::remember($cacheKey, 300, function () use ($token) {
+            $member = Member::where('public_share_token', $token)->firstOrFail();
+
+            return [
+                'is_complete' => $member->isProfileComplete(),
+                'missing_fields' => $member->getMissingProfileFields(),
+                'profile_completed_at' => $member->profile_completed_at,
+                'member' => [
+                    'name' => $member->name,
+                    'phone' => $member->phone,
+                    'secondary_phone' => $member->secondary_phone,
+                    'email' => $member->email,
+                    'id_number' => $member->id_number,
+                    'church' => $member->church,
+                    'member_code' => $member->member_code,
+                    'member_number' => $member->member_number,
+                ],
+            ];
+        });
+
+        return response()->json($data);
     }
 
     /**
@@ -37,6 +55,16 @@ class ProfileController extends Controller
      */
     public function updateProfile(Request $request, $token)
     {
+        // Rate limiting: max 10 update attempts per hour per IP
+        $key = 'profile-update:' . $request->ip() . ':' . $token;
+        if (RateLimiter::tooManyAttempts($key, 10)) {
+            return response()->json([
+                'error' => 'Too many update attempts',
+                'message' => 'Please wait before trying again.',
+            ], 429);
+        }
+        RateLimiter::hit($key, 3600); // 1 hour window
+
         $member = Member::where('public_share_token', $token)->firstOrFail();
 
         $validator = Validator::make($request->all(), [
@@ -72,6 +100,9 @@ class ProfileController extends Controller
 
         // Mark profile as complete if all required fields are filled
         $member->markProfileComplete();
+
+        // Clear cached profile status after update
+        Cache::forget('profile-status:' . $token);
 
         return response()->json([
             'message' => 'Profile updated successfully',

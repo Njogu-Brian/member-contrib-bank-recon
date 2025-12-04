@@ -199,25 +199,28 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <div className="grid min-h-screen gap-0 lg:grid-cols-2">
         <div 
-          className="relative hidden flex-col justify-between px-10 py-12 lg:flex"
+          className="relative hidden flex-col justify-between px-10 py-12 lg:flex overflow-hidden"
           style={{ 
-            background: `linear-gradient(to bottom right, var(--color-brand-600, ${primaryColor}), var(--login-bg-color, ${loginBgColor}))`
+            background: `linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)`
           }}
         >
-          <div>
-            <div className="mb-6">
+          {/* Animated background patterns */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute top-0 -left-4 w-72 h-72 bg-white rounded-full mix-blend-multiply filter blur-xl animate-blob"></div>
+            <div className="absolute top-0 -right-4 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-2000"></div>
+            <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl animate-blob animation-delay-4000"></div>
+          </div>
+          <div className="relative z-10">
+            <div className="mb-8">
               {logoUrl ? (
                 <img 
                   src={logoUrl} 
                   alt={appName}
-                  className="h-12 object-contain max-w-xs bg-white/50 p-2 rounded"
+                  className="h-16 object-contain max-w-xs bg-white/90 backdrop-blur-sm p-3 rounded-2xl shadow-2xl ring-2 ring-white/50"
                   onError={(e) => {
-                    // Silently handle logo load failures - don't log as error
-                    // console.error('Failed to load logo:', logoUrl)
-                    // Show fallback instead of hiding
                     e.target.style.display = 'none'
                     const fallback = e.target.nextElementSibling
                     if (fallback) fallback.style.display = 'block'
@@ -226,31 +229,60 @@ export default function Login() {
                 />
               ) : null}
               {(!logoUrl || !effectiveSettings?.logo_url) && (
-                <div className="text-2xl font-bold text-slate-900">{appName}</div>
+                <div className="text-3xl font-bold text-white drop-shadow-lg">{appName}</div>
               )}
             </div>
-            <p className="text-sm uppercase tracking-widest text-slate-700">{appName}</p>
-            <h1 className="mt-4 text-4xl font-semibold leading-tight text-slate-900">
-              Finance & governance portal for modern chamas.
+            <div className="space-y-2">
+              <div className="inline-block px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full">
+                <p className="text-sm font-semibold uppercase tracking-widest text-white">
+                  {appName}
+                </p>
+              </div>
+            </div>
+            <h1 className="mt-6 text-5xl font-bold leading-tight text-white drop-shadow-2xl">
+              Finance & Governance Portal
             </h1>
-            <p className="mt-4 text-slate-600">
-              Reconcile statements, approve payouts, and keep your members informed in real time.
+            <p className="mt-6 text-xl text-white/90 drop-shadow-lg leading-relaxed">
+              Reconcile bank statements, manage contributions, track invoices, and keep your members informed in real-time.
             </p>
+            
+            {/* Feature highlights */}
+            <div className="mt-8 grid grid-cols-2 gap-4">
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
+                <div className="text-3xl mb-2">💰</div>
+                <p className="text-sm font-semibold text-white">Smart Reconciliation</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
+                <div className="text-3xl mb-2">📊</div>
+                <p className="text-sm font-semibold text-white">Real-Time Reports</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
+                <div className="text-3xl mb-2">📱</div>
+                <p className="text-sm font-semibold text-white">Mobile Access</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
+                <div className="text-3xl mb-2">🔐</div>
+                <p className="text-sm font-semibold text-white">Secure & Compliant</p>
+              </div>
+            </div>
           </div>
-          <div className="space-y-4">
-            <div className="rounded-3xl bg-white/90 backdrop-blur p-6 shadow-lg">
-              <p className="text-sm uppercase tracking-widest text-slate-600">Live snapshot</p>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <div>
-                  <p className="text-xs text-slate-500">Pending approvals</p>
-                  <p className="text-2xl font-semibold text-slate-900">
-                    {snapshot?.pending_approvals ?? '—'}
+          <div className="space-y-4 relative z-10">
+            <div className="rounded-3xl bg-white/95 backdrop-blur-lg p-6 shadow-2xl border border-white/50">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-bold uppercase tracking-widest text-purple-900">📈 Live Snapshot</p>
+                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-4 border border-blue-200">
+                  <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Pending Approvals</p>
+                  <p className="text-3xl font-bold text-blue-900 mt-2">
+                    {snapshot?.pending_approvals ?? '0'}
                   </p>
                 </div>
-                <div>
-                  <p className="text-xs text-slate-500">Today's inflow</p>
-                  <p className="text-2xl font-semibold text-slate-900">
-                    {snapshot?.today_inflow ? formatCurrency(snapshot.today_inflow) : '—'}
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-4 border border-green-200">
+                  <p className="text-xs font-semibold text-green-600 uppercase tracking-wide">Today's Inflow</p>
+                  <p className="text-2xl font-bold text-green-900 mt-2">
+                    {snapshot?.today_inflow ? formatCurrency(snapshot.today_inflow) : 'KES 0'}
                   </p>
                 </div>
               </div>
@@ -258,13 +290,13 @@ export default function Login() {
             
             {/* Announcements */}
             {announcements && announcements.length > 0 && (
-              <div className="rounded-3xl bg-white/90 backdrop-blur p-6 shadow-lg">
-                <p className="text-sm uppercase tracking-widest text-slate-600 mb-4">Announcements</p>
+              <div className="rounded-3xl bg-white/95 backdrop-blur-lg p-6 shadow-2xl border border-white/50">
+                <p className="text-sm font-bold uppercase tracking-widest text-purple-900 mb-4">📢 Announcements</p>
                 <div className="space-y-3 max-h-48 overflow-y-auto">
                   {announcements.map((announcement) => (
-                    <div key={announcement.id} className="border-l-4 border-brand-600 pl-3 py-2">
-                      <p className="text-sm font-semibold text-slate-900">{announcement.title}</p>
-                      <p className="text-xs text-slate-600 mt-1 line-clamp-2">
+                    <div key={announcement.id} className="border-l-4 border-purple-500 bg-purple-50 pl-4 pr-3 py-3 rounded-r-lg">
+                      <p className="text-sm font-bold text-purple-900">{announcement.title}</p>
+                      <p className="text-xs text-purple-700 mt-1 line-clamp-2">
                         {announcement.content}
                       </p>
                     </div>
@@ -275,23 +307,23 @@ export default function Login() {
           </div>
         </div>
 
-        <div className="flex flex-col justify-center px-6 py-12 sm:px-12 lg:px-16 bg-white">
-          <div className="mx-auto w-full max-w-md space-y-8">
+        <div className="flex flex-col justify-center px-6 py-12 sm:px-12 lg:px-16 bg-white relative overflow-hidden">
+          {/* Decorative elements */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full filter blur-3xl opacity-30 -mr-32 -mt-32"></div>
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-blue-100 to-indigo-100 rounded-full filter blur-3xl opacity-30 -ml-32 -mb-32"></div>
+          
+          <div className="mx-auto w-full max-w-md space-y-8 relative z-10">
             <div>
-              <div className="mb-6">
+              <div className="mb-8 flex justify-center">
                 {logoUrl ? (
                   <img 
                     src={logoUrl} 
                     alt={appName}
-                    className="h-10 object-contain max-w-xs"
+                    className="h-16 object-contain max-w-xs drop-shadow-lg"
                     onError={(e) => {
-                      // Silently handle logo load failures - don't log as error
-                    // console.error('Failed to load logo:', logoUrl)
-                      // Show fallback instead of hiding
                       e.target.style.display = 'none'
                     }}
                     onLoad={() => {
-                      // Only log in development
                       if (import.meta.env.DEV) {
                         console.log('Logo loaded successfully:', logoUrl)
                       }
@@ -299,21 +331,25 @@ export default function Login() {
                   />
                 ) : null}
                 {(!logoUrl || !effectiveSettings?.logo_url) && (
-                  <div className="text-xl font-bold text-slate-900">{appName}</div>
+                  <div className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">{appName}</div>
                 )}
               </div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-brand-600">
-                Staff access
-              </p>
-              <h2 className="mt-2 text-3xl font-semibold text-slate-900">
-                Sign in to {appName}
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Enter the administrator credentials assigned to you. Need help? Contact Super Admin.
-              </p>
+              <div className="text-center">
+                <div className="inline-block px-4 py-1.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full shadow-lg mb-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-white">
+                    🔐 Staff Access
+                  </p>
+                </div>
+                <h2 className="text-4xl font-bold bg-gradient-to-r from-purple-900 via-purple-700 to-pink-700 bg-clip-text text-transparent">
+                  Welcome Back
+                </h2>
+                <p className="mt-3 text-base text-slate-600">
+                  Sign in to access the {appName} management portal
+                </p>
+              </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="glass space-y-5 rounded-3xl border px-6 py-8">
+            <form onSubmit={handleSubmit} className="space-y-6 rounded-3xl bg-white border-2 border-slate-200 px-8 py-10 shadow-2xl">
               {error && (
                 <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">
                   {error}
@@ -321,8 +357,8 @@ export default function Login() {
               )}
 
               <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-medium text-slate-700">
-                  Work email
+                <label htmlFor="email" className="text-sm font-semibold text-slate-700 flex items-center">
+                  <span className="mr-2">📧</span> Email Address
                 </label>
                 <input
                   id="email"
@@ -330,16 +366,16 @@ export default function Login() {
                   type="email"
                   autoComplete="email"
                   required
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                  placeholder="you@evimeria.africa"
+                  className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-5 py-4 text-slate-900 placeholder:text-slate-400 focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-purple-100 transition-all"
+                  placeholder="admin@evimeria.africa"
                   value={formData.email}
                   onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
                 />
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="password" className="text-sm font-medium text-slate-700">
-                  Password
+                <label htmlFor="password" className="text-sm font-semibold text-slate-700 flex items-center">
+                  <span className="mr-2">🔒</span> Password
                 </label>
                 <input
                   id="password"
@@ -347,19 +383,22 @@ export default function Login() {
                   type="password"
                   autoComplete="current-password"
                   required
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                  placeholder="••••••••"
+                  className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-5 py-4 text-slate-900 placeholder:text-slate-400 focus:border-purple-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-purple-100 transition-all"
+                  placeholder="Enter your password"
                   value={formData.password}
                   onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
                 />
               </div>
 
-              <div className="flex items-center justify-between text-sm text-slate-500">
-                <span>Protected with MFA</span>
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center text-slate-500">
+                  <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
+                  Secure Connection
+                </span>
                 <button 
                   type="button" 
                   onClick={() => navigate('/forgot-password')}
-                  className="font-medium text-brand-600 hover:text-brand-700"
+                  className="font-semibold text-purple-600 hover:text-purple-700 underline decoration-2 underline-offset-2"
                 >
                   Forgot password?
                 </button>
@@ -368,10 +407,24 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={loginMutation.isPending}
-                className="w-full rounded-2xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-brand-600/30 transition hover:bg-brand-700 disabled:opacity-60"
+                className="w-full rounded-xl bg-gradient-to-r from-purple-600 via-purple-700 to-pink-600 px-6 py-4 text-base font-bold text-white shadow-2xl shadow-purple-500/50 transition-all hover:shadow-purple-500/80 hover:scale-[1.02] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
-                {loginMutation.isPending ? 'Signing in…' : 'Sign in'}
+                {loginMutation.isPending ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Signing in…
+                  </span>
+                ) : (
+                  'Sign In to Portal'
+                )}
               </button>
+              
+              <div className="text-center text-xs text-slate-500 mt-4">
+                <p>Protected by enterprise-grade security</p>
+              </div>
             </form>
           </div>
         </div>
