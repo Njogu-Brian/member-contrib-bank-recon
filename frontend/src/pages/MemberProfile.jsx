@@ -401,34 +401,40 @@ export default function MemberProfile() {
       {/* Member Info Card */}
       <div className="bg-white shadow rounded-lg p-6">
         <h2 className="text-xl font-semibold mb-4">Member Information</h2>
+        
+        {/* Profile Completion Alert */}
+        {!member.profile_completed_at && (
+          <div className="mb-4 bg-amber-50 border-l-4 border-amber-500 p-3 rounded">
+            <p className="text-sm text-amber-800">
+              ⚠️ <strong>Profile Incomplete:</strong> Member needs to complete profile to access statements.
+            </p>
+          </div>
+        )}
+        
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div>
-            <label className="text-sm font-medium text-gray-500">Phone</label>
+            <label className="text-sm font-medium text-gray-500">Phone Number</label>
             <p className="text-gray-900 font-semibold">{member.phone || '-'}</p>
           </div>
           <div>
             <label className="text-sm font-medium text-gray-500">WhatsApp Number</label>
-            <p className="text-gray-900">{member.secondary_phone || '-'}</p>
+            <p className="text-gray-900">{member.secondary_phone || <span className="text-gray-400">Not set</span>}</p>
           </div>
           <div>
             <label className="text-sm font-medium text-gray-500">Email</label>
-            <p className="text-gray-900">{member.email || '-'}</p>
+            <p className="text-gray-900">{member.email || <span className="text-gray-400">Not set</span>}</p>
           </div>
           <div>
             <label className="text-sm font-medium text-gray-500">ID Number</label>
-            <p className="text-gray-900 font-semibold">{member.id_number || '-'}</p>
+            <p className="text-gray-900 font-semibold text-lg">{member.id_number || <span className="text-gray-400">Not set</span>}</p>
           </div>
           <div>
             <label className="text-sm font-medium text-gray-500">Church</label>
-            <p className="text-gray-900">{member.church || '-'}</p>
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-500">Member Code</label>
-            <p className="text-gray-900">{member.member_code || '-'}</p>
+            <p className="text-gray-900">{member.church || <span className="text-gray-400">Not set</span>}</p>
           </div>
           <div>
             <label className="text-sm font-medium text-gray-500">Member Number</label>
-            <p className="text-gray-900">{member.member_number || '-'}</p>
+            <p className="text-gray-900 font-mono bg-gray-100 px-2 py-1 rounded">{member.member_number || '-'}</p>
           </div>
           <div>
             <label className="text-sm font-medium text-gray-500">Date of Registration</label>
@@ -447,7 +453,11 @@ export default function MemberProfile() {
           {member.profile_completed_at && (
             <div>
               <label className="text-sm font-medium text-gray-500">Profile Completed</label>
-              <p className="text-gray-900">{formatDate(member.profile_completed_at)}</p>
+              <p className="text-gray-900">
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                  ✓ {formatDate(member.profile_completed_at)}
+                </span>
+              </p>
             </div>
           )}
         </div>
@@ -1205,6 +1215,14 @@ export default function MemberProfile() {
             <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
               <form onSubmit={handleSubmit} className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Edit Member</h3>
+                
+                {/* Profile Completion Info */}
+                <div className="mb-4 bg-blue-50 border-l-4 border-blue-500 p-3 rounded">
+                  <p className="text-xs text-blue-800">
+                    <strong>Profile Completion Fields:</strong> Name, Phone, Email, ID Number, and Church are required for members to view statements.
+                  </p>
+                </div>
+                
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Name *</label>
@@ -1217,13 +1235,15 @@ export default function MemberProfile() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Phone</label>
+                    <label className="block text-sm font-medium text-gray-700">Phone Number *</label>
                     <input
                       type="text"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      placeholder="+254712345678"
                     />
+                    <p className="mt-1 text-xs text-gray-500">Format: +254712345678 (with country code)</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">WhatsApp Number</label>
@@ -1232,60 +1252,67 @@ export default function MemberProfile() {
                       value={formData.secondary_phone || ''}
                       onChange={(e) => setFormData({ ...formData, secondary_phone: e.target.value })}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      placeholder="+254712345678"
+                      placeholder="+254723456789 (optional)"
                     />
+                    <p className="mt-1 text-xs text-gray-500">Optional, with country code</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Email</label>
+                    <label className="block text-sm font-medium text-gray-700">Email *</label>
                     <input
                       type="email"
-                      value={formData.email}
+                      value={formData.email || ''}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      placeholder="email@example.com"
                     />
+                    <p className="mt-1 text-xs text-gray-500">Valid email format required</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">ID Number</label>
+                    <label className="block text-sm font-medium text-gray-700">ID Number *</label>
                     <input
                       type="text"
                       value={formData.id_number || ''}
                       onChange={(e) => setFormData({ ...formData, id_number: e.target.value })}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      placeholder="12345678"
                     />
+                    <p className="mt-1 text-xs text-gray-500">Digits only, minimum 5 characters</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Church</label>
+                    <label className="block text-sm font-medium text-gray-700">Church *</label>
                     <input
                       type="text"
                       value={formData.church || ''}
                       onChange={(e) => setFormData({ ...formData, church: e.target.value })}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      placeholder="Church name"
                     />
+                    <p className="mt-1 text-xs text-gray-500">Required for profile completion</p>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Member Code</label>
-                    <input
-                      type="text"
-                      value={formData.member_code}
-                      onChange={(e) => setFormData({ ...formData, member_code: e.target.value })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    />
+                  
+                  {/* Divider */}
+                  <div className="border-t border-gray-200 pt-4 mt-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">System Information</h4>
                   </div>
+                  
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Member Number</label>
                     <input
                       type="text"
-                      value={formData.member_number}
+                      value={formData.member_number || ''}
                       onChange={(e) => setFormData({ ...formData, member_number: e.target.value })}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      placeholder="Auto-generated"
                     />
+                    <p className="mt-1 text-xs text-gray-500">System reference number (optional)</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Notes</label>
+                    <label className="block text-sm font-medium text-gray-700">Admin Notes</label>
                     <textarea
-                      value={formData.notes}
+                      value={formData.notes || ''}
                       onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                       rows={3}
+                      placeholder="Internal notes visible only to administrators"
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     />
                   </div>
