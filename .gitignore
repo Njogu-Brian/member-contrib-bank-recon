@@ -48,3 +48,9 @@ backend/storage/framework/views/*
 backend/bootstrap/cache/*
 !backend/bootstrap/cache/.gitkeep
 
+# Deployment guides with server-specific info
+DEPLOY_NOW.txt
+SERVER_COMMANDS.txt
+*_DEPLOY_*.txt
+*_SERVER_*.txt
+
