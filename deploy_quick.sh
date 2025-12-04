@@ -33,7 +33,15 @@ echo "Deleted all .md files (kept README.md)"
 echo "🔧 Setting permissions..."
 cd backend
 chmod -R 775 storage bootstrap/cache
-sudo chown -R www-data:www-data storage bootstrap/cache
+
+# Try to set ownership (non-interactive, skip if no sudo access)
+if sudo -n true 2>/dev/null; then
+    echo "Setting ownership with sudo..."
+    sudo chown -R www-data:www-data storage bootstrap/cache
+else
+    echo "⚠️  Skipping ownership change (no sudo access or requires password)"
+    echo "   Run manually if needed: sudo chown -R www-data:www-data storage bootstrap/cache"
+fi
 
 echo "✅ Backend deployment complete!"
 echo ""
