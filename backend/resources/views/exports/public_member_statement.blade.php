@@ -39,10 +39,15 @@
         </div>
 
         @php
-            // Format phone with country code
+            // Format phone with country code (add +254 for Kenya numbers only if not already formatted)
             $phone = $member->phone ?? '-';
             if ($phone !== '-' && !str_starts_with($phone, '+')) {
-                $phone = str_starts_with($phone, '254') ? '+' . $phone : '+254' . ltrim($phone, '0');
+                // Only add +254 for Kenyan numbers
+                if (str_starts_with($phone, '254')) {
+                    $phone = '+' . $phone;
+                } elseif (str_starts_with($phone, '0') && strlen($phone) >= 10) {
+                    $phone = '+254' . ltrim($phone, '0');
+                }
             }
             $totalContributions = $summary['total_contributions'] ?? 0;
             $expectedContributions = $summary['expected_contributions'] ?? 0;

@@ -41,14 +41,14 @@ class ProfileController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'phone' => ['required', 'string', 'max:20', 'regex:/^\+254[17]\d{8}$/'],
-            'secondary_phone' => ['nullable', 'string', 'max:20', 'regex:/^\+254[17]\d{8}$/'],
+            'phone' => ['required', 'string', 'max:20', 'regex:/^\+\d{1,4}\d{6,14}$/'],
+            'secondary_phone' => ['nullable', 'string', 'max:20', 'regex:/^\+\d{1,4}\d{6,14}$/'],
             'email' => 'required|email|max:255',
             'id_number' => ['required', 'string', 'regex:/^\d+$/', 'min:5', 'max:20'],
             'church' => 'required|string|max:255',
         ], [
-            'phone.regex' => 'Phone number must be in format +254712345678 or +254112345678',
-            'secondary_phone.regex' => 'WhatsApp number must be in format +254712345678 or +254112345678',
+            'phone.regex' => 'Phone number must start with + followed by country code and number (e.g., +254712345678)',
+            'secondary_phone.regex' => 'WhatsApp number must start with + followed by country code and number',
             'id_number.regex' => 'ID Number must contain only digits',
             'id_number.min' => 'ID Number must be at least 5 digits',
         ]);

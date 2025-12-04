@@ -2,10 +2,16 @@
     $range = $rangeLabel ?? 'All Time';
     $memberNumber = $member->member_number ?? '-';
     $email = $member->email ?? '-';
-    // Format phone with country code
+    // Format phone with country code (add +254 for Kenya numbers only if not already formatted)
     $phone = $member->phone ?? '-';
     if ($phone !== '-' && !str_starts_with($phone, '+')) {
-        $phone = str_starts_with($phone, '254') ? '+' . $phone : '+254' . ltrim($phone, '0');
+        // Only add +254 for Kenyan numbers (starting with 0 or 254)
+        if (str_starts_with($phone, '254')) {
+            $phone = '+' . $phone;
+        } elseif (str_starts_with($phone, '0') && strlen($phone) >= 10) {
+            $phone = '+254' . ltrim($phone, '0');
+        }
+        // Otherwise leave as is (could be international already formatted differently)
     }
     $idNumber = $member->id_number ?? '-';
     $church = $member->church ?? '-';

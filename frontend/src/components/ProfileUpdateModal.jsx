@@ -1,6 +1,20 @@
 import { useState, useEffect } from 'react'
 import { HiXMark } from 'react-icons/hi2'
 
+// Common country codes (with Kenya first as default)
+const COUNTRY_CODES = [
+  { code: '+254', country: 'Kenya', flag: '🇰🇪', length: 9 },
+  { code: '+1', country: 'USA/Canada', flag: '🇺🇸', length: 10 },
+  { code: '+44', country: 'UK', flag: '🇬🇧', length: 10 },
+  { code: '+256', country: 'Uganda', flag: '🇺🇬', length: 9 },
+  { code: '+255', country: 'Tanzania', flag: '🇹🇿', length: 9 },
+  { code: '+250', country: 'Rwanda', flag: '🇷🇼', length: 9 },
+  { code: '+27', country: 'South Africa', flag: '🇿🇦', length: 9 },
+  { code: '+234', country: 'Nigeria', flag: '🇳🇬', length: 10 },
+  { code: '+91', country: 'India', flag: '🇮🇳', length: 10 },
+  { code: '+86', country: 'China', flag: '🇨🇳', length: 11 },
+]
+
 export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, initialData = {} }) {
   const [formData, setFormData] = useState({
     name: '',
@@ -10,15 +24,53 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
     id_number: '',
     church: '',
   })
+  const [phoneCountryCode, setPhoneCountryCode] = useState('+254')
+  const [whatsappCountryCode, setWhatsappCountryCode] = useState('+254')
+  const [phoneNumber, setPhoneNumber] = useState('')
+  const [whatsappNumber, setWhatsappNumber] = useState('')
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     if (initialData) {
+      // Parse phone number to extract country code
+      const parsePhone = (fullPhone) => {
+        if (!fullPhone) return { code: '+254', number: '' }
+        
+        // Check if already has country code
+        if (fullPhone.startsWith('+')) {
+          const match = COUNTRY_CODES.find(c => fullPhone.startsWith(c.code))
+          if (match) {
+            return {
+              code: match.code,
+              number: fullPhone.substring(match.code.length)
+            }
+          }
+        }
+        
+        // Kenya numbers starting with 254 or 0
+        if (fullPhone.startsWith('254')) {
+          return { code: '+254', number: fullPhone.substring(3) }
+        }
+        if (fullPhone.startsWith('0')) {
+          return { code: '+254', number: fullPhone.substring(1) }
+        }
+        
+        return { code: '+254', number: fullPhone }
+      }
+      
+      const parsedPhone = parsePhone(initialData.phone)
+      const parsedWhatsapp = parsePhone(initialData.secondary_phone)
+      
+      setPhoneCountryCode(parsedPhone.code)
+      setPhoneNumber(parsedPhone.number)
+      setWhatsappCountryCode(parsedWhatsapp.code)
+      setWhatsappNumber(parsedWhatsapp.number)
+      
       setFormData({
         name: initialData.name || '',
-        phone: initialData.phone || '',
-        secondary_phone: initialData.secondary_phone || '',
+        phone: parsedPhone.code + parsedPhone.number,
+        secondary_phone: parsedWhatsapp.number ? parsedWhatsapp.code + parsedWhatsapp.number : '',
         email: initialData.email || '',
         id_number: initialData.id_number || '',
         church: initialData.church || '',
@@ -39,6 +91,44 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
     }
   }
 
+  const handlePhoneNumberChange = (e) => {
+    const value = e.target.value.replace(/\D/g, '') // Only digits
+    setPhoneNumber(value)
+    setFormData((prev) => ({ ...prev, phone: phoneCountryCode + value }))
+    if (errors.phone) {
+      setErrors((prev) => {
+        const newErrors = { ...prev }
+        delete newErrors.phone
+        return newErrors
+      })
+    }
+  }
+
+  const handleWhatsappNumberChange = (e) => {
+    const value = e.target.value.replace(/\D/g, '') // Only digits
+    setWhatsappNumber(value)
+    setFormData((prev) => ({ ...prev, secondary_phone: value ? whatsappCountryCode + value : '' }))
+    if (errors.secondary_phone) {
+      setErrors((prev) => {
+        const newErrors = { ...prev }
+        delete newErrors.secondary_phone
+        return newErrors
+      })
+    }
+  }
+
+  const handlePhoneCountryCodeChange = (e) => {
+    const code = e.target.value
+    setPhoneCountryCode(code)
+    setFormData((prev) => ({ ...prev, phone: code + phoneNumber }))
+  }
+
+  const handleWhatsappCountryCodeChange = (e) => {
+    const code = e.target.value
+    setWhatsappCountryCode(code)
+    setFormData((prev) => ({ ...prev, secondary_phone: whatsappNumber ? code + whatsappNumber : '' }))
+  }
+
   const validate = () => {
     const newErrors = {}
 
@@ -48,12 +138,18 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
     
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone number is required'
-    } else if (!/^\+254[17]\d{8}$/.test(formData.phone)) {
-      newErrors.phone = 'Phone must be in format +254712345678 or +254112345678'
+    } else if (!/^\+\d{1,4}\d{6,14}$/.test(formData.phone)) {
+      newErrors.phone = 'Please enter a valid international phone number'
+    } else if (!phoneNumber.trim()) {
+      newErrors.phone = 'Please enter the phone number after selecting country code'
     }
     
-    if (formData.secondary_phone && !/^\+254[17]\d{8}$/.test(formData.secondary_phone)) {
-      newErrors.secondary_phone = 'WhatsApp must be in format +254712345678 or +254112345678'
+    if (formData.secondary_phone) {
+      if (!/^\+\d{1,4}\d{6,14}$/.test(formData.secondary_phone)) {
+        newErrors.secondary_phone = 'Please enter a valid international phone number'
+      } else if (!whatsappNumber.trim()) {
+        newErrors.secondary_phone = 'Please enter the number after selecting country code'
+      }
     }
     
     if (!formData.email.trim()) {
@@ -173,38 +269,74 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
               <label htmlFor="phone" className="block text-sm font-semibold text-gray-700 mb-2">
                 Phone Number <span className="text-red-500">*</span>
               </label>
-              <input
-                type="tel"
-                id="phone"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
-                  errors.phone ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="+254712345678"
-              />
+              <div className="flex gap-2">
+                <select
+                  value={phoneCountryCode}
+                  onChange={handlePhoneCountryCodeChange}
+                  className="px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-sm font-medium"
+                  style={{ minWidth: '140px' }}
+                >
+                  {COUNTRY_CODES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.flag} {c.code}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="tel"
+                  id="phone"
+                  name="phone_number"
+                  value={phoneNumber}
+                  onChange={handlePhoneNumberChange}
+                  className={`flex-1 px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
+                    errors.phone ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  placeholder="712345678"
+                />
+              </div>
               {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone}</p>}
-              <p className="mt-1 text-xs text-gray-500">Format: +254712345678 or +254112345678</p>
+              <p className="mt-1 text-xs text-gray-500">
+                Full number: <strong>{phoneCountryCode}{phoneNumber || '...'}</strong>
+              </p>
             </div>
 
             <div>
               <label htmlFor="secondary_phone" className="block text-sm font-semibold text-gray-700 mb-2">
-                WhatsApp Number
+                WhatsApp Number <span className="text-gray-400 text-xs">(Optional)</span>
               </label>
-              <input
-                type="tel"
-                id="secondary_phone"
-                name="secondary_phone"
-                value={formData.secondary_phone}
-                onChange={handleChange}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
-                  errors.secondary_phone ? 'border-red-500' : 'border-gray-300'
-                }`}
-                placeholder="+254723456789 (optional)"
-              />
+              <div className="flex gap-2">
+                <select
+                  value={whatsappCountryCode}
+                  onChange={handleWhatsappCountryCodeChange}
+                  className="px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-sm font-medium"
+                  style={{ minWidth: '140px' }}
+                >
+                  {COUNTRY_CODES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.flag} {c.code}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="tel"
+                  id="secondary_phone"
+                  name="whatsapp_number"
+                  value={whatsappNumber}
+                  onChange={handleWhatsappNumberChange}
+                  className={`flex-1 px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
+                    errors.secondary_phone ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  placeholder="723456789"
+                />
+              </div>
               {errors.secondary_phone && <p className="mt-1 text-sm text-red-600">{errors.secondary_phone}</p>}
-              <p className="mt-1 text-xs text-gray-500">Format: +254712345678 (optional)</p>
+              <p className="mt-1 text-xs text-gray-500">
+                {whatsappNumber ? (
+                  <>Full number: <strong>{whatsappCountryCode}{whatsappNumber}</strong></>
+                ) : (
+                  'Optional field'
+                )}
+              </p>
             </div>
           </div>
 
