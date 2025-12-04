@@ -33,15 +33,7 @@ echo "Deleted all .md files (kept README.md)"
 echo "🔧 Setting permissions..."
 cd backend
 chmod -R 775 storage bootstrap/cache
-
-# Try to set ownership (non-interactive, skip if no sudo access)
-if sudo -n true 2>/dev/null; then
-    echo "Setting ownership with sudo..."
-    sudo chown -R www-data:www-data storage bootstrap/cache
-else
-    echo "⚠️  Skipping ownership change (no sudo access or requires password)"
-    echo "   Run manually if needed: sudo chown -R www-data:www-data storage bootstrap/cache"
-fi
+sudo chown -R www-data:www-data storage bootstrap/cache
 
 echo "✅ Backend deployment complete!"
 echo ""
@@ -51,4 +43,3 @@ echo "2. Test the application"
 echo "3. Run: php artisan invoices:backfill (first time only)"
 
 cd ~/domains/evimeria.breysomsolutions.co.ke/public_html
-
