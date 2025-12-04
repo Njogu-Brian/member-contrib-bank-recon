@@ -42,15 +42,37 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
   const validate = () => {
     const newErrors = {}
 
-    if (!formData.name.trim()) newErrors.name = 'Name is required'
-    if (!formData.phone.trim()) newErrors.phone = 'Phone number is required'
+    if (!formData.name.trim()) {
+      newErrors.name = 'Name is required'
+    }
+    
+    if (!formData.phone.trim()) {
+      newErrors.phone = 'Phone number is required'
+    } else if (!/^\+254[17]\d{8}$/.test(formData.phone)) {
+      newErrors.phone = 'Phone must be in format +254712345678 or +254112345678'
+    }
+    
+    if (formData.secondary_phone && !/^\+254[17]\d{8}$/.test(formData.secondary_phone)) {
+      newErrors.secondary_phone = 'WhatsApp must be in format +254712345678 or +254112345678'
+    }
+    
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required'
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address'
     }
-    if (!formData.id_number.trim()) newErrors.id_number = 'ID Number is required'
-    if (!formData.church.trim()) newErrors.church = 'Church is required'
+    
+    if (!formData.id_number.trim()) {
+      newErrors.id_number = 'ID Number is required'
+    } else if (!/^\d+$/.test(formData.id_number)) {
+      newErrors.id_number = 'ID Number must contain only digits'
+    } else if (formData.id_number.length < 5) {
+      newErrors.id_number = 'ID Number must be at least 5 digits'
+    }
+    
+    if (!formData.church.trim()) {
+      newErrors.church = 'Church is required'
+    }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -160,14 +182,15 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
                 className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
                   errors.phone ? 'border-red-500' : 'border-gray-300'
                 }`}
-                placeholder="0712345678"
+                placeholder="+254712345678"
               />
               {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone}</p>}
+              <p className="mt-1 text-xs text-gray-500">Format: +254712345678 or +254112345678</p>
             </div>
 
             <div>
               <label htmlFor="secondary_phone" className="block text-sm font-semibold text-gray-700 mb-2">
-                Alternative Phone
+                WhatsApp Number
               </label>
               <input
                 type="tel"
@@ -175,9 +198,13 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
                 name="secondary_phone"
                 value={formData.secondary_phone}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
-                placeholder="0723456789 (optional)"
+                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
+                  errors.secondary_phone ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="+254723456789 (optional)"
               />
+              {errors.secondary_phone && <p className="mt-1 text-sm text-red-600">{errors.secondary_phone}</p>}
+              <p className="mt-1 text-xs text-gray-500">Format: +254712345678 (optional)</p>
             </div>
           </div>
 
@@ -214,9 +241,11 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
               className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
                 errors.id_number ? 'border-red-500' : 'border-gray-300'
               }`}
-              placeholder="Enter your ID number"
+              placeholder="12345678"
+              maxLength="20"
             />
             {errors.id_number && <p className="mt-1 text-sm text-red-600">{errors.id_number}</p>}
+            <p className="mt-1 text-xs text-gray-500">Digits only, minimum 5 digits</p>
           </div>
 
           {/* Church */}

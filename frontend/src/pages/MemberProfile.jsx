@@ -404,10 +404,10 @@ export default function MemberProfile() {
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <div>
             <label className="text-sm font-medium text-gray-500">Phone</label>
-            <p className="text-gray-900">{member.phone || '-'}</p>
+            <p className="text-gray-900 font-semibold">{member.phone || '-'}</p>
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-500">Alternative Phone</label>
+            <label className="text-sm font-medium text-gray-500">WhatsApp Number</label>
             <p className="text-gray-900">{member.secondary_phone || '-'}</p>
           </div>
           <div>
@@ -1226,12 +1226,13 @@ export default function MemberProfile() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Alternative Phone</label>
+                    <label className="block text-sm font-medium text-gray-700">WhatsApp Number</label>
                     <input
                       type="text"
                       value={formData.secondary_phone || ''}
                       onChange={(e) => setFormData({ ...formData, secondary_phone: e.target.value })}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      placeholder="+254712345678"
                     />
                   </div>
                   <div>

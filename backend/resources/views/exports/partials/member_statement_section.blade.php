@@ -1,16 +1,20 @@
 @php
     $range = $rangeLabel ?? 'All Time';
-    $memberNumber = $member->member_code ?? $member->member_number ?? '-';
+    $memberNumber = $member->member_number ?? '-';
     $email = $member->email ?? '-';
+    // Format phone with country code
     $phone = $member->phone ?? '-';
+    if ($phone !== '-' && !str_starts_with($phone, '+')) {
+        $phone = str_starts_with($phone, '254') ? '+' . $phone : '+254' . ltrim($phone, '0');
+    }
     $idNumber = $member->id_number ?? '-';
-    $church = $member->church ?? $member->resident_church ?? '-';
-    $membershipType = $member->membership_type ?? 'Member';
-    $statusLabel = $member->is_active ? 'Active' : 'Inactive';
+    $church = $member->church ?? '-';
+    $contributionStatus = $summaryData['contribution_status_label'] ?? 'Unknown';
+    $contributionStatusColor = $summaryData['contribution_status_color'] ?? '#6B7280';
     $summaryData = $summary ?? [];
     $totalContributions = $summaryData['total_contributions'] ?? 0;
     $expectedContributions = $summaryData['expected_contributions'] ?? 0;
-    $outstanding = max($expectedContributions - $totalContributions, 0);
+    $difference = $totalContributions - $expectedContributions;
     $generatedDisplay = $generatedAt instanceof \Carbon\CarbonInterface ? $generatedAt->format('F j, Y g:i A') : $generatedAt;
     $sortedEntries = collect($entries ?? [])->sortBy('date')->values();
     $runningBalance = 0;
@@ -41,13 +45,13 @@
     <table class="info-table">
         <tr>
             <td class="label">Name:</td>
-            <td>{{ $member->name }}</td>
+            <td><strong>{{ $member->name }}</strong></td>
             <td class="label">Phone:</td>
-            <td>{{ $phone }}</td>
+            <td><strong>{{ $phone }}</strong></td>
         </tr>
         <tr>
             <td class="label">Member No:</td>
-            <td>{{ $memberNumber }}</td>
+            <td><strong>{{ $memberNumber }}</strong></td>
             <td class="label">ID Number:</td>
             <td><strong>{{ $idNumber }}</strong></td>
         </tr>
@@ -58,14 +62,14 @@
             <td>{{ $church }}</td>
         </tr>
         <tr>
-            <td class="label">Registration Date:</td>
-            <td>{{ optional($member->date_of_registration)->format('M d, Y') ?? '-' }}</td>
-            <td class="label">Status:</td>
-            <td>{{ $statusLabel }}</td>
+            <td class="label">Contribution Status:</td>
+            <td colspan="3">
+                <strong style="color: {{ $contributionStatusColor }};">{{ $contributionStatus }}</strong>
+            </td>
         </tr>
         <tr>
             <td class="label">Period:</td>
-            <td colspan="3">{{ $range }}</td>
+            <td colspan="3"><strong>{{ $range }}</strong></td>
         </tr>
     </table>
 
@@ -121,11 +125,28 @@
         </tfoot>
     </table>
 
-    <div class="summary-block">
-        <div><strong>Total Contributions:</strong> KES {{ number_format($totalContributions, 2) }}</div>
-        <div><strong>Total Outstanding Invoices (remaining):</strong> KES {{ number_format($outstanding, 2) }}</div>
-        <div><strong>Total Expenses:</strong> KES {{ number_format($summaryData['total_expenses'] ?? 0, 2) }}</div>
-        <div><strong>Status:</strong> {{ $summaryData['contribution_status_label'] ?? 'Unknown' }}</div>
+    <div class="summary-section" style="margin-top: 30px; padding: 20px; background-color: #f8f9fa; border: 2px solid #dee2e6; border-radius: 8px;">
+        <h3 style="margin: 0 0 15px 0; font-size: 16px; color: #495057; border-bottom: 2px solid #dee2e6; padding-bottom: 10px;">Statement Summary</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+                <td style="padding: 8px 0; font-size: 14px;">Total Contributions:</td>
+                <td style="padding: 8px 0; text-align: right; font-size: 14px;">KES {{ number_format($totalContributions, 2) }}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px 0; font-size: 14px;">Total Expenses:</td>
+                <td style="padding: 8px 0; text-align: right; font-size: 14px;">KES {{ number_format($summaryData['total_expenses'] ?? 0, 2) }}</td>
+            </tr>
+            <tr style="border-top: 2px solid #dee2e6;">
+                <td style="padding: 12px 0; font-size: 16px;"><strong>Expected Contributions:</strong></td>
+                <td style="padding: 12px 0; text-align: right; font-size: 16px; font-weight: bold; color: #0066cc;">KES {{ number_format($expectedContributions, 2) }}</td>
+            </tr>
+            <tr style="background-color: {{ $difference >= 0 ? '#d4edda' : '#f8d7da' }}; border: 2px solid {{ $difference >= 0 ? '#28a745' : '#dc3545' }};">
+                <td style="padding: 12px 10px; font-size: 16px;"><strong>Difference (Contribution - Expected):</strong></td>
+                <td style="padding: 12px 10px; text-align: right; font-size: 18px; font-weight: bold; color: {{ $difference >= 0 ? '#155724' : '#721c24' }};">
+                    KES {{ number_format($difference, 2) }}
+                </td>
+            </tr>
+        </table>
     </div>
 
     <div class="footer-text">

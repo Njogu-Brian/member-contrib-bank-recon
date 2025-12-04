@@ -41,11 +41,16 @@ class ProfileController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'phone' => 'required|string|max:20',
-            'secondary_phone' => 'nullable|string|max:20',
+            'phone' => ['required', 'string', 'max:20', 'regex:/^\+254[17]\d{8}$/'],
+            'secondary_phone' => ['nullable', 'string', 'max:20', 'regex:/^\+254[17]\d{8}$/'],
             'email' => 'required|email|max:255',
-            'id_number' => 'required|string|max:50',
+            'id_number' => ['required', 'string', 'regex:/^\d+$/', 'min:5', 'max:20'],
             'church' => 'required|string|max:255',
+        ], [
+            'phone.regex' => 'Phone number must be in format +254712345678 or +254112345678',
+            'secondary_phone.regex' => 'WhatsApp number must be in format +254712345678 or +254112345678',
+            'id_number.regex' => 'ID Number must contain only digits',
+            'id_number.min' => 'ID Number must be at least 5 digits',
         ]);
 
         if ($validator->fails()) {
