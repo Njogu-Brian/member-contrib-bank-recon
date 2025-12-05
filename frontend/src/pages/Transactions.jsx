@@ -59,7 +59,9 @@ export default function Transactions({
       // Also don't close if clicking on modal overlays
       if (event.target.closest('button[type="button"]') || 
           event.target.closest('.fixed.z-50') ||
-          event.target.closest('.fixed.z-40')) {
+          event.target.closest('.fixed.z-40') ||
+          event.target.closest('[role="menu"]') ||
+          event.target.closest('.absolute.right-0')) {
         return
       }
       if (actionMenuRef.current && !actionMenuRef.current.contains(event.target)) {
@@ -916,27 +918,43 @@ export default function Transactions({
                                   onClick={(e) => {
                                     e.preventDefault()
                                     e.stopPropagation()
-                                    console.log('=== Restore button clicked ===')
-                                    console.log('Event:', e)
-                                    console.log('Transaction:', tx)
-                                    console.log('Transaction ID:', tx.id)
                                     
-                                    const transactionId = tx.id
-                                    if (!transactionId) {
-                                      console.error('No transaction ID found')
+                                    console.log('=== Restore button clicked ===')
+                                    console.log('Transaction ID:', tx.id)
+                                    console.log('Transaction object:', tx)
+                                    
+                                    if (!tx || !tx.id) {
+                                      console.error('No transaction ID found', tx)
                                       alert('Error: Transaction ID not found')
                                       setActionMenuOpen(null)
                                       return
                                     }
                                     
-                                    // Close menu first to prevent click outside handler from interfering
+                                    const transactionId = tx.id
+                                    
+                                    // Close menu first to prevent interference
                                     setActionMenuOpen(null)
                                     
-                                    // Use requestAnimationFrame to ensure menu closes before confirm
-                                    requestAnimationFrame(() => {
-                                      console.log('Calling handleUnarchive with transaction:', tx)
-                                      handleUnarchive(tx)
-                                    })
+                                    // Use setTimeout to ensure menu closes before confirm
+                                    setTimeout(() => {
+                                      // Show confirm dialog
+                                      if (!confirm('Restore this transaction?')) {
+                                        console.log('User cancelled restore')
+                                        return
+                                      }
+                                      
+                                      // Call mutation directly
+                                      console.log('Calling unarchiveMutation.mutate with ID:', transactionId)
+                                      console.log('Unarchive mutation object:', unarchiveMutation)
+                                      
+                                      try {
+                                        unarchiveMutation.mutate(transactionId)
+                                        console.log('Mutation called successfully')
+                                      } catch (error) {
+                                        console.error('Error calling mutation:', error)
+                                        alert('Error: ' + error.message)
+                                      }
+                                    }, 50)
                                   }}
                                   disabled={unarchiveMutation.isPending && unarchivingId === tx.id}
                                   className="block w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-100 disabled:opacity-50"

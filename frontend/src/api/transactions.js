@@ -82,13 +82,24 @@ export const archiveTransaction = async (id, reason = '') => {
 
 export const unarchiveTransaction = async (id) => {
   try {
-    console.log('API: Unarchiving transaction', id)
-    const response = await api.delete(`${adminBase}/transactions/${id}/archive`)
-    console.log('API: Unarchive response:', response.data)
+    console.log('=== API: unarchiveTransaction called ===')
+    console.log('API: Transaction ID:', id)
+    console.log('API: Full URL will be:', `${adminBase}/transactions/${id}/archive`)
+    
+    const url = `${adminBase}/transactions/${id}/archive`
+    console.log('API: Making DELETE request to:', url)
+    
+    const response = await api.delete(url)
+    console.log('API: Unarchive response status:', response.status)
+    console.log('API: Unarchive response data:', response.data)
     return response.data
   } catch (error) {
-    console.error('API: Unarchive error:', error)
-    console.error('API: Unarchive error response:', error.response)
+    console.error('=== API: Unarchive error ===')
+    console.error('API: Error object:', error)
+    console.error('API: Error message:', error.message)
+    console.error('API: Error response:', error.response)
+    console.error('API: Error response data:', error.response?.data)
+    console.error('API: Error response status:', error.response?.status)
     throw error
   }
 }

@@ -1239,7 +1239,7 @@ export default function MemberProfile() {
                 {/* Profile Completion Info */}
                 <div className="mb-4 bg-blue-50 border-l-4 border-blue-500 p-3 rounded">
                   <p className="text-xs text-blue-800">
-                    <strong>Profile Completion Fields:</strong> Name, Phone, Email, ID Number, and Church are required for members to view statements.
+                    <strong>Profile Completion Fields:</strong> Name, Phone, Email, ID Number, Church, and all Next of Kin fields are required for members to view statements.
                   </p>
                 </div>
                 
@@ -1313,13 +1313,14 @@ export default function MemberProfile() {
                   {/* Next of Kin Section */}
                   <div className="border-t border-gray-200 pt-4 mt-4">
                     <h4 className="text-sm font-semibold text-gray-700 mb-3">Next of Kin Information</h4>
-                    <p className="text-xs text-gray-500 mb-3">Optional: Provide emergency contact information</p>
+                    <p className="text-xs text-gray-500 mb-3">Required: All next of kin fields must be filled for profile completion</p>
                     
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Next of Kin Name</label>
+                        <label className="block text-sm font-medium text-gray-700">Next of Kin Name <span className="text-red-500">*</span></label>
                         <input
                           type="text"
+                          required
                           value={formData.next_of_kin_name || ''}
                           onChange={(e) => setFormData({ ...formData, next_of_kin_name: e.target.value })}
                           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
@@ -1328,9 +1329,10 @@ export default function MemberProfile() {
                       </div>
                       
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Next of Kin Contact</label>
+                        <label className="block text-sm font-medium text-gray-700">Next of Kin Contact <span className="text-red-500">*</span></label>
                         <input
                           type="text"
+                          required
                           value={formData.next_of_kin_phone || ''}
                           onChange={(e) => setFormData({ ...formData, next_of_kin_phone: e.target.value })}
                           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
@@ -1340,8 +1342,9 @@ export default function MemberProfile() {
                       </div>
                       
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Relationship</label>
+                        <label className="block text-sm font-medium text-gray-700">Relationship <span className="text-red-500">*</span></label>
                         <select
+                          required
                           value={formData.next_of_kin_relationship || ''}
                           onChange={(e) => setFormData({ ...formData, next_of_kin_relationship: e.target.value })}
                           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"

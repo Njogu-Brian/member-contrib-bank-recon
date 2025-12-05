@@ -815,27 +815,43 @@ export default function StatementTransactions() {
                                   onClick={(e) => {
                                     e.preventDefault()
                                     e.stopPropagation()
-                                    console.log('=== Restore button clicked ===')
-                                    console.log('Event:', e)
-                                    console.log('Transaction:', transaction)
-                                    console.log('Transaction ID:', transaction.id)
                                     
-                                    const transactionId = transaction.id
-                                    if (!transactionId) {
-                                      console.error('No transaction ID found')
+                                    console.log('=== Restore button clicked ===')
+                                    console.log('Transaction ID:', transaction.id)
+                                    console.log('Transaction object:', transaction)
+                                    
+                                    if (!transaction || !transaction.id) {
+                                      console.error('No transaction ID found', transaction)
                                       alert('Error: Transaction ID not found')
                                       setActionMenuOpen(null)
                                       return
                                     }
                                     
-                                    // Close menu first to prevent click outside handler from interfering
+                                    const transactionId = transaction.id
+                                    
+                                    // Close menu first to prevent interference
                                     setActionMenuOpen(null)
                                     
-                                    // Use requestAnimationFrame to ensure menu closes before confirm
-                                    requestAnimationFrame(() => {
-                                      console.log('Calling handleUnarchive with transaction:', transaction)
-                                      handleUnarchive(transaction)
-                                    })
+                                    // Use setTimeout to ensure menu closes before confirm
+                                    setTimeout(() => {
+                                      // Show confirm dialog
+                                      if (!confirm('Restore this transaction?')) {
+                                        console.log('User cancelled restore')
+                                        return
+                                      }
+                                      
+                                      // Call mutation directly
+                                      console.log('Calling unarchiveMutation.mutate with ID:', transactionId)
+                                      console.log('Unarchive mutation object:', unarchiveMutation)
+                                      
+                                      try {
+                                        unarchiveMutation.mutate(transactionId)
+                                        console.log('Mutation called successfully')
+                                      } catch (error) {
+                                        console.error('Error calling mutation:', error)
+                                        alert('Error: ' + error.message)
+                                      }
+                                    }, 50)
                                   }}
                                   disabled={unarchiveMutation.isPending && unarchivingId === transaction.id}
                                   className="block w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-100 disabled:opacity-50"
