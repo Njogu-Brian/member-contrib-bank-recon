@@ -173,14 +173,23 @@ export default function StatementTransactions() {
   })
 
   const unarchiveMutation = useMutation({
-    mutationFn: (transactionId) => unarchiveTransaction(transactionId),
-    onSuccess: () => {
+    mutationFn: (transactionId) => {
+      console.log('unarchiveMutation.mutationFn called with ID:', transactionId)
+      const result = unarchiveTransaction(transactionId)
+      console.log('unarchiveTransaction call initiated, promise:', result)
+      return result
+    },
+    onSuccess: (data) => {
+      console.log('Unarchive success:', data)
       queryClient.invalidateQueries(['transactions', 'statement', id])
       queryClient.invalidateQueries(['transactions'])
-      alert('Transaction restored')
+      alert(data?.message || 'Transaction restored')
     },
     onError: (error) => {
-      alert(error.response?.data?.message || 'Failed to restore transaction')
+      console.error('Unarchive error:', error)
+      console.error('Unarchive error response:', error.response)
+      console.error('Unarchive error message:', error.message)
+      alert(error.response?.data?.message || error.message || 'Failed to restore transaction')
     },
   })
 
@@ -380,14 +389,25 @@ export default function StatementTransactions() {
   }
 
   const handleUnarchive = (transaction) => {
+    console.log('handleUnarchive called with transaction:', transaction)
+    
     if (unarchiveMutation.isPending) {
+      console.log('Unarchive already in progress')
+      return
+    }
+
+    if (!transaction || !transaction.id) {
+      console.error('Invalid transaction in handleUnarchive:', transaction)
+      alert('Error: Invalid transaction data')
       return
     }
 
     if (!confirm('Restore this transaction?')) {
+      console.log('User cancelled restore')
       return
     }
 
+    console.log('Calling unarchiveMutation.mutate with ID:', transaction.id)
     unarchiveMutation.mutate(transaction.id)
   }
 
@@ -791,9 +811,31 @@ export default function StatementTransactions() {
                             <div className="py-1">
                               {transaction.is_archived ? (
                                 <button
-                                  onClick={() => {
-                                    handleUnarchive(transaction)
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    console.log('=== Restore button clicked ===')
+                                    console.log('Event:', e)
+                                    console.log('Transaction:', transaction)
+                                    console.log('Transaction ID:', transaction.id)
+                                    
+                                    const transactionId = transaction.id
+                                    if (!transactionId) {
+                                      console.error('No transaction ID found')
+                                      alert('Error: Transaction ID not found')
+                                      setActionMenuOpen(null)
+                                      return
+                                    }
+                                    
+                                    // Close menu first to prevent click outside handler from interfering
                                     setActionMenuOpen(null)
+                                    
+                                    // Use requestAnimationFrame to ensure menu closes before confirm
+                                    requestAnimationFrame(() => {
+                                      console.log('Calling handleUnarchive with transaction:', transaction)
+                                      handleUnarchive(transaction)
+                                    })
                                   }}
                                   disabled={unarchiveMutation.isPending && unarchivingId === transaction.id}
                                   className="block w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-100 disabled:opacity-50"

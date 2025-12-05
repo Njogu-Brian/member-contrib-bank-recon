@@ -200,17 +200,21 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
       newErrors.church = 'Church is required'
     }
     
-    // Next of kin validation (all optional, but if one is filled, validate properly)
-    if (formData.next_of_kin_phone) {
-      if (!/^\+\d{1,4}\d{6,14}$/.test(formData.next_of_kin_phone)) {
-        newErrors.next_of_kin_phone = 'Please enter a valid international phone number'
-      } else if (!nextOfKinNumber.trim()) {
-        newErrors.next_of_kin_phone = 'Please enter the number after selecting country code'
-      }
+    // Next of kin validation (all required)
+    if (!formData.next_of_kin_name.trim()) {
+      newErrors.next_of_kin_name = 'Next of kin name is required'
     }
     
-    if (formData.next_of_kin_phone && !formData.next_of_kin_name.trim()) {
-      newErrors.next_of_kin_name = 'Next of kin name is required when contact is provided'
+    if (!formData.next_of_kin_phone.trim()) {
+      newErrors.next_of_kin_phone = 'Next of kin phone number is required'
+    } else if (!/^\+\d{1,4}\d{6,14}$/.test(formData.next_of_kin_phone)) {
+      newErrors.next_of_kin_phone = 'Please enter a valid international phone number'
+    } else if (!nextOfKinNumber.trim()) {
+      newErrors.next_of_kin_phone = 'Please enter the number after selecting country code'
+    }
+    
+    if (!formData.next_of_kin_relationship) {
+      newErrors.next_of_kin_relationship = 'Next of kin relationship is required'
     }
 
     setErrors(newErrors)
@@ -445,13 +449,13 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
           {/* Next of Kin Section */}
           <div className="border-t pt-6 mt-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Next of Kin Information</h3>
-            <p className="text-sm text-gray-500 mb-4">Optional: Provide emergency contact information</p>
+            <p className="text-sm text-gray-500 mb-4">Required: Please provide emergency contact information</p>
             
             <div className="space-y-4">
               {/* Next of Kin Name */}
               <div>
                 <label htmlFor="next_of_kin_name" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Next of Kin Name <span className="text-gray-400 text-xs">(Optional)</span>
+                  Next of Kin Name <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -470,7 +474,7 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
               {/* Next of Kin Contact */}
               <div>
                 <label htmlFor="next_of_kin_phone" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Next of Kin Contact <span className="text-gray-400 text-xs">(Optional)</span>
+                  Next of Kin Contact <span className="text-red-500">*</span>
                 </label>
                 <div className="flex gap-2">
                   <select
@@ -510,7 +514,7 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
               {/* Next of Kin Relationship */}
               <div>
                 <label htmlFor="next_of_kin_relationship" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Relationship <span className="text-gray-400 text-xs">(Optional)</span>
+                  Relationship <span className="text-red-500">*</span>
                 </label>
                 <select
                   id="next_of_kin_relationship"

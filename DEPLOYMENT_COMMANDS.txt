@@ -1,0 +1,92 @@
+================================================================================
+PRODUCTION DEPLOYMENT COMMANDS
+================================================================================
+
+SSH Connection:
+  ssh -p 1980 1980royalce1@breysomsolutions.co.ke
+
+Once connected, run these commands:
+
+================================================================================
+STEP 1: Navigate and Pull Latest Code
+================================================================================
+
+cd /home/1980royalce1/laravel-app/evimeria
+git pull origin master
+
+================================================================================
+STEP 2: Update Backend Dependencies
+================================================================================
+
+cd backend
+composer install --optimize-autoloader --no-dev
+
+================================================================================
+STEP 3: Run Migrations (UPDATE ONLY - NOT FRESH!)
+================================================================================
+
+php artisan migrate --force
+
+================================================================================
+STEP 4: Clear Caches
+================================================================================
+
+php artisan config:clear
+php artisan cache:clear
+php artisan route:clear
+php artisan view:clear
+php artisan optimize
+
+================================================================================
+STEP 5: Upload and Extract Frontend (from local machine)
+================================================================================
+
+From your local machine, run:
+  scp -P 1980 frontend/dist.zip 1980royalce1@breysomsolutions.co.ke:/home/1980royalce1/laravel-app/evimeria/
+
+Then on server:
+  cd /home/1980royalce1/laravel-app/evimeria
+  unzip -o dist.zip -d dist_temp
+  rm -rf /home/1980royalce1/public_html/evimeria.breysomsolutions.co.ke/*
+  cp -r dist_temp/dist/* /home/1980royalce1/public_html/evimeria.breysomsolutions.co.ke/
+  rm -rf dist_temp
+  rm -f dist.zip
+
+================================================================================
+STEP 6: Set Permissions
+================================================================================
+
+cd /home/1980royalce1/laravel-app/evimeria/backend
+chmod -R 775 storage bootstrap/cache
+chown -R www-data:www-data storage bootstrap/cache
+
+================================================================================
+STEP 7: Generate Invoices
+================================================================================
+
+cd /home/1980royalce1/laravel-app/evimeria/backend
+
+# Weekly invoices (1000 per week from contribution start date)
+php artisan invoices:backfill
+
+# Registration fees (1000, date = first contribution date)
+php artisan invoices:generate-registration-fees
+
+# Annual subscriptions (1000, Jan 1 2025, for members who joined in 2024)
+php artisan invoices:generate-annual-subscriptions
+
+# Software acquisition (2000, April 22 2025, for all members)
+php artisan invoices:generate-software-acquisition
+
+================================================================================
+VERIFICATION
+================================================================================
+
+# Check invoice counts
+php artisan tinker --execute="echo 'Weekly: ' . App\Models\Invoice::where('invoice_type', 'weekly_contribution')->count() . PHP_EOL; echo 'Registration: ' . App\Models\Invoice::where('invoice_type', 'registration_fee')->count() . PHP_EOL; echo 'Annual: ' . App\Models\Invoice::where('invoice_type', 'annual_subscription')->count() . PHP_EOL; echo 'Software: ' . App\Models\Invoice::where('invoice_type', 'software_acquisition')->count() . PHP_EOL;"
+
+================================================================================
+COMPLETE!
+================================================================================
+
+

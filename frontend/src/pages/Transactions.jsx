@@ -202,13 +202,22 @@ export default function Transactions({
   })
 
   const unarchiveMutation = useMutation({
-    mutationFn: (id) => unarchiveTransaction(id),
-    onSuccess: () => {
+    mutationFn: (id) => {
+      console.log('unarchiveMutation.mutationFn called with ID:', id)
+      const result = unarchiveTransaction(id)
+      console.log('unarchiveTransaction call initiated, promise:', result)
+      return result
+    },
+    onSuccess: (data) => {
+      console.log('Unarchive success:', data)
       queryClient.invalidateQueries(['transactions'])
-      alert('Transaction restored')
+      alert(data?.message || 'Transaction restored')
     },
     onError: (error) => {
-      alert(error.response?.data?.message || 'Failed to restore transaction')
+      console.error('Unarchive error:', error)
+      console.error('Unarchive error response:', error.response)
+      console.error('Unarchive error message:', error.message)
+      alert(error.response?.data?.message || error.message || 'Failed to restore transaction')
     },
   })
 
@@ -464,14 +473,25 @@ export default function Transactions({
   }
 
   const handleUnarchive = (transaction) => {
+    console.log('handleUnarchive called with transaction:', transaction)
+    
     if (unarchiveMutation.isPending) {
+      console.log('Unarchive already in progress')
+      return
+    }
+
+    if (!transaction || !transaction.id) {
+      console.error('Invalid transaction in handleUnarchive:', transaction)
+      alert('Error: Invalid transaction data')
       return
     }
 
     if (!confirm('Restore this transaction?')) {
+      console.log('User cancelled restore')
       return
     }
 
+    console.log('Calling unarchiveMutation.mutate with ID:', transaction.id)
     unarchiveMutation.mutate(transaction.id)
   }
 
@@ -892,9 +912,31 @@ export default function Transactions({
                             <div className="py-1">
                               {tx.is_archived ? (
                                 <button
-                                  onClick={() => {
-                                    handleUnarchive(tx)
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    console.log('=== Restore button clicked ===')
+                                    console.log('Event:', e)
+                                    console.log('Transaction:', tx)
+                                    console.log('Transaction ID:', tx.id)
+                                    
+                                    const transactionId = tx.id
+                                    if (!transactionId) {
+                                      console.error('No transaction ID found')
+                                      alert('Error: Transaction ID not found')
+                                      setActionMenuOpen(null)
+                                      return
+                                    }
+                                    
+                                    // Close menu first to prevent click outside handler from interfering
                                     setActionMenuOpen(null)
+                                    
+                                    // Use requestAnimationFrame to ensure menu closes before confirm
+                                    requestAnimationFrame(() => {
+                                      console.log('Calling handleUnarchive with transaction:', tx)
+                                      handleUnarchive(tx)
+                                    })
                                   }}
                                   disabled={unarchiveMutation.isPending && unarchivingId === tx.id}
                                   className="block w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-100 disabled:opacity-50"

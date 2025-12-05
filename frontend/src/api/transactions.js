@@ -81,8 +81,16 @@ export const archiveTransaction = async (id, reason = '') => {
 }
 
 export const unarchiveTransaction = async (id) => {
-  const response = await api.delete(`${adminBase}/transactions/${id}/archive`)
-  return response.data
+  try {
+    console.log('API: Unarchiving transaction', id)
+    const response = await api.delete(`${adminBase}/transactions/${id}/archive`)
+    console.log('API: Unarchive response:', response.data)
+    return response.data
+  } catch (error) {
+    console.error('API: Unarchive error:', error)
+    console.error('API: Unarchive error response:', error.response)
+    throw error
+  }
 }
 
 export const bulkArchiveTransactions = async (transactionIds, reason = '') => {

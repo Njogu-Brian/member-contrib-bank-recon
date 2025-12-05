@@ -1705,23 +1705,34 @@ class TransactionController extends Controller
 
     public function unarchive(Transaction $transaction)
     {
-        if (!$transaction->is_archived) {
-            return response()->json([
-                'message' => 'Transaction is not archived',
-                'transaction' => $transaction,
+        try {
+            if (!$transaction->is_archived) {
+                return response()->json([
+                    'message' => 'Transaction is not archived',
+                    'transaction' => $transaction,
+                ]);
+            }
+
+            $transaction->update([
+                'is_archived' => false,
+                'archived_at' => null,
+                'archive_reason' => null,
             ]);
+
+            Log::info('Transaction restored successfully', ['transaction_id' => $transaction->id]);
+            return response()->json([
+                'message' => 'Transaction restored successfully',
+                'transaction' => $transaction->fresh(['member', 'bankStatement']),
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Restore transaction error: ' . $e->getMessage(), [
+                'transaction_id' => $transaction->id,
+                'error' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'message' => 'Failed to restore transaction: ' . $e->getMessage(),
+            ], 500);
         }
-
-        $transaction->update([
-            'is_archived' => false,
-            'archived_at' => null,
-            'archive_reason' => null,
-        ]);
-
-        return response()->json([
-            'message' => 'Transaction restored successfully',
-            'transaction' => $transaction->fresh(['member', 'bankStatement']),
-        ]);
     }
 
     public function bulkArchive(Request $request)

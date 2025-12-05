@@ -281,7 +281,7 @@ class Member extends Model
 
     /**
      * Check if member profile is complete
-     * Required fields: name, phone, email, id_number, church
+     * Required fields: name, phone, email, id_number, church, next_of_kin_name, next_of_kin_phone, next_of_kin_relationship
      */
     public function isProfileComplete(): bool
     {
@@ -289,7 +289,10 @@ class Member extends Model
                !empty($this->phone) &&
                !empty($this->email) &&
                !empty($this->id_number) &&
-               !empty($this->church);
+               !empty($this->church) &&
+               !empty($this->next_of_kin_name) &&
+               !empty($this->next_of_kin_phone) &&
+               !empty($this->next_of_kin_relationship);
     }
 
     /**
@@ -304,6 +307,9 @@ class Member extends Model
         if (empty($this->email)) $missing[] = 'email';
         if (empty($this->id_number)) $missing[] = 'id_number';
         if (empty($this->church)) $missing[] = 'church';
+        if (empty($this->next_of_kin_name)) $missing[] = 'next_of_kin_name';
+        if (empty($this->next_of_kin_phone)) $missing[] = 'next_of_kin_phone';
+        if (empty($this->next_of_kin_relationship)) $missing[] = 'next_of_kin_relationship';
         
         return $missing;
     }
