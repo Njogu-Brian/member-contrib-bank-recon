@@ -1,0 +1,427 @@
+[
+    {
+        "statement_id": 17,
+        "filename": "JOINT 04-04-2025 To 27-10-2025.pdf",
+        "transaction_count": 252,
+        "duplicate_count": 2,
+        "total_credits": 913600,
+        "sample_transactions": [
+            {
+                "id": 13348,
+                "date": "2025-04-03T21:00:00.000000Z",
+                "particulars_length": 39,
+                "particulars_preview": "MPS 254795109956 TD41CD2GLR JACINTA WAN",
+                "credit": "3000.00",
+                "code": "TD41CD2GLR"
+            },
+            {
+                "id": 13349,
+                "date": "2025-04-03T21:00:00.000000Z",
+                "particulars_length": 39,
+                "particulars_preview": "MPS 254728676551 TD49CP0SUJ MUSYOKAH LE",
+                "credit": "4000.00",
+                "code": "TD49CP0SUJ"
+            },
+            {
+                "id": 13350,
+                "date": "2025-04-03T21:00:00.000000Z",
+                "particulars_length": 39,
+                "particulars_preview": "MPS 254726836024 TD47E09RBV DAVID NJUGU",
+                "credit": "5000.00",
+                "code": "TD47E09RBV"
+            },
+            {
+                "id": 13351,
+                "date": "2025-04-03T21:00:00.000000Z",
+                "particulars_length": 39,
+                "particulars_preview": "MPS 254727140965 TD45E3DTYR AGNES MATHE",
+                "credit": "2000.00",
+                "code": "TD45E3DTYR"
+            },
+            {
+                "id": 13352,
+                "date": "2025-04-03T21:00:00.000000Z",
+                "particulars_length": 39,
+                "particulars_preview": "MPS 254713304335 TD46EAURVY JANE W GITU",
+                "credit": "4000.00",
+                "code": "TD46EAURVY"
+            }
+        ]
+    },
+    {
+        "statement_id": 18,
+        "filename": "JOINT ACCOUNT 01-09-2024-4.04.2025.pdf",
+        "transaction_count": 977,
+        "duplicate_count": 6,
+        "total_credits": 2542091,
+        "sample_transactions": [
+            {
+                "id": 13600,
+                "date": "2024-09-09T21:00:00.000000Z",
+                "particulars_length": 39,
+                "particulars_preview": "MPS 254721404848 SIA93MAWD9 DICKSON NJO",
+                "credit": "100.00",
+                "code": "SIA93MAWD9"
+            },
+            {
+                "id": 13601,
+                "date": "2024-09-09T21:00:00.000000Z",
+                "particulars_length": 39,
+                "particulars_preview": "MPS 254723345969 SIA73MIGKN JOSEPH WANJ",
+                "credit": "5.00",
+                "code": "SIA73MIGKN"
+            },
+            {
+                "id": 13602,
+                "date": "2024-09-09T21:00:00.000000Z",
+                "particulars_length": 42,
+                "particulars_preview": "EAZZYPAY\/254763545091\/07STK\/\/100972950094\/",
+                "credit": "1.00",
+                "code": "100972950094"
+            },
+            {
+                "id": 13603,
+                "date": "2024-09-09T21:00:00.000000Z",
+                "particulars_length": 39,
+                "particulars_preview": "MPS 254721404848 SIA83MT4WS DICKSON NJO",
+                "credit": "6000.00",
+                "code": "SIA83MT4WS"
+            },
+            {
+                "id": 13604,
+                "date": "2024-09-09T21:00:00.000000Z",
+                "particulars_length": 51,
+                "particulars_preview": "USSD\/254726836024\/629199529486\/254716227320\/ EVIMER",
+                "credit": "1000.00",
+                "code": "629199529486"
+            }
+        ]
+    },
+    {
+        "statement_id": 19,
+        "filename": "EVIMERIA 30.10.2024-27-10-2025.pdf",
+        "transaction_count": 438,
+        "duplicate_count": 0,
+        "total_credits": 6081538,
+        "sample_transactions": [
+            {
+                "id": 14577,
+                "date": "2024-11-24T21:00:00.000000Z",
+                "particulars_length": 43,
+                "particulars_preview": "MPS 254721404848 SKP61U8JBM # DICKSON NJOGU",
+                "credit": "100.00",
+                "code": "SKP61U8JBM"
+            },
+            {
+                "id": 14578,
+                "date": "2024-11-27T21:00:00.000000Z",
+                "particulars_length": 30,
+                "particulars_preview": "APP\/MARGARET WANJIKU ODHIAMBO\/",
+                "credit": "6000.00",
+                "code": null
+            },
+            {
+                "id": 14579,
+                "date": "2024-12-03T21:00:00.000000Z",
+                "particulars_length": 47,
+                "particulars_preview": "APP\/PATRICK MBANDI MUTUNGA\/WEEKLY CONTRIBUTIONS",
+                "credit": "3000.00",
+                "code": null
+            },
+            {
+                "id": 14580,
+                "date": "2024-12-08T21:00:00.000000Z",
+                "particulars_length": 28,
+                "particulars_preview": "APP\/SULEMAN ACHESA ALUVISIA\/",
+                "credit": "20000.00",
+                "code": null
+            },
+            {
+                "id": 14581,
+                "date": "2024-12-08T21:00:00.000000Z",
+                "particulars_length": 44,
+                "particulars_preview": "MPS 254722884442 SL96V13X6W # SHEM KIHORO\/ob",
+                "credit": "4000.00",
+                "code": "SL96V13X6W"
+            }
+        ]
+    },
+    {
+        "statement_id": 20,
+        "filename": "Evimeria Paybill statement.pdf",
+        "transaction_count": 265,
+        "duplicate_count": 26,
+        "total_credits": 1154461,
+        "sample_transactions": [
+            {
+                "id": 15015,
+                "date": "2025-10-30T21:00:00.000000Z",
+                "particulars_length": 57,
+                "particulars_preview": "Pay Bill from 25472****176 -\nJOYCE NJAGI Acc. Joyce\nNjagi",
+                "credit": "5000.00",
+                "code": "TJVMV8W9FC"
+            },
+            {
+                "id": 15016,
+                "date": "2025-10-29T21:00:00.000000Z",
+                "particulars_length": 63,
+                "particulars_preview": "Pay Bill from 25472****788 -\nEDWARD MUCHIRI Acc.\nEdward Much",
+                "credit": "4000.00",
+                "code": "TJUCB8SF0Q"
+            },
+            {
+                "id": 15017,
+                "date": "2025-10-29T21:00:00.000000Z",
+                "particulars_length": 74,
+                "particulars_preview": "Pay Bill from 25472****498 -\nSIMON **** WAITHIRA Acc.\nSimon ",
+                "credit": "3000.00",
+                "code": "TJUG08QUD9"
+            },
+            {
+                "id": 15018,
+                "date": "2025-10-29T21:00:00.000000Z",
+                "particulars_length": 65,
+                "particulars_preview": "Pay Bill Online from\n25471****904 - Nelson ****\nSammy Acc. I",
+                "credit": "1.00",
+                "code": "TJU0H8RH7K"
+            },
+            {
+                "id": 15020,
+                "date": "2025-10-27T21:00:00.000000Z",
+                "particulars_length": 67,
+                "particulars_preview": "Pay Bill from 25472****187 -\nGEOFFREY MONGARE Acc.\nGEOFFREY ",
+                "credit": "1000.00",
+                "code": "TJSJA8MXZY"
+            }
+        ]
+    },
+    {
+        "statement_id": 21,
+        "filename": "EVIMERIA OCT.pdf",
+        "transaction_count": 7,
+        "duplicate_count": 32,
+        "total_credits": 73917,
+        "sample_transactions": [
+            {
+                "id": 15316,
+                "date": "2025-10-01T21:00:00.000000Z",
+                "particulars_length": 34,
+                "particulars_preview": "MPS TJ2SU26PO4 EVIMERIA INITIATIVE",
+                "credit": "11013.00",
+                "code": null
+            },
+            {
+                "id": 15317,
+                "date": "2025-10-05T21:00:00.000000Z",
+                "particulars_length": 36,
+                "particulars_preview": "MPS TJ6SU2C0BE EVIMERIA INITIATIVE _",
+                "credit": "1900.00",
+                "code": null
+            },
+            {
+                "id": 15318,
+                "date": "2025-10-10T21:00:00.000000Z",
+                "particulars_length": 36,
+                "particulars_preview": "MPS TJBSU2I7VD EVIMERIA INITIATIVE _",
+                "credit": "26000.00",
+                "code": null
+            },
+            {
+                "id": 15319,
+                "date": "2025-10-15T21:00:00.000000Z",
+                "particulars_length": 34,
+                "particulars_preview": "MPS TJGSU2O9I2 EVIMERIA INITIATIVE",
+                "credit": "5003.00",
+                "code": null
+            },
+            {
+                "id": 15320,
+                "date": "2025-10-29T21:00:00.000000Z",
+                "particulars_length": 36,
+                "particulars_preview": "MPS TJUSU36H0H EVIMERIA INITIATIVE _",
+                "credit": "11000.00",
+                "code": null
+            }
+        ]
+    },
+    {
+        "statement_id": 22,
+        "filename": "JOINT 02-10-2025-29-10-2025.pdf",
+        "transaction_count": 3,
+        "duplicate_count": 7,
+        "total_credits": 11000,
+        "sample_transactions": [
+            {
+                "id": 15323,
+                "date": "2025-10-26T21:00:00.000000Z",
+                "particulars_length": 39,
+                "particulars_preview": "MPS 254714082283 TJR6P8F7PF Denzel Mura",
+                "credit": "4000.00",
+                "code": "TJR6P8F7PF"
+            },
+            {
+                "id": 15324,
+                "date": "2025-10-27T21:00:00.000000Z",
+                "particulars_length": 38,
+                "particulars_preview": "MPS 254703116858 TJSAL8IUQS EPHANTUS M",
+                "credit": "2000.00",
+                "code": "TJSAL8IUQS"
+            },
+            {
+                "id": 15325,
+                "date": "2025-10-28T21:00:00.000000Z",
+                "particulars_length": 31,
+                "particulars_preview": "APP\/IRENE CHESEBE\/ EVIMERIA OCT",
+                "credit": "5000.00",
+                "code": null
+            }
+        ]
+    },
+    {
+        "statement_id": 23,
+        "filename": "EVIMERIA (1).pdf",
+        "transaction_count": 5,
+        "duplicate_count": 71,
+        "total_credits": 291007,
+        "sample_transactions": [
+            {
+                "id": 15326,
+                "date": "2025-09-01T21:00:00.000000Z",
+                "particulars_length": 46,
+                "particulars_preview": "TPG 44p7j0r6dp KCB Pesalink transfer DOMINI\/ _",
+                "credit": "24000.00",
+                "code": null
+            },
+            {
+                "id": 15327,
+                "date": "2025-09-03T21:00:00.000000Z",
+                "particulars_length": 34,
+                "particulars_preview": "MPS TI41B550FF EVIMERIA INITIATIVE",
+                "credit": "80000.00",
+                "code": null
+            },
+            {
+                "id": 15328,
+                "date": "2025-09-10T21:00:00.000000Z",
+                "particulars_length": 41,
+                "particulars_preview": "LOCHOKA ENTERPRT- BY:\/5254130511- 20:44 _",
+                "credit": "1000.00",
+                "code": null
+            },
+            {
+                "id": 15329,
+                "date": "2025-09-24T21:00:00.000000Z",
+                "particulars_length": 36,
+                "particulars_preview": "MPS TIPSU1VFH3 EVIMERIA INITIATIVE _",
+                "credit": "120007.00",
+                "code": null
+            },
+            {
+                "id": 15330,
+                "date": "2025-09-30T21:00:00.000000Z",
+                "particulars_length": 36,
+                "particulars_preview": "MPS TJ1SU259CU EVIMERIA INITIATIVE _",
+                "credit": "66000.00",
+                "code": null
+            }
+        ]
+    },
+    {
+        "statement_id": 24,
+        "filename": "Account_statementTB25112800289853.pdf",
+        "transaction_count": 24,
+        "duplicate_count": 2,
+        "total_credits": 378032,
+        "sample_transactions": [
+            {
+                "id": 15331,
+                "date": "2025-10-29T21:00:00.000000Z",
+                "particulars_length": 41,
+                "particulars_preview": "MPS TJUSU36H0H EVIMERIA INITIATIVE 178028",
+                "credit": "11000.00",
+                "code": null
+            },
+            {
+                "id": 15332,
+                "date": "2025-10-29T21:00:00.000000Z",
+                "particulars_length": 17,
+                "particulars_preview": "627851XXXXXX 1245",
+                "credit": "7000.00",
+                "code": "627851XXXXXX"
+            },
+            {
+                "id": 15333,
+                "date": "2025-10-31T21:00:00.000000Z",
+                "particulars_length": 41,
+                "particulars_preview": "MPS TK1SU39CJC EVIMERIA INITIATIVE 178028",
+                "credit": "12001.00",
+                "code": null
+            },
+            {
+                "id": 15334,
+                "date": "2025-10-31T21:00:00.000000Z",
+                "particulars_length": 50,
+                "particulars_preview": "MPS 254727953511 TK11E8XTWW 000889# LUCY NDUNGU NU",
+                "credit": "4000.00",
+                "code": "TK11E8XTWW"
+            },
+            {
+                "id": 15335,
+                "date": "2025-11-02T21:00:00.000000Z",
+                "particulars_length": 50,
+                "particulars_preview": "MPS 254706920533 TK3O496UJU 000889# ALPHINE MWENDW",
+                "credit": "1500.00",
+                "code": "TK3O496UJU"
+            }
+        ]
+    },
+    {
+        "statement_id": 26,
+        "filename": "EvimeriaAccount_statementTB25120500632751.pdf",
+        "transaction_count": 9,
+        "duplicate_count": 0,
+        "total_credits": 84159,
+        "sample_transactions": [
+            {
+                "id": 15395,
+                "date": "2025-11-30T21:00:00.000000Z",
+                "particulars_length": 50,
+                "particulars_preview": "MPS 254715025081 TKU11BID5B 000889# VIRGINIA NJERI",
+                "credit": "150.00",
+                "code": "TKU11BID5B"
+            },
+            {
+                "id": 15396,
+                "date": "2025-11-30T21:00:00.000000Z",
+                "particulars_length": 28,
+                "particulars_preview": "APP\/PENINA WANJIKU MUCHICHU\/",
+                "credit": "10000.00",
+                "code": "MUCHICHU"
+            },
+            {
+                "id": 15397,
+                "date": "2025-11-30T21:00:00.000000Z",
+                "particulars_length": 50,
+                "particulars_preview": "MPS 254721307264 TL1GEBN1UA 000889# PAUL KARANJA W",
+                "credit": "3000.00",
+                "code": "TL1GEBN1UA"
+            },
+            {
+                "id": 15398,
+                "date": "2025-11-30T21:00:00.000000Z",
+                "particulars_length": 50,
+                "particulars_preview": "MPS 254708825808 TL2BEBRMXL 000889# Purity Mwendwa",
+                "credit": "1000.00",
+                "code": "TL2BEBRMXL"
+            },
+            {
+                "id": 15399,
+                "date": "2025-12-02T21:00:00.000000Z",
+                "particulars_length": 52,
+                "particulars_preview": "LOCHOKA ENTERPRT- BY:\/533713416281\/03-12- 2025 19:29",
+                "credit": "4000.00",
+                "code": "533713416281"
+            }
+        ]
+    }
+]

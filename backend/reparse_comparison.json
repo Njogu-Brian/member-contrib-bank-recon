@@ -1,0 +1,136 @@
+{
+  "current_total": 1980,
+  "new_total": 2164,
+  "statements_tested": 9,
+  "differences_found": 7,
+  "details": [
+    {
+      "statement_id": 22,
+      "filename": "1763997250_JOINT 02-10-2025-29-10-2025.pdf",
+      "current_count": 3,
+      "new_count": 10,
+      "difference": 7
+    },
+    {
+      "statement_id": 18,
+      "filename": "1763997307_JOINT ACCOUNT 01-09-2024-4.04.2025.pdf",
+      "current_count": 977,
+      "new_count": 983,
+      "difference": 6
+    },
+    {
+      "statement_id": 23,
+      "filename": "1764007852_EVIMERIA (1).pdf",
+      "current_count": 5,
+      "new_count": 76,
+      "difference": 71
+    },
+    {
+      "statement_id": 21,
+      "filename": "1764007871_EVIMERIA OCT.pdf",
+      "current_count": 7,
+      "new_count": 39,
+      "difference": 32
+    },
+    {
+      "statement_id": 17,
+      "filename": "1764007934_JOINT 04-04-2025 To 27-10-2025.pdf",
+      "current_count": 252,
+      "new_count": 253,
+      "difference": 1
+    },
+    {
+      "statement_id": 20,
+      "filename": "1764008257_Evimeria Paybill statement.pdf",
+      "current_count": 265,
+      "new_count": 327,
+      "difference": 62
+    },
+    {
+      "statement_id": 19,
+      "filename": "1764700057_EVIMERIA 30.10.2024-27-10-2025.pdf",
+      "current_count": 438,
+      "new_count": 438,
+      "difference": 0
+    },
+    {
+      "statement_id": 24,
+      "filename": "1764703087_Account_statementTB25112800289853.pdf",
+      "current_count": 24,
+      "new_count": 29,
+      "difference": 5
+    },
+    {
+      "statement_id": 26,
+      "filename": "1764919651_EvimeriaAccount_statementTB25120500632751.pdf",
+      "current_count": 9,
+      "new_count": 9,
+      "difference": 0
+    }
+  ],
+  "differences": [
+    {
+      "statement_id": 22,
+      "filename": "1763997250_JOINT 02-10-2025-29-10-2025.pdf",
+      "current_count": 3,
+      "new_count": 10,
+      "difference": 7,
+      "current_total_credits": 11000,
+      "new_total_credits": 20000.0
+    },
+    {
+      "statement_id": 18,
+      "filename": "1763997307_JOINT ACCOUNT 01-09-2024-4.04.2025.pdf",
+      "current_count": 977,
+      "new_count": 983,
+      "difference": 6,
+      "current_total_credits": 2542091,
+      "new_total_credits": 2608206.0
+    },
+    {
+      "statement_id": 23,
+      "filename": "1764007852_EVIMERIA (1).pdf",
+      "current_count": 5,
+      "new_count": 76,
+      "difference": 71,
+      "current_total_credits": 291007,
+      "new_total_credits": 917650.0
+    },
+    {
+      "statement_id": 21,
+      "filename": "1764007871_EVIMERIA OCT.pdf",
+      "current_count": 7,
+      "new_count": 39,
+      "difference": 32,
+      "current_total_credits": 73917,
+      "new_total_credits": 576841.0
+    },
+    {
+      "statement_id": 17,
+      "filename": "1764007934_JOINT 04-04-2025 To 27-10-2025.pdf",
+      "current_count": 252,
+      "new_count": 253,
+      "difference": 1,
+      "current_total_credits": 913600,
+      "new_total_credits": 913715.0
+    },
+    {
+      "statement_id": 20,
+      "filename": "1764008257_Evimeria Paybill statement.pdf",
+      "current_count": 265,
+      "new_count": 327,
+      "difference": 62,
+      "current_total_credits": 1154461,
+      "new_total_credits": 1154485.0
+    },
+    {
+      "statement_id": 24,
+      "filename": "1764703087_Account_statementTB25112800289853.pdf",
+      "current_count": 24,
+      "new_count": 29,
+      "difference": 5,
+      "current_total_credits": 378032,
+      "new_total_credits": 388032.0
+    }
+  ]
+}
