@@ -563,6 +563,20 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
                                     if any(keyword in next_cell_str.upper() for keyword in summary_keywords):
                                         break  # Don't merge summary text into particulars
                                     
+                                    # CRITICAL: Stop merging if we hit transaction boundary markers
+                                    # These indicate the start of a NEW transaction, not continuation of current one
+                                    transaction_markers = [
+                                        r'^APP/',      # APP/CUSTOMER NAME pattern
+                                        r'^BY:/',      # BY:/reference pattern
+                                        r'^MPS\s+\d',  # MPS followed by phone/code
+                                        r'^FROM:',     # FROM: sender pattern
+                                        r'^TO:',       # TO: recipient pattern
+                                        r'^\d{12}',    # 12+ digit codes at start (like 454787546843)
+                                    ]
+                                    is_new_transaction = any(re.match(pattern, next_cell_str, re.IGNORECASE) for pattern in transaction_markers)
+                                    if is_new_transaction:
+                                        break  # Don't merge next transaction into current particulars
+                                    
                                     is_date = bool(re.search(r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}', next_cell_str))
                                     is_amount = parse_amount(next_cell_str) is not None
                                     is_header = any(keyword in next_cell_str.upper() for keyword in ["CREDIT", "DEBIT", "BALANCE", "INSTRUMENT"])
@@ -681,10 +695,16 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
                 if header_candidate:
                     credit = header_candidate['amount']
                 else:
-                    # Prefer realistic contribution-sized amounts first (<= 100,000)
-                    realistic = [c for c in credit_candidates if c['amount'] <= 100000]
-                    candidates = realistic or credit_candidates
-                    credit = min(candidates, key=lambda c: (c['amount'], c['index']))['amount']
+                    # IMPROVED: Prefer credit closest to particulars column (column alignment)
+                    # rather than just smallest amount (which can pick from wrong transaction)
+                    if particulars_col is not None:
+                        # Sort by distance from particulars column, then by amount
+                        credit = min(credit_candidates, key=lambda c: (abs(c['index'] - particulars_col), c['amount']))['amount']
+                    else:
+                        # Fallback: Prefer realistic contribution-sized amounts first (<= 100,000)
+                        realistic = [c for c in credit_candidates if c['amount'] <= 100000]
+                        candidates = realistic or credit_candidates
+                        credit = min(candidates, key=lambda c: (c['amount'], c['index']))['amount']
 
             # As a last resort, consider the rightmost value if we couldn't identify credit column
             if credit is None and possible_balance_idx is not None and possible_balance_idx < len(row):
@@ -806,6 +826,24 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
             credit = credit if credit and credit > 0 else 0.0
             debit = debit if debit and debit > 0 else 0.0
             
+            # CRITICAL: Detect implausibly large amounts that are likely running balances
+            # If credit > 500,000 AND row contains balance-related context, skip it
+            if credit > 500000:
+                row_context = ' '.join([str(c) for c in row if c]).upper()
+                balance_context_keywords = [
+                    "BALANCE", "CLOSING", "OPENING", "SUMMARY", "TOTAL", "B/F", "C/F"
+                ]
+                if any(keyword in row_context for keyword in balance_context_keywords):
+                    log_bank_skip(
+                        "implausibly_large_amount_with_balance_context",
+                        row,
+                        page_number=page_number,
+                        row_offset=row_offset,
+                        table_index=table_index,
+                        extra={'credit': credit, 'context_keywords': [k for k in balance_context_keywords if k in row_context]}
+                    )
+                    continue
+            
             # If no particulars found or incomplete, use a default or try to extract from row
             # CRITICAL: Capture the FULL description/particulars
             if not particulars or len(particulars) < 3 or particulars.startswith('---'):
@@ -828,6 +866,18 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
                         # Skip if it's a date
                         if re.search(r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}', cell_str):
                             continue
+                        # CRITICAL: Skip if it's a transaction boundary marker (new transaction starting)
+                        transaction_markers = [
+                            r'^APP/',      # APP/CUSTOMER NAME pattern
+                            r'^BY:/',      # BY:/reference pattern
+                            r'^MPS\s+\d',  # MPS followed by phone/code
+                            r'^FROM:',     # FROM: sender pattern
+                            r'^TO:',       # TO: recipient pattern
+                        ]
+                        is_new_transaction = any(re.match(pattern, cell_str, re.IGNORECASE) for pattern in transaction_markers)
+                        if is_new_transaction and len(other_cells) > 0:  # Only skip if we already have some particulars
+                            break  # Stop combining - we've hit the next transaction
+                        
                         # Skip if it's an amount
                         amount = parse_amount(cell_str)
                         if not amount or amount <= 0:
@@ -875,6 +925,35 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
                     page_number=page_number,
                     row_offset=row_offset,
                     table_index=table_index
+                )
+                continue
+            
+            # CRITICAL: Check for footer/summary keywords AFTER cell merging
+            # (Footer text might have been merged into particulars after initial check)
+            particulars_upper = particulars.upper()
+            footer_indicators = [
+                "END OF STATEMENT", "SUMMARY", "OPENING BALANCE", "CLOSING BALANCE",
+                "TOTAL DEBITS", "TOTAL CREDITS", "IMPORTANT NOTICE", "PLEASE EXAMINE",
+                "GRAND TOTAL", "BROUGHT FORWARD", "CARRIED FORWARD", "BALANCE B/F", "BALANCE C/F"
+            ]
+            footer_found_count = sum(1 for keyword in footer_indicators if keyword in particulars_upper)
+            
+            # CRITICAL: Also check for dash separator patterns (often precede "End of Statement")
+            has_dash_separator = bool(re.search(r'-{3,}', particulars))  # 3+ consecutive dashes
+            
+            # Skip if we find 2+ footer keywords OR specific critical keywords OR dash separator + footer keyword
+            if footer_found_count >= 2 or \
+               (has_dash_separator and footer_found_count >= 1) or \
+               any(keyword in particulars_upper for keyword in 
+                   ["END OF STATEMENT", "IMPORTANT NOTICE", "PLEASE EXAMINE YOUR STATEMENT"]):
+                log_bank_skip(
+                    "footer_text_in_final_particulars",
+                    row,
+                    page_number=page_number,
+                    row_offset=row_offset,
+                    table_index=table_index,
+                    extra={'particulars_snippet': particulars[:200], 'footer_keywords_found': footer_found_count, 
+                           'has_dash_separator': has_dash_separator}
                 )
                 continue
             
