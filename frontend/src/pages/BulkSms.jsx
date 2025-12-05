@@ -27,6 +27,13 @@ export default function BulkSms() {
     queryFn: () => getMembers({ search: searchTerm, per_page: 50, page }),
   })
 
+  // Query to fetch all members for "Select All" functionality
+  const { data: allMembersData } = useQuery({
+    queryKey: ['members', 'sms', 'all', searchTerm],
+    queryFn: () => getMembers({ search: searchTerm, per_page: 10000, page: 1 }),
+    enabled: false, // Only fetch when needed
+  })
+
   const { data: logsData, isLoading: logsLoading } = useQuery({
     queryKey: ['sms-logs', logsPage],
     queryFn: () => getSmsLogs({ page: logsPage, per_page: 25 }),
@@ -68,12 +75,45 @@ export default function BulkSms() {
     )
   }
 
-  const toggleSelectAll = () => {
-    const selectableIds = members.filter((m) => m.is_active && m.phone).map((m) => m.id)
-    if (selectableIds.every((id) => selectedMembers.includes(id))) {
+  const toggleSelectAll = async () => {
+    // Fetch all members if not already fetched
+    let allSelectableIds = []
+    
+    if (allMembersData?.data) {
+      // Use cached data
+      allSelectableIds = allMembersData.data
+        .filter((m) => m.is_active && m.phone)
+        .map((m) => m.id)
+    } else {
+      // Fetch all members
+      try {
+        const data = await queryClient.fetchQuery({
+          queryKey: ['members', 'sms', 'all', searchTerm],
+          queryFn: () => getMembers({ search: searchTerm, per_page: 10000, page: 1 }),
+        })
+        const fetchedMembers = data?.data || []
+        allSelectableIds = fetchedMembers
+          .filter((m) => m.is_active && m.phone)
+          .map((m) => m.id)
+      } catch (error) {
+        console.error('Failed to fetch all members:', error)
+        // Fallback to current page only
+        allSelectableIds = members.filter((m) => m.is_active && m.phone).map((m) => m.id)
+      }
+    }
+    
+    // Check if all are already selected
+    const allSelected = allSelectableIds.length > 0 && allSelectableIds.every((id) => selectedMembers.includes(id))
+    
+    if (allSelected) {
+      // Deselect all
       setSelectedMembers([])
     } else {
-      setSelectedMembers(selectableIds)
+      // Select all (merge with existing selections to keep selections from other pages)
+      setSelectedMembers((prev) => {
+        const newSelections = [...new Set([...prev, ...allSelectableIds])]
+        return newSelections
+      })
     }
   }
 
@@ -126,9 +166,17 @@ export default function BulkSms() {
   }
 
   const selectedCount = selectedMembers.length
-  const selectableCount = members.filter((m) => m.is_active && m.phone).length
+  // Get selectable count for current page (for display)
+  const currentPageSelectableCount = members.filter((m) => m.is_active && m.phone).length
   const customNumbersArray = customNumbers.split(/[,\n]/).map(n => n.trim()).filter(n => n.length > 0)
   const totalRecipients = selectedCount + customNumbersArray.length
+  
+  // Check if all members across all pages are selected
+  // First try to use cached all members data, otherwise use current page
+  const allSelectableIds = (allMembersData?.data || members)
+    .filter((m) => m.is_active && m.phone)
+    .map((m) => m.id)
+  const allSelected = allSelectableIds.length > 0 && allSelectableIds.every((id) => selectedMembers.includes(id))
 
   return (
     <div className="space-y-6">
@@ -460,7 +508,7 @@ export default function BulkSms() {
                   onClick={toggleSelectAll}
                   className="px-4 py-2 bg-white text-purple-600 rounded-lg hover:bg-purple-50 font-semibold text-sm shadow-md transition-colors"
                 >
-                  {selectableCount > 0 && selectableCount === selectedMembers.filter(id => members.some(m => m.id === id)).length
+                  {allSelected
                     ? '✗ Deselect All'
                     : '✓ Select All'}
                 </button>
@@ -473,7 +521,7 @@ export default function BulkSms() {
                     <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                       <input
                         type="checkbox"
-                        checked={selectableCount > 0 && selectableCount === selectedMembers.filter(id => members.some(m => m.id === id)).length}
+                        checked={allSelected}
                         onChange={toggleSelectAll}
                         className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                       />
