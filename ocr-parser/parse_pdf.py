@@ -1435,6 +1435,48 @@ def detect_table_rows(text, page_number=None, initial_balance=None):
             i += 1
             continue
         
+        # CRITICAL: Comprehensive footer/summary check (same as table parser)
+        particulars_upper = particulars.upper()
+        footer_indicators = [
+            "END OF STATEMENT", "SUMMARY", "OPENING BALANCE", "CLOSING BALANCE",
+            "TOTAL DEBITS", "TOTAL CREDITS", "IMPORTANT NOTICE", "PLEASE EXAMINE",
+            "GRAND TOTAL", "BROUGHT FORWARD", "CARRIED FORWARD", "BALANCE B/F", "BALANCE C/F"
+        ]
+        footer_found_count = sum(1 for keyword in footer_indicators if keyword in particulars_upper)
+        has_dash_separator = bool(re.search(r'-{3,}', particulars))  # 3+ consecutive dashes
+        
+        # Skip if we find 2+ footer keywords OR dash + footer keyword OR specific critical keywords
+        if footer_found_count >= 2 or \
+           (has_dash_separator and footer_found_count >= 1) or \
+           any(keyword in particulars_upper for keyword in 
+               ["END OF STATEMENT", "IMPORTANT NOTICE", "PLEASE EXAMINE YOUR STATEMENT"]):
+            log_text_skip(
+                "footer_text_in_final_particulars_text",
+                line=full_line,
+                page_number=page_number,
+                line_index=line_index,
+                extra={'particulars_snippet': particulars[:200], 'footer_keywords_found': footer_found_count,
+                       'has_dash_separator': has_dash_separator}
+            )
+            prev_balance = balance_value if balance_value is not None else prev_balance
+            i += 1
+            continue
+        
+        # CRITICAL: Detect implausibly large amounts with balance context (text parser)
+        if credit > 500000:
+            balance_context_keywords = ["BALANCE", "CLOSING", "OPENING", "SUMMARY", "TOTAL", "B/F", "C/F"]
+            if any(keyword in particulars_upper for keyword in balance_context_keywords):
+                log_text_skip(
+                    "implausibly_large_amount_text",
+                    line=full_line,
+                    page_number=page_number,
+                    line_index=line_index,
+                    extra={'credit': credit, 'particulars_snippet': particulars[:100]}
+                )
+                prev_balance = balance_value if balance_value is not None else prev_balance
+                i += 1
+                continue
+        
         # Skip if particulars is too short or looks like a header
         if len(particulars) < 3 or particulars.upper() in ["TRAN DATE", "VALUE DATE", "PARTICULARS"]:
             log_text_skip(
