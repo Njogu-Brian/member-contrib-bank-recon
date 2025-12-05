@@ -152,34 +152,164 @@ class InvoicePaymentMatcher
 
     /**
      * Bulk match all unmatched transactions and contributions
+     * This method processes all payments and matches them to ALL pending invoices in a single pass
+     * It tracks which transactions have been used to prevent duplicate matching
      */
     public function bulkMatchPayments(): array
     {
         $matchedTransactions = 0;
         $matchedContributions = 0;
         $totalInvoicesPaid = 0;
+        $totalAmountMatched = 0;
 
-        // Match transactions
-        $transactions = Transaction::whereNotNull('member_id')
+        // Get all pending invoices grouped by member
+        $pendingInvoicesByMember = Invoice::whereIn('status', ['pending', 'overdue'])
+            ->orderBy('due_date', 'asc')
+            ->orderBy('issue_date', 'asc')
+            ->get()
+            ->groupBy('member_id');
+
+        // Get all transactions and calculate how much has already been used
+        $allTransactions = Transaction::whereNotNull('member_id')
             ->where('credit', '>', 0)
             ->where('is_archived', false)
+            ->orderBy('tran_date', 'asc')
             ->get();
 
-        foreach ($transactions as $transaction) {
-            $result = $this->matchTransactionToInvoices($transaction);
-            if ($result['matched']) {
+        // Track how much of each transaction has already been used by existing paid invoices
+        $transactionAmountsUsed = [];
+        
+        Invoice::where('status', 'paid')
+            ->whereNotNull('metadata')
+            ->get()
+            ->each(function($invoice) use (&$transactionAmountsUsed) {
+                $metadata = is_string($invoice->metadata) 
+                    ? json_decode($invoice->metadata, true) 
+                    : ($invoice->metadata ?? []);
+                
+                // If this invoice was paid by a transaction, mark that transaction as used
+                if (isset($metadata['transaction_id'])) {
+                    $transactionId = $metadata['transaction_id'];
+                    $transaction = $allTransactions->firstWhere('id', $transactionId);
+                    if ($transaction) {
+                        // For simplicity, if a transaction was used, mark it as fully used
+                        // In a more complex system, we could track partial usage
+                        $transactionAmountsUsed[$transactionId] = $transaction->credit;
+                    }
+                }
+                
+                // Handle multiple transactions used for one invoice
+                if (isset($metadata['matched_transactions']) && is_array($metadata['matched_transactions'])) {
+                    foreach ($metadata['matched_transactions'] as $transactionId) {
+                        $transaction = $allTransactions->firstWhere('id', $transactionId);
+                        if ($transaction) {
+                            $transactionAmountsUsed[$transactionId] = $transaction->credit;
+                        }
+                    }
+                }
+            });
+
+        // Group transactions by member
+        $transactions = $allTransactions->groupBy('member_id');
+
+        foreach ($transactions as $memberId => $memberTransactions) {
+            if (!isset($pendingInvoicesByMember[$memberId])) {
+                continue; // No pending invoices for this member
+            }
+
+            $pendingInvoices = $pendingInvoicesByMember[$memberId];
+            $memberMatched = false;
+
+            foreach ($pendingInvoices as $invoice) {
+                // Calculate available amount from all member's unused transactions
+                $availableAmount = 0;
+                foreach ($memberTransactions as $transaction) {
+                    $used = $transactionAmountsUsed[$transaction->id] ?? 0;
+                    $availableAmount += max(0, $transaction->credit - $used);
+                }
+
+                if ($availableAmount < $invoice->amount) {
+                    continue; // Not enough funds for this invoice
+                }
+
+                // Use transactions to pay this invoice
+                $amountNeeded = $invoice->amount;
+                $usedTransactionIdsForInvoice = [];
+
+                foreach ($memberTransactions as $transaction) {
+                    if ($amountNeeded <= 0) {
+                        break;
+                    }
+
+                    $used = $transactionAmountsUsed[$transaction->id] ?? 0;
+                    $available = $transaction->credit - $used;
+
+                    if ($available > 0) {
+                        $useAmount = min($available, $amountNeeded);
+                        $transactionAmountsUsed[$transaction->id] = ($transactionAmountsUsed[$transaction->id] ?? 0) + $useAmount;
+                        $usedTransactionIdsForInvoice[] = $transaction->id;
+                        $amountNeeded -= $useAmount;
+                    }
+                }
+
+                // Mark invoice as paid
+                if ($amountNeeded <= 0) {
+                    $primaryTransactionId = $usedTransactionIdsForInvoice[0];
+                    
+                    $invoice->update([
+                        'status' => 'paid',
+                        'paid_at' => now(),
+                        'metadata' => array_merge($invoice->metadata ?? [], [
+                            'auto_matched' => true,
+                            'transaction_id' => $primaryTransactionId,
+                            'matched_at' => now()->toDateTimeString(),
+                            'matched_transactions' => $usedTransactionIdsForInvoice,
+                        ]),
+                    ]);
+
+                    $totalInvoicesPaid++;
+                    $totalAmountMatched += $invoice->amount;
+                    $memberMatched = true;
+
+                    Log::info('Invoice auto-matched in bulk', [
+                        'invoice_id' => $invoice->id,
+                        'transaction_ids' => $usedTransactionIdsForInvoice,
+                        'amount' => $invoice->amount,
+                    ]);
+                }
+            }
+
+            if ($memberMatched) {
                 $matchedTransactions++;
-                $totalInvoicesPaid += count($result['matched_invoices']);
             }
         }
 
-        // Match manual contributions
-        $contributions = ManualContribution::all();
+        // Match manual contributions (check if already used)
+        $usedContributionIds = Invoice::where('status', 'paid')
+            ->whereNotNull('metadata')
+            ->get()
+            ->filter(function($invoice) {
+                $metadata = is_string($invoice->metadata) 
+                    ? json_decode($invoice->metadata, true) 
+                    : $invoice->metadata;
+                return isset($metadata['manual_contribution_id']);
+            })
+            ->pluck('metadata')
+            ->map(function($metadata) {
+                $meta = is_string($metadata) ? json_decode($metadata, true) : $metadata;
+                return $meta['manual_contribution_id'] ?? null;
+            })
+            ->filter()
+            ->unique()
+            ->toArray();
+
+        $contributions = ManualContribution::whereNotIn('id', $usedContributionIds)->get();
         foreach ($contributions as $contribution) {
             $result = $this->matchManualContributionToInvoices($contribution);
             if ($result['matched']) {
                 $matchedContributions++;
                 $totalInvoicesPaid += count($result['matched_invoices']);
+                $totalAmountMatched += $result['total_matched_amount'];
             }
         }
 
@@ -187,6 +317,7 @@ class InvoicePaymentMatcher
             'matched_transactions' => $matchedTransactions,
             'matched_contributions' => $matchedContributions,
             'total_invoices_paid' => $totalInvoicesPaid,
+            'total_amount_matched' => $totalAmountMatched,
         ];
     }
 }
