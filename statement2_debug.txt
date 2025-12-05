@@ -1,5 +1,0 @@
-Extracted 10 transactions
-
-Text length: 0
-Tables found: 0
-Is Paybill: False
