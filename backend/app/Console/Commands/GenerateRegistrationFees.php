@@ -91,25 +91,46 @@ class GenerateRegistrationFees extends Command
     
     /**
      * Get member's first contribution date
+     * Includes direct transactions, manual contributions, and shared transactions (splits)
      */
     private function getFirstContributionDate(Member $member): ?Carbon
     {
-        // Check transactions
+        // Use the member's computed date_of_registration which includes:
+        // - Direct transactions
+        // - Manual contributions  
+        // - Transaction splits (shared transactions)
+        if ($member->date_of_registration) {
+            return Carbon::parse($member->date_of_registration);
+        }
+        
+        // Fallback: compute manually if date_of_registration is not set
+        $member->refreshDateOfRegistration();
+        if ($member->date_of_registration) {
+            return Carbon::parse($member->date_of_registration);
+        }
+        
+        // Last resort: check transactions and manual contributions directly
         $firstTransaction = $member->transactions()
             ->where('assignment_status', '!=', 'duplicate')
             ->where('credit', '>', 0)
             ->orderBy('tran_date')
             ->first();
         
-        // Check manual contributions
         $firstManual = $member->manualContributions()
             ->orderBy('contribution_date')
+            ->first();
+        
+        // Check transaction splits (shared transactions)
+        $firstSplit = \App\Models\TransactionSplit::where('member_id', $member->id)
+            ->join('transactions', 'transaction_splits.transaction_id', '=', 'transactions.id')
+            ->where('transactions.is_archived', false)
+            ->orderBy('transactions.tran_date')
             ->first();
         
         $dates = array_filter([
             $firstTransaction?->tran_date,
             $firstManual?->contribution_date,
-            $member->date_of_registration,
+            $firstSplit?->transaction?->tran_date,
         ]);
         
         if (empty($dates)) {

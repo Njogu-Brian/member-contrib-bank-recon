@@ -68,7 +68,10 @@ class InvoiceController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'member_id' => 'required|exists:members,id',
+            'member_id' => 'required_without:all_members|exists:members,id',
+            'all_members' => 'boolean',
+            'invoice_type_id' => 'nullable|exists:invoice_types,id',
+            'invoice_type' => 'nullable|string',
             'amount' => 'required|numeric|min:0.01',
             'due_date' => 'required|date',
             'issue_date' => 'nullable|date',
@@ -76,14 +79,146 @@ class InvoiceController extends Controller
             'description' => 'nullable|string',
         ]);
 
-        $validated['invoice_number'] = Invoice::generateInvoiceNumber();
-        $validated['issue_date'] = $validated['issue_date'] ?? now();
+        $allMembers = $request->boolean('all_members', false);
+        $invoiceTypeId = $validated['invoice_type_id'] ?? null;
+        $invoiceTypeCode = $validated['invoice_type'] ?? null;
+
+        // Get invoice type if provided
+        $invoiceType = null;
+        if ($invoiceTypeId) {
+            $invoiceType = \App\Models\InvoiceType::find($invoiceTypeId);
+        } elseif ($invoiceTypeCode) {
+            $invoiceType = \App\Models\InvoiceType::where('code', $invoiceTypeCode)->first();
+        }
+
+        // If invoice type is "once" or "after_joining", check for duplicates
+        if ($invoiceType && in_array($invoiceType->charge_type, [
+            \App\Models\InvoiceType::CHARGE_ONCE,
+            \App\Models\InvoiceType::CHARGE_AFTER_JOINING
+        ])) {
+            if ($allMembers) {
+                // Bulk generation - return detailed results
+                return $this->bulkCreateInvoices($validated, $invoiceType);
+            } else {
+                // Single member - check and throw error if exists
+                $exists = Invoice::where('member_id', $validated['member_id'])
+                    ->where(function ($query) use ($invoiceType) {
+                        $query->where('invoice_type_id', $invoiceType->id)
+                              ->orWhere('invoice_type', $invoiceType->code);
+                    })
+                    ->exists();
+
+                if ($exists) {
+                    return response()->json([
+                        'message' => 'Invoice of this type has already been issued to this member. One-time invoices can only be issued once.',
+                        'error' => 'duplicate_invoice',
+                    ], 422);
+                }
+            }
+        }
+
+        if ($allMembers) {
+            return $this->bulkCreateInvoices($validated, $invoiceType);
+        }
+
+        // Single invoice creation
+        $member = \App\Models\Member::find($validated['member_id']);
+        
+        // For "after_joining" types, use member's registration date
+        if ($invoiceType && $invoiceType->charge_type === \App\Models\InvoiceType::CHARGE_AFTER_JOINING) {
+            if (!$member || !$member->date_of_registration) {
+                return response()->json([
+                    'message' => 'Member does not have a registration date. Cannot create invoice for this type.',
+                    'error' => 'no_registration_date',
+                ], 422);
+            }
+            $validated['issue_date'] = $member->date_of_registration;
+        } else {
+            $validated['issue_date'] = $validated['issue_date'] ?? now();
+        }
+        
+        $validated['invoice_number'] = Invoice::generateInvoiceNumber($invoiceTypeCode ?? Invoice::TYPE_CUSTOM, \Carbon\Carbon::parse($validated['issue_date']));
         $validated['status'] = 'pending';
+        if ($invoiceType) {
+            $validated['invoice_type_id'] = $invoiceType->id;
+            $validated['invoice_type'] = $invoiceType->code;
+        }
 
         $invoice = Invoice::create($validated);
         $invoice->load('member');
 
         return response()->json($invoice, 201);
+    }
+
+    /**
+     * Bulk create invoices for all members
+     */
+    protected function bulkCreateInvoices(array $validated, ?\App\Models\InvoiceType $invoiceType): \Illuminate\Http\JsonResponse
+    {
+        $members = \App\Models\Member::where('is_active', true)->get();
+        $generated = 0;
+        $skipped = 0;
+        $errors = [];
+
+        foreach ($members as $member) {
+            // Check for duplicates if one-time type
+            if ($invoiceType && in_array($invoiceType->charge_type, [
+                \App\Models\InvoiceType::CHARGE_ONCE,
+                \App\Models\InvoiceType::CHARGE_AFTER_JOINING
+            ])) {
+                $exists = Invoice::where('member_id', $member->id)
+                    ->where(function ($query) use ($invoiceType) {
+                        $query->where('invoice_type_id', $invoiceType->id)
+                              ->orWhere('invoice_type', $invoiceType->code);
+                    })
+                    ->exists();
+
+                if ($exists) {
+                    $skipped++;
+                    $errors[] = "{$member->name}: Invoice already issued (one-time type)";
+                    continue;
+                }
+            }
+
+            try {
+                // For "after_joining" types, use member's registration date
+                $issueDate = $validated['issue_date'] ?? now();
+                if ($invoiceType && $invoiceType->charge_type === \App\Models\InvoiceType::CHARGE_AFTER_JOINING) {
+                    if (!$member->date_of_registration) {
+                        $skipped++;
+                        $errors[] = "{$member->name}: No registration date found";
+                        continue;
+                    }
+                    $issueDate = $member->date_of_registration;
+                }
+                
+                $invoiceData = array_merge($validated, [
+                    'member_id' => $member->id,
+                    'invoice_number' => Invoice::generateInvoiceNumber($invoiceType ? $invoiceType->code : Invoice::TYPE_CUSTOM, \Carbon\Carbon::parse($issueDate)),
+                    'issue_date' => $issueDate,
+                    'status' => 'pending',
+                ]);
+
+                if ($invoiceType) {
+                    $invoiceData['invoice_type_id'] = $invoiceType->id;
+                    $invoiceData['invoice_type'] = $invoiceType->code;
+                }
+
+                Invoice::create($invoiceData);
+                $generated++;
+            } catch (\Exception $e) {
+                $skipped++;
+                $errors[] = "{$member->name}: " . $e->getMessage();
+                \Illuminate\Support\Facades\Log::error("Error creating invoice for member {$member->id}: " . $e->getMessage());
+            }
+        }
+
+        return response()->json([
+            'message' => "Invoice generation complete. Generated: {$generated}, Skipped: {$skipped}",
+            'generated' => $generated,
+            'skipped' => $skipped,
+            'errors' => $errors,
+        ], 201);
     }
 
     public function show(Invoice $invoice)
@@ -164,5 +299,58 @@ class InvoiceController extends Controller
             'message' => 'Bulk matching completed',
             'result' => $result,
         ]);
+    }
+
+    /**
+     * Get all members with their invoice totals
+     */
+    public function membersWithInvoices(Request $request)
+    {
+        $query = Member::where('is_active', true)
+            ->withCount([
+                'invoices as total_invoices_count',
+                'invoices as paid_invoices_count' => function ($q) {
+                    $q->where('status', 'paid');
+                },
+                'invoices as pending_invoices_count' => function ($q) {
+                    $q->whereIn('status', ['pending', 'overdue']);
+                },
+            ])
+            ->withSum([
+                'invoices as total_invoices_amount',
+                'invoices as paid_invoices_amount' => function ($q) {
+                    $q->where('status', 'paid');
+                },
+                'invoices as pending_invoices_amount' => function ($q) {
+                    $q->whereIn('status', ['pending', 'overdue']);
+                },
+            ], 'amount');
+
+        // Search filter
+        if ($request->has('search') && $request->search !== '') {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('member_code', 'like', "%{$search}%");
+            });
+        }
+
+        // Sort
+        $sortBy = $request->get('sort_by', 'total_invoices_amount');
+        $sortOrder = $request->get('sort_order', 'desc');
+        
+        $allowedSortColumns = ['name', 'total_invoices_amount', 'total_invoices_count', 'pending_invoices_amount'];
+        if (!in_array($sortBy, $allowedSortColumns)) {
+            $sortBy = 'total_invoices_amount';
+        }
+        
+        $sortOrder = in_array($sortOrder, ['asc', 'desc']) ? $sortOrder : 'desc';
+
+        return response()->json(
+            $query->orderBy($sortBy, $sortOrder)
+                ->paginate($request->get('per_page', 25))
+        );
     }
 }

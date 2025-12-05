@@ -28,6 +28,7 @@ class Invoice extends Model
         'payment_id',
         'period',
         'invoice_type',
+        'invoice_type_id',
         'invoice_year',
         'description',
         'metadata',
@@ -50,6 +51,11 @@ class Invoice extends Model
     public function payment()
     {
         return $this->belongsTo(Payment::class);
+    }
+
+    public function invoiceType()
+    {
+        return $this->belongsTo(InvoiceType::class, 'invoice_type_id');
     }
 
     public function isPending(): bool

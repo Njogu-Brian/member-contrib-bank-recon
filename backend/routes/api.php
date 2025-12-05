@@ -19,6 +19,7 @@ use App\Http\Controllers\ContributionStatusRuleController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\ManualContributionController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\InvoiceTypeController;
 use App\Http\Controllers\InvoiceReportController;
 use App\Http\Controllers\MeetingAttendanceUploadController;
 use App\Http\Controllers\ReportController;
@@ -249,6 +250,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/transactions/auto-assign', [TransactionController::class, 'autoAssign']);
         Route::post('/transactions/bulk-assign', [TransactionController::class, 'bulkAssign']);
         Route::post('/transactions/archive-bulk', [TransactionController::class, 'bulkArchive']);
+        Route::post('/transactions/unarchive-bulk', [TransactionController::class, 'bulkUnarchive']);
         Route::post('/transactions/{transaction}/archive', [TransactionController::class, 'archive']);
         Route::delete('/transactions/{transaction}/archive', [TransactionController::class, 'unarchive']);
         Route::post('/transactions/{transaction}/ask-ai', [TransactionController::class, 'askAi']);
@@ -263,6 +265,10 @@ Route::prefix('v1')->group(function () {
         Route::post('/invoices/{invoice}/mark-paid', [InvoiceController::class, 'markAsPaid']);
         Route::post('/invoices/{invoice}/cancel', [InvoiceController::class, 'cancel']);
         Route::post('/invoices/bulk-match', [InvoiceController::class, 'bulkMatch']);
+        Route::get('/invoices/members-summary', [InvoiceController::class, 'membersWithInvoices']);
+
+        // Invoice Types
+        Route::apiResource('invoice-types', InvoiceTypeController::class);
         
         // Invoice Reports
         Route::get('/invoice-reports/outstanding', [InvoiceReportController::class, 'outstandingInvoices']);

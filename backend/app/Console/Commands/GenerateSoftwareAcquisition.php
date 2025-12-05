@@ -31,14 +31,26 @@ class GenerateSoftwareAcquisition extends Command
         $this->info("   Amount: KES " . number_format($amount, 2));
         
         // Get all members who were active as of the charge date
+        // Include members with shared transactions (splits) as their first contribution
         $members = Member::where('is_active', true)
             ->where(function ($query) use ($chargeDate) {
                 // Members created before or on charge date
                 $query->whereDate('created_at', '<=', $chargeDate)
-                    // Or members with contributions before or on charge date
+                    // Or members with direct transactions before or on charge date
                     ->orWhereHas('transactions', function ($q) use ($chargeDate) {
-                        $q->whereDate('tran_date', '<=', $chargeDate);
-                    });
+                        $q->whereDate('tran_date', '<=', $chargeDate)
+                          ->whereNotIn('assignment_status', ['unassigned', 'duplicate'])
+                          ->where('is_archived', false);
+                    })
+                    // Or members with shared transactions (splits) before or on charge date
+                    ->orWhereHas('transactionSplits', function ($q) use ($chargeDate) {
+                        $q->join('transactions', 'transaction_splits.transaction_id', '=', 'transactions.id')
+                          ->whereDate('transactions.tran_date', '<=', $chargeDate)
+                          ->where('transactions.is_archived', false);
+                    })
+                    // Or members with date_of_registration set (includes splits)
+                    ->orWhereNotNull('date_of_registration')
+                    ->whereDate('date_of_registration', '<=', $chargeDate);
             })
             ->get();
         

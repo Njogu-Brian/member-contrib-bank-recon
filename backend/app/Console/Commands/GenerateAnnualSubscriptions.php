@@ -10,9 +10,9 @@ use Illuminate\Console\Command;
 class GenerateAnnualSubscriptions extends Command
 {
     protected $signature = 'invoices:generate-annual-subscriptions 
-                            {--year= : Year to generate subscriptions for (e.g., 2026)}
+                            {--year= : Year to generate subscriptions for (e.g., 2026). Charges members who joined in the previous year.}
                             {--dry-run : Show what would be generated without creating}';
-    protected $description = 'Generate annual subscription invoices for members from previous year';
+    protected $description = 'Generate annual subscription invoices for members who joined in the previous year. For example, if year=2025, charges members who joined in 2024.';
 
     public function handle()
     {
@@ -32,13 +32,21 @@ class GenerateAnnualSubscriptions extends Command
         $this->info("   Due Date: {$dueDate->format('M d, Y')}");
         $this->info("   Amount: KES " . number_format($amount, 2));
         
-        // Get members who joined before this year (previous year and earlier)
-        $members = Member::whereYear('created_at', '<', $year)
-            ->orWhere(function ($query) use ($year) {
-                // Include members with first contribution before this year
-                $query->whereHas('transactions', function ($q) use ($year) {
-                    $q->whereYear('tran_date', '<', $year);
-                });
+        // Get members who joined in the previous year (for annual subscription)
+        // This charges members who joined last year for this year's subscription
+        $previousYear = $year - 1;
+        $members = Member::where('is_active', true)
+            ->where(function ($query) use ($previousYear) {
+                // Members with registration date in previous year
+                $query->whereYear('date_of_registration', $previousYear)
+                    // Or members created in previous year (fallback)
+                    ->orWhereYear('created_at', $previousYear)
+                    // Or members with first contribution in previous year
+                    ->orWhereHas('transactions', function ($q) use ($previousYear) {
+                        $q->whereYear('tran_date', $previousYear)
+                          ->whereNotIn('assignment_status', ['unassigned', 'duplicate'])
+                          ->where('is_archived', false);
+                    });
             })
             ->get();
         

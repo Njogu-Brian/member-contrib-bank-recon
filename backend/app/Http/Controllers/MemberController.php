@@ -86,10 +86,25 @@ class MemberController extends Controller
             'month' => 'nullable|date_format:Y-m',
             'per_page' => 'nullable|integer|min:1|max:500',
             'page' => 'nullable|integer|min:1',
+            'filter' => 'nullable|string|in:all,contributions,invoices',
         ]);
 
         $data = $this->buildStatementData($member, $validated);
         $collection = $data['collection'];
+        
+        // Apply filter if specified
+        $filter = $validated['filter'] ?? 'all';
+        if ($filter !== 'all') {
+            if ($filter === 'contributions') {
+                $collection = $collection->filter(function ($entry) {
+                    return in_array($entry['type'] ?? '', ['contribution', 'shared_contribution', 'manual_contribution']);
+                })->values();
+            } elseif ($filter === 'invoices') {
+                $collection = $collection->filter(function ($entry) {
+                    return ($entry['type'] ?? '') === 'invoice';
+                })->values();
+            }
+        }
 
         $perPage = max(1, (int) $request->get('per_page', 25));
         $page = max(1, (int) $request->get('page', 1));

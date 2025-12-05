@@ -23,6 +23,17 @@ class Kernel extends ConsoleKernel
                 \Log::error('Failed to generate weekly invoices');
             });
 
+        // Generate scheduled invoices (yearly, monthly, after_joining, once) daily at 01:00
+        $schedule->command('invoices:generate-scheduled')
+            ->dailyAt('01:00')
+            ->withoutOverlapping()
+            ->onSuccess(function () {
+                \Log::info('Scheduled invoices generated successfully');
+            })
+            ->onFailure(function () {
+                \Log::error('Failed to generate scheduled invoices');
+            });
+
         // Send invoice reminders (time and frequency configured in settings)
         // Note: Command itself checks frequency, we run it daily and let it decide
         $reminderTime = \App\Models\Setting::get('invoice_reminder_time', '09:00');

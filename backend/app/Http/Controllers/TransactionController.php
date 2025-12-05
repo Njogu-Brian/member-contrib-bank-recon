@@ -1759,6 +1759,42 @@ class TransactionController extends Controller
         ]);
     }
 
+    public function bulkUnarchive(Request $request)
+    {
+        $validated = $request->validate([
+            'transaction_ids' => 'required|array|min:1',
+            'transaction_ids.*' => 'exists:transactions,id',
+        ]);
+
+        $transactions = Transaction::whereIn('id', $validated['transaction_ids'])
+            ->where('is_archived', true)
+            ->get();
+
+        $unarchived = 0;
+        foreach ($transactions as $transaction) {
+            try {
+                $transaction->update([
+                    'is_archived' => false,
+                    'archived_at' => null,
+                    'archive_reason' => null,
+                ]);
+                $unarchived++;
+                Log::info('Transaction restored successfully', ['transaction_id' => $transaction->id]);
+            } catch (\Exception $e) {
+                Log::error('Restore transaction error: ' . $e->getMessage(), [
+                    'transaction_id' => $transaction->id,
+                    'error' => $e->getTraceAsString(),
+                ]);
+            }
+        }
+
+        return response()->json([
+            'message' => "Restored {$unarchived} transaction(s)",
+            'unarchived' => $unarchived,
+            'requested' => count($validated['transaction_ids']),
+        ]);
+    }
+
     public function askAi(Request $request, Transaction $transaction, MatchingService $matchingService)
     {
         $members = Member::where('is_active', true)->get();
