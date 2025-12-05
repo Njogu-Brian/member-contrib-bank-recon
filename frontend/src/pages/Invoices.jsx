@@ -1,13 +1,18 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getInvoices, createInvoice, updateInvoice, deleteInvoice, markInvoiceAsPaid, cancelInvoice, bulkMatchInvoices } from '../api/invoices'
+import { useNavigate } from 'react-router-dom'
+import { getInvoices, createInvoice, updateInvoice, deleteInvoice, markInvoiceAsPaid, cancelInvoice, bulkMatchInvoices, getMembersWithInvoices, getInvoiceTypes } from '../api/invoices'
 import { getMembers } from '../api/members'
 import MemberSearchModal from '../components/MemberSearchModal'
 import Pagination from '../components/Pagination'
 import PageHeader from '../components/PageHeader'
 
 export default function Invoices() {
+  const navigate = useNavigate()
+  const [activeTab, setActiveTab] = useState('list') // 'list' or 'members'
   const [page, setPage] = useState(1)
+  const [membersPage, setMembersPage] = useState(1)
+  const [membersSearch, setMembersSearch] = useState('')
   const [filters, setFilters] = useState({
     status: '',
     member_id: '',
@@ -23,6 +28,8 @@ export default function Invoices() {
   const [selectedMember, setSelectedMember] = useState(null)
   const [formData, setFormData] = useState({
     member_id: '',
+    all_members: false,
+    invoice_type_id: '',
     amount: '1000',
     due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     issue_date: new Date().toISOString().split('T')[0],
@@ -40,15 +47,55 @@ export default function Invoices() {
     queryFn: () => getMembers({ per_page: 1000 }),
   })
 
+  const { data: invoiceTypes } = useQuery({
+    queryKey: ['invoice-types'],
+    queryFn: () => getInvoiceTypes(true),
+  })
+
+  const { data: membersWithInvoicesData, isLoading: isLoadingMembers } = useQuery({
+    queryKey: ['members-with-invoices', membersPage, membersSearch],
+    queryFn: () => getMembersWithInvoices({ 
+      page: membersPage, 
+      per_page: 25,
+      search: membersSearch,
+      sort_by: 'total_invoices_amount',
+      sort_order: 'desc',
+    }),
+    enabled: activeTab === 'members',
+  })
+
   const createMutation = useMutation({
     mutationFn: createInvoice,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries(['invoices'])
       setShowModal(false)
       resetForm()
-      alert('Invoice created successfully!')
+      
+      // Handle bulk creation response
+      if (data.generated !== undefined) {
+        let message = `✅ Successfully generated ${data.generated} invoice(s)`
+        if (data.skipped > 0) {
+          message += `\n⚠️ Skipped ${data.skipped} member(s) (already charged or not eligible)`
+        }
+        if (data.errors && data.errors.length > 0) {
+          message += `\n\nErrors:\n${data.errors.slice(0, 5).join('\n')}`
+          if (data.errors.length > 5) {
+            message += `\n... and ${data.errors.length - 5} more`
+          }
+        }
+        alert(message)
+      } else {
+        alert('Invoice created successfully!')
+      }
     },
-    onError: (error) => alert(error.response?.data?.message || 'Failed to create invoice'),
+    onError: (error) => {
+      const errorMessage = error.response?.data?.message || 'Failed to create invoice'
+      if (error.response?.data?.error === 'duplicate_invoice') {
+        alert(`❌ ${errorMessage}\n\nThis invoice type can only be issued once per member.`)
+      } else {
+        alert(`❌ ${errorMessage}`)
+      }
+    },
   })
 
   const updateMutation = useMutation({
@@ -109,6 +156,8 @@ export default function Invoices() {
   const resetForm = () => {
     setFormData({
       member_id: '',
+      all_members: false,
+      invoice_type_id: '',
       amount: '1000',
       due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       issue_date: new Date().toISOString().split('T')[0],
@@ -132,14 +181,21 @@ export default function Invoices() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (!formData.member_id) {
-      alert('Please select a member')
+    if (!formData.all_members && !formData.member_id) {
+      alert('Please select a member or choose "All Members"')
       return
     }
     if (editingInvoice) {
       updateMutation.mutate({ id: editingInvoice.id, data: formData })
     } else {
-      createMutation.mutate(formData)
+      // For bulk creation, remove member_id if all_members is selected
+      const submitData = { ...formData }
+      if (submitData.all_members) {
+        delete submitData.member_id
+      } else {
+        delete submitData.all_members
+      }
+      createMutation.mutate(submitData)
     }
   }
 
@@ -157,7 +213,15 @@ export default function Invoices() {
 
   const handleMemberSelect = (member) => {
     setSelectedMember(member)
-    setFormData({ ...formData, member_id: member.id })
+    const selectedType = invoiceTypes?.find(t => t.id === parseInt(formData.invoice_type_id))
+    
+    // For after_joining types, set issue_date to member's registration date
+    let issueDate = formData.issue_date
+    if (selectedType?.charge_type === 'after_joining' && member.date_of_registration) {
+      issueDate = member.date_of_registration
+    }
+    
+    setFormData({ ...formData, member_id: member.id, issue_date: issueDate })
     setShowMemberSearch(false)
   }
 
@@ -188,11 +252,39 @@ export default function Invoices() {
       <PageHeader
         title="Invoices"
         description="Manage weekly contribution invoices and track payments"
-        metric={pagination?.total || 0}
-        metricLabel="Total Invoices"
+        metric={activeTab === 'list' ? (pagination?.total || 0) : (membersWithInvoicesData?.meta?.total || 0)}
+        metricLabel={activeTab === 'list' ? 'Total Invoices' : 'Total Members'}
         gradient="from-orange-600 to-amber-600"
       />
 
+      {/* Tabs */}
+      <div className="bg-white rounded-xl shadow-sm p-1">
+        <div className="flex space-x-1">
+          <button
+            onClick={() => setActiveTab('list')}
+            className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+              activeTab === 'list'
+                ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white'
+                : 'text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            📋 Invoice List
+          </button>
+          <button
+            onClick={() => setActiveTab('members')}
+            className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+              activeTab === 'members'
+                ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white'
+                : 'text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            👥 Members Summary
+          </button>
+        </div>
+      </div>
+
+      {activeTab === 'list' && (
+        <>
       <div className="bg-white rounded-xl shadow-sm p-4">
         <div className="flex flex-wrap gap-3 justify-end">
           <button
@@ -443,29 +535,94 @@ export default function Invoices() {
                   {editingInvoice ? 'Edit Invoice' : 'Create Invoice'}
                 </h3>
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Member *</label>
-                    <div className="mt-1">
-                      <button
-                        type="button"
-                        onClick={() => setShowMemberSearch(true)}
-                        disabled={!!editingInvoice}
-                        className="w-full flex items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-left shadow-sm hover:bg-gray-50 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
-                      >
-                        <span className={selectedMember ? 'text-gray-900' : 'text-gray-500'}>
-                          {selectedMember ? selectedMember.name : 'Click to search and select a member...'}
-                        </span>
-                        <svg className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                      {selectedMember && (
-                        <p className="mt-1 text-xs text-gray-500">
-                          {[selectedMember.phone, selectedMember.email, selectedMember.member_code].filter(Boolean).join(' • ')}
-                        </p>
-                      )}
-                      <input type="hidden" required value={formData.member_id} />
+                  {!editingInvoice && (
+                    <div>
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={formData.all_members}
+                          onChange={(e) => {
+                            setFormData({ ...formData, all_members: e.target.checked, member_id: '' })
+                            setSelectedMember(null)
+                          }}
+                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="ml-2 text-sm font-medium text-gray-700">Issue to All Active Members</span>
+                      </label>
+                      <p className="mt-1 text-xs text-gray-500">
+                        When enabled, invoice will be created for all active members. Members who already have this invoice type will be skipped.
+                      </p>
                     </div>
+                  )}
+                  {!formData.all_members && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Member *</label>
+                      <div className="mt-1">
+                        <button
+                          type="button"
+                          onClick={() => setShowMemberSearch(true)}
+                          disabled={!!editingInvoice}
+                          className="w-full flex items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-left shadow-sm hover:bg-gray-50 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        >
+                          <span className={selectedMember ? 'text-gray-900' : 'text-gray-500'}>
+                            {selectedMember ? selectedMember.name : 'Click to search and select a member...'}
+                          </span>
+                          <svg className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                        {selectedMember && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            {[selectedMember.phone, selectedMember.email, selectedMember.member_code].filter(Boolean).join(' • ')}
+                          </p>
+                        )}
+                        <input type="hidden" required={!formData.all_members} value={formData.member_id} />
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Invoice Type</label>
+                    <select
+                      value={formData.invoice_type_id}
+                      onChange={(e) => {
+                        const selectedType = invoiceTypes?.find(t => t.id === parseInt(e.target.value))
+                        const updateData = {
+                          ...formData,
+                          invoice_type_id: e.target.value,
+                          amount: selectedType?.default_amount || formData.amount,
+                          description: selectedType?.description || formData.description,
+                        }
+                        
+                        // For after_joining types with a selected member, set issue_date to registration date
+                        if (selectedType?.charge_type === 'after_joining' && selectedMember?.date_of_registration) {
+                          updateData.issue_date = selectedMember.date_of_registration
+                        }
+                        
+                        setFormData(updateData)
+                      }}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    >
+                      <option value="">Select invoice type (optional)</option>
+                      {invoiceTypes?.map((type) => (
+                        <option key={type.id} value={type.id}>
+                          {type.name} ({type.charge_type})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Selecting an invoice type helps prevent duplicate charges for one-time invoices.
+                    </p>
+                    {formData.invoice_type_id && (() => {
+                      const selectedType = invoiceTypes?.find(t => t.id === parseInt(formData.invoice_type_id))
+                      if (selectedType?.charge_type === 'after_joining') {
+                        return (
+                          <p className="mt-1 text-xs text-blue-600 font-medium">
+                            ⓘ Issue date will automatically be set to each member's registration date
+                          </p>
+                        )
+                      }
+                      return null
+                    })()}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Amount *</label>
@@ -481,13 +638,52 @@ export default function Invoices() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Issue Date *</label>
-                    <input
-                      type="date"
-                      required
-                      value={formData.issue_date}
-                      onChange={(e) => setFormData({ ...formData, issue_date: e.target.value })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                    />
+                    {(() => {
+                      const selectedType = invoiceTypes?.find(t => t.id === parseInt(formData.invoice_type_id))
+                      const isAfterJoining = selectedType?.charge_type === 'after_joining'
+                      
+                      if (isAfterJoining && formData.all_members) {
+                        return (
+                          <div>
+                            <input
+                              type="date"
+                              disabled
+                              value={formData.issue_date}
+                              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-100 text-gray-500 sm:text-sm cursor-not-allowed"
+                            />
+                            <p className="mt-1 text-xs text-blue-600">
+                              Will use each member's registration date automatically
+                            </p>
+                          </div>
+                        )
+                      }
+                      
+                      if (isAfterJoining && selectedMember) {
+                        return (
+                          <div>
+                            <input
+                              type="date"
+                              disabled
+                              value={selectedMember.date_of_registration || formData.issue_date}
+                              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-100 text-gray-500 sm:text-sm cursor-not-allowed"
+                            />
+                            <p className="mt-1 text-xs text-blue-600">
+                              Will use member's registration date: {selectedMember.date_of_registration ? new Date(selectedMember.date_of_registration).toLocaleDateString() : 'Not set'}
+                            </p>
+                          </div>
+                        )
+                      }
+                      
+                      return (
+                        <input
+                          type="date"
+                          required
+                          value={formData.issue_date}
+                          onChange={(e) => setFormData({ ...formData, issue_date: e.target.value })}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        />
+                      )
+                    })()}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Due Date *</label>
@@ -542,6 +738,95 @@ export default function Invoices() {
         title="Select Member"
         preSelectedId={formData.member_id}
       />
+        </>
+      )}
+
+      {activeTab === 'members' && (
+        <div className="space-y-6">
+          {/* Search */}
+          <div className="bg-white rounded-xl shadow-sm p-4">
+            <input
+              type="text"
+              placeholder="Search members by name, phone, email, or code..."
+              value={membersSearch}
+              onChange={(e) => {
+                setMembersSearch(e.target.value)
+                setMembersPage(1)
+              }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+            />
+          </div>
+
+          {/* Members Table */}
+          {isLoadingMembers ? (
+            <div className="text-center py-12">Loading...</div>
+          ) : (
+            <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Invoices</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Amount</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Paid</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Pending</th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {membersWithInvoicesData?.data?.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="px-6 py-12 text-center text-sm text-gray-500">
+                        No members found.
+                      </td>
+                    </tr>
+                  ) : (
+                    membersWithInvoicesData?.data?.map((member) => (
+                      <tr key={member.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">{member.name}</div>
+                          <div className="text-xs text-gray-500">{member.phone || member.email || member.member_code}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                          {member.total_invoices_count || 0}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                          {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(member.total_invoices_amount || 0)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-green-600">
+                          {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(member.paid_invoices_amount || 0)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-red-600">
+                          {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(member.pending_invoices_amount || 0)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                          <button
+                            onClick={() => navigate(`/members/${member.id}`)}
+                            className="text-indigo-600 hover:text-indigo-900"
+                          >
+                            View Profile
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+              {membersWithInvoicesData?.meta && (
+                <Pagination
+                  pagination={{
+                    current_page: membersWithInvoicesData.meta.current_page || 1,
+                    last_page: membersWithInvoicesData.meta.last_page || 1,
+                    per_page: membersWithInvoicesData.meta.per_page || 25,
+                    total: membersWithInvoicesData.meta.total || 0,
+                  }}
+                  onPageChange={(newPage) => setMembersPage(newPage)}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

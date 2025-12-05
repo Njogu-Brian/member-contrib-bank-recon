@@ -112,4 +112,11 @@ export const bulkArchiveTransactions = async (transactionIds, reason = '') => {
   return response.data
 }
 
+export const bulkUnarchiveTransactions = async (transactionIds) => {
+  const response = await api.post(`${adminBase}/transactions/unarchive-bulk`, {
+    transaction_ids: transactionIds,
+  })
+  return response.data
+}
+
 

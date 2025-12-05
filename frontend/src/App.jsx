@@ -14,6 +14,7 @@ import DraftTransactions from './pages/DraftTransactions'
 import Expenses from './pages/Expenses'
 import ManualContributions from './pages/ManualContributions'
 import Invoices from './pages/Invoices'
+import InvoiceTypes from './pages/InvoiceTypes'
 import MemberProfile from './pages/MemberProfile'
 import Settings from './pages/Settings'
 import Reports from './pages/Reports'
@@ -194,6 +195,14 @@ function App() {
         />
         <Route path="manual-contributions" element={<ManualContributions />} />
         <Route path="invoices" element={<Invoices />} />
+        <Route
+          path="invoice-types"
+          element={
+            <ProtectedRoute roles={[ROLES.SUPER_ADMIN, ROLES.TREASURER, ROLES.ACCOUNTANT]}>
+              <InvoiceTypes />
+            </ProtectedRoute>
+          }
+        />
         <Route path="wallets" element={<Wallets />} />
         <Route path="investments" element={<Investments />} />
         <Route path="announcements" element={<Announcements />} />

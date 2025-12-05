@@ -39,6 +39,7 @@ export default function MemberProfile() {
   const [perPage, setPerPage] = useState(25)
   const [showEditModal, setShowEditModal] = useState(false)
   const [activeTab, setActiveTab] = useState('statement')
+  const [transactionFilter, setTransactionFilter] = useState('all') // 'all', 'invoices', 'contributions'
   const [formData, setFormData] = useState({})
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [assigningTransaction, setAssigningTransaction] = useState(null)
@@ -64,8 +65,12 @@ export default function MemberProfile() {
   })
 
   const { data: statementData, isLoading: isStatementLoading } = useQuery({
-    queryKey: ['member-statement', id, page, perPage],
-    queryFn: () => getMemberStatement(id, { page, per_page: perPage }),
+    queryKey: ['member-statement', id, page, perPage, transactionFilter],
+    queryFn: () => getMemberStatement(id, { 
+      page, 
+      per_page: perPage,
+      filter: transactionFilter !== 'all' ? transactionFilter : undefined,
+    }),
     enabled: !!id,
   })
 
@@ -202,6 +207,7 @@ export default function MemberProfile() {
 
   const pagination = statementData?.pagination || { current_page: 1, last_page: 1 }
   const monthlyTotals = statementData?.monthly_totals || []
+  // Backend now handles filtering, so use statement directly
   const statementEntries = statementData?.statement || []
   
   // Helper to get amount from entry (handles both amount property and credit/debit)
@@ -651,11 +657,62 @@ export default function MemberProfile() {
               </div>
             </div>
             <div className="lg:col-span-2 border rounded-lg">
-              <div className="px-4 py-2 border-b bg-gray-50 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-gray-700">Transactions</h3>
-                <span className="text-xs text-gray-500">
-                  Page {pagination?.current_page || 1} of {pagination?.last_page || 1}
-                </span>
+              <div className="px-4 py-2 border-b bg-gray-50">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-gray-700">Transactions</h3>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-gray-500">
+                      {pagination?.total ? `Showing ${statementEntries.length} of ${pagination.total} entries` : `${statementEntries.length} entries`}
+                    </span>
+                    {pagination?.last_page > 1 && (
+                      <span className="text-xs text-gray-500">
+                        Page {pagination?.current_page || 1} of {pagination?.last_page || 1}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {/* Filter Tabs */}
+                <div className="flex space-x-1">
+                  <button
+                    onClick={() => {
+                      setTransactionFilter('all')
+                      setPage(1)
+                    }}
+                    className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                      transactionFilter === 'all'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => {
+                      setTransactionFilter('contributions')
+                      setPage(1)
+                    }}
+                    className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                      transactionFilter === 'contributions'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    Contributions Only
+                  </button>
+                  <button
+                    onClick={() => {
+                      setTransactionFilter('invoices')
+                      setPage(1)
+                    }}
+                    className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+                      transactionFilter === 'invoices'
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-white text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    Invoices Only
+                  </button>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">

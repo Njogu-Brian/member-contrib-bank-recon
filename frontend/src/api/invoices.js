@@ -69,3 +69,13 @@ export const getWeeklySummaryReport = async (params = {}) => {
   return response.data
 }
 
+export const getMembersWithInvoices = async (params = {}) => {
+  const response = await api.get('/admin/invoices/members-summary', { params })
+  return response.data
+}
+
+export const getInvoiceTypes = async (activeOnly = false) => {
+  const response = await api.get('/admin/invoice-types', { params: { active_only: activeOnly } })
+  return response.data
+}
+

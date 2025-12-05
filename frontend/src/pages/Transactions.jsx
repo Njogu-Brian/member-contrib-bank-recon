@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { getTransactions, autoAssign, transferTransaction, archiveTransaction, unarchiveTransaction, bulkArchiveTransactions, bulkAssign, splitTransaction } from '../api/transactions'
+import { getTransactions, autoAssign, transferTransaction, archiveTransaction, unarchiveTransaction, bulkArchiveTransactions, bulkUnarchiveTransactions, bulkAssign, splitTransaction } from '../api/transactions'
 import { getMembers } from '../api/members'
 import MemberSearchModal from '../components/MemberSearchModal'
 import Pagination from '../components/Pagination'
@@ -232,6 +232,18 @@ export default function Transactions({
     },
     onError: (error) => {
       alert(error.response?.data?.message || 'Failed to archive transactions')
+    },
+  })
+
+  const bulkUnarchiveMutation = useMutation({
+    mutationFn: (ids) => bulkUnarchiveTransactions(ids),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(['transactions'])
+      setSelectedTransactions([])
+      alert(data?.message || `Restored ${data?.unarchived || 0} transaction(s)`)
+    },
+    onError: (error) => {
+      alert(error.response?.data?.message || 'Failed to restore transactions')
     },
   })
 
@@ -497,6 +509,18 @@ export default function Transactions({
     unarchiveMutation.mutate(transaction.id)
   }
 
+  const handleBulkUnarchive = () => {
+    if (bulkUnarchiveMutation.isPending || selectedTransactions.length === 0 || !isArchivedView) {
+      return
+    }
+
+    if (!confirm(`Restore ${selectedTransactions.length} transaction(s)?`)) {
+      return
+    }
+
+    bulkUnarchiveMutation.mutate(selectedTransactions)
+  }
+
   if (isLoading) {
     return <div className="text-center py-12">Loading...</div>
   }
@@ -524,6 +548,9 @@ export default function Transactions({
   const selectableTransactionIds = transactions
     .filter((tx) => !tx.is_archived)
     .map((tx) => tx.id)
+  const archivableTransactionIds = transactions
+    .filter((tx) => tx.is_archived)
+    .map((tx) => tx.id)
   const archivingId = archiveMutation.variables?.id
   const unarchivingId = unarchiveMutation.variables
   
@@ -537,6 +564,28 @@ export default function Transactions({
         metricLabel="Total Transactions"
         gradient="from-green-600 to-emerald-600"
       />
+
+      {isArchivedView && selectedTransactions.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={handleBulkUnarchive}
+              disabled={bulkUnarchiveMutation.isPending || selectedTransactions.length === 0}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-md text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              title={selectedTransactions.length === 0 ? 'Select transactions using checkboxes to enable bulk restore' : ''}
+            >
+              {bulkUnarchiveMutation.isPending ? 'Restoring...' : `🔄 Bulk Restore${selectedTransactions.length > 0 ? ` (${selectedTransactions.length})` : ''}`}
+            </button>
+            <button
+              onClick={() => setSelectedTransactions([])}
+              className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              title="Clear selection"
+            >
+              Clear Selection
+            </button>
+          </div>
+        </div>
+      )}
 
       {!isArchivedView && (
         <div className="bg-white rounded-xl shadow-sm p-4">
@@ -807,17 +856,12 @@ export default function Transactions({
                         type="checkbox"
                         checked={selectedTransactions.includes(tx.id)}
                         onChange={(e) => {
-                          if (tx.is_archived) {
-                            return
-                          }
                           if (e.target.checked) {
                             setSelectedTransactions([...new Set([...selectedTransactions, tx.id])])
                           } else {
                             setSelectedTransactions(selectedTransactions.filter(id => id !== tx.id))
                           }
                         }}
-                        disabled={tx.is_archived}
-                        title={tx.is_archived ? 'Archived transactions cannot be selected' : undefined}
                         className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                       />
                     </td>

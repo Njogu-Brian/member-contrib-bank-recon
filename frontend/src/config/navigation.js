@@ -61,6 +61,10 @@ export const NAVIGATION = [
         icon: HiOutlineReceiptPercent,
         path: '/invoices',
         roles: [ROLES.SUPER_ADMIN, ROLES.TREASURER, ROLES.GROUP_TREASURER, ROLES.ACCOUNTANT],
+        submenu: [
+          { label: 'All Invoices', path: '/invoices' },
+          { label: 'Invoice Types', path: '/invoice-types' },
+        ],
       },
       {
         label: 'Budgets',
