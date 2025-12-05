@@ -395,7 +395,7 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
             cell_str = str(cell).strip().upper() if cell else ""
             if "TRAN DATE" in cell_str or ("DATE" in cell_str and "VALUE" not in cell_str):
                 date_col = i
-            elif "PARTICULARS" in cell_str or "DETAILS" in cell_str or "DESCRIPTION" in cell_str:
+            elif "PARTICULARS" in cell_str or "DETAILS" in cell_str or "DESCRIPTION" in cell_str or "NARRATIVE" in cell_str:
                 particulars_col = i
             elif "INSTRUMENT" in cell_str and "ID" in cell_str:
                 instrument_id_col = i  # Track this - might contain part of particulars
@@ -604,9 +604,6 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
                         for pattern in footer_patterns:
                             particulars = re.sub(pattern, '', particulars, flags=re.IGNORECASE | re.DOTALL)
                         particulars = re.sub(r'\s+', ' ', particulars).strip()
-                elif particulars_col < len(row):
-                    # Cell exists but is None/empty - set to empty string
-                    particulars = ""
             
             if credit_col is not None and credit_col < len(row):
                 credit_str = str(row[credit_col]).strip() if row[credit_col] else ""
@@ -826,21 +823,45 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
             credit = credit if credit and credit > 0 else 0.0
             debit = debit if debit and debit > 0 else 0.0
             
+            # CRITICAL: Detect merged rows (multiple transactions combined into one)
+            # Check if particulars contains multiple transaction codes (merged rows)
+            mps_count = len(re.findall(r'\bMPS\s+\d{12}', particulars or ''))
+            app_count = len(re.findall(r'\bAPP/', particulars or ''))
+            merged_transactions = mps_count + app_count
+            
+            if merged_transactions > 1:
+                log_bank_skip(
+                    "merged_multiple_transactions",
+                    row,
+                    page_number=page_number,
+                    row_offset=row_offset,
+                    table_index=table_index,
+                    extra={
+                        'credit': credit, 
+                        'merged_transaction_count': merged_transactions
+                    }
+                )
+                continue
+            
             # CRITICAL: Detect implausibly large amounts that are likely running balances
-            # If credit > 500,000 AND row contains balance-related context, skip it
             if credit > 500000:
                 row_context = ' '.join([str(c) for c in row if c]).upper()
                 balance_context_keywords = [
                     "BALANCE", "CLOSING", "OPENING", "SUMMARY", "TOTAL", "B/F", "C/F"
                 ]
-                if any(keyword in row_context for keyword in balance_context_keywords):
+                has_balance_keyword = any(keyword in row_context for keyword in balance_context_keywords)
+                
+                if has_balance_keyword:
                     log_bank_skip(
                         "implausibly_large_amount_with_balance_context",
                         row,
                         page_number=page_number,
                         row_offset=row_offset,
                         table_index=table_index,
-                        extra={'credit': credit, 'context_keywords': [k for k in balance_context_keywords if k in row_context]}
+                        extra={
+                            'credit': credit, 
+                            'has_balance_keywords': has_balance_keyword
+                        }
                     )
                     continue
             

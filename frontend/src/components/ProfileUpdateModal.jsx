@@ -23,11 +23,16 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
     email: '',
     id_number: '',
     church: '',
+    next_of_kin_name: '',
+    next_of_kin_phone: '',
+    next_of_kin_relationship: '',
   })
   const [phoneCountryCode, setPhoneCountryCode] = useState('+254')
   const [whatsappCountryCode, setWhatsappCountryCode] = useState('+254')
+  const [nextOfKinCountryCode, setNextOfKinCountryCode] = useState('+254')
   const [phoneNumber, setPhoneNumber] = useState('')
   const [whatsappNumber, setWhatsappNumber] = useState('')
+  const [nextOfKinNumber, setNextOfKinNumber] = useState('')
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -61,11 +66,14 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
       
       const parsedPhone = parsePhone(initialData.phone)
       const parsedWhatsapp = parsePhone(initialData.secondary_phone)
+      const parsedNextOfKin = parsePhone(initialData.next_of_kin_phone)
       
       setPhoneCountryCode(parsedPhone.code)
       setPhoneNumber(parsedPhone.number)
       setWhatsappCountryCode(parsedWhatsapp.code)
       setWhatsappNumber(parsedWhatsapp.number)
+      setNextOfKinCountryCode(parsedNextOfKin.code)
+      setNextOfKinNumber(parsedNextOfKin.number)
       
       setFormData({
         name: initialData.name || '',
@@ -74,6 +82,9 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
         email: initialData.email || '',
         id_number: initialData.id_number || '',
         church: initialData.church || '',
+        next_of_kin_name: initialData.next_of_kin_name || '',
+        next_of_kin_phone: parsedNextOfKin.number ? parsedNextOfKin.code + parsedNextOfKin.number : '',
+        next_of_kin_relationship: initialData.next_of_kin_relationship || '',
       })
     }
   }, [initialData])
@@ -129,6 +140,25 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
     setFormData((prev) => ({ ...prev, secondary_phone: whatsappNumber ? code + whatsappNumber : '' }))
   }
 
+  const handleNextOfKinNumberChange = (e) => {
+    const value = e.target.value.replace(/\D/g, '') // Only digits
+    setNextOfKinNumber(value)
+    setFormData((prev) => ({ ...prev, next_of_kin_phone: value ? nextOfKinCountryCode + value : '' }))
+    if (errors.next_of_kin_phone) {
+      setErrors((prev) => {
+        const newErrors = { ...prev }
+        delete newErrors.next_of_kin_phone
+        return newErrors
+      })
+    }
+  }
+
+  const handleNextOfKinCountryCodeChange = (e) => {
+    const code = e.target.value
+    setNextOfKinCountryCode(code)
+    setFormData((prev) => ({ ...prev, next_of_kin_phone: nextOfKinNumber ? code + nextOfKinNumber : '' }))
+  }
+
   const validate = () => {
     const newErrors = {}
 
@@ -168,6 +198,19 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
     
     if (!formData.church.trim()) {
       newErrors.church = 'Church is required'
+    }
+    
+    // Next of kin validation (all optional, but if one is filled, validate properly)
+    if (formData.next_of_kin_phone) {
+      if (!/^\+\d{1,4}\d{6,14}$/.test(formData.next_of_kin_phone)) {
+        newErrors.next_of_kin_phone = 'Please enter a valid international phone number'
+      } else if (!nextOfKinNumber.trim()) {
+        newErrors.next_of_kin_phone = 'Please enter the number after selecting country code'
+      }
+    }
+    
+    if (formData.next_of_kin_phone && !formData.next_of_kin_name.trim()) {
+      newErrors.next_of_kin_name = 'Next of kin name is required when contact is provided'
     }
 
     setErrors(newErrors)
@@ -397,6 +440,103 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
               placeholder="Enter your church name"
             />
             {errors.church && <p className="mt-1 text-sm text-red-600">{errors.church}</p>}
+          </div>
+
+          {/* Next of Kin Section */}
+          <div className="border-t pt-6 mt-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Next of Kin Information</h3>
+            <p className="text-sm text-gray-500 mb-4">Optional: Provide emergency contact information</p>
+            
+            <div className="space-y-4">
+              {/* Next of Kin Name */}
+              <div>
+                <label htmlFor="next_of_kin_name" className="block text-sm font-semibold text-gray-700 mb-2">
+                  Next of Kin Name <span className="text-gray-400 text-xs">(Optional)</span>
+                </label>
+                <input
+                  type="text"
+                  id="next_of_kin_name"
+                  name="next_of_kin_name"
+                  value={formData.next_of_kin_name}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
+                    errors.next_of_kin_name ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                  placeholder="Enter next of kin full name"
+                />
+                {errors.next_of_kin_name && <p className="mt-1 text-sm text-red-600">{errors.next_of_kin_name}</p>}
+              </div>
+
+              {/* Next of Kin Contact */}
+              <div>
+                <label htmlFor="next_of_kin_phone" className="block text-sm font-semibold text-gray-700 mb-2">
+                  Next of Kin Contact <span className="text-gray-400 text-xs">(Optional)</span>
+                </label>
+                <div className="flex gap-2">
+                  <select
+                    value={nextOfKinCountryCode}
+                    onChange={handleNextOfKinCountryCodeChange}
+                    className="px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-sm font-medium"
+                    style={{ minWidth: '140px' }}
+                  >
+                    {COUNTRY_CODES.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.flag} {c.code}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="tel"
+                    id="next_of_kin_phone"
+                    name="next_of_kin_phone_number"
+                    value={nextOfKinNumber}
+                    onChange={handleNextOfKinNumberChange}
+                    className={`flex-1 px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
+                      errors.next_of_kin_phone ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="712345678"
+                  />
+                </div>
+                {errors.next_of_kin_phone && <p className="mt-1 text-sm text-red-600">{errors.next_of_kin_phone}</p>}
+                <p className="mt-1 text-xs text-gray-500">
+                  {nextOfKinNumber ? (
+                    <>Full number: <strong>{nextOfKinCountryCode}{nextOfKinNumber}</strong></>
+                  ) : (
+                    'Optional field'
+                  )}
+                </p>
+              </div>
+
+              {/* Next of Kin Relationship */}
+              <div>
+                <label htmlFor="next_of_kin_relationship" className="block text-sm font-semibold text-gray-700 mb-2">
+                  Relationship <span className="text-gray-400 text-xs">(Optional)</span>
+                </label>
+                <select
+                  id="next_of_kin_relationship"
+                  name="next_of_kin_relationship"
+                  value={formData.next_of_kin_relationship}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
+                    errors.next_of_kin_relationship ? 'border-red-500' : 'border-gray-300'
+                  }`}
+                >
+                  <option value="">Select relationship</option>
+                  <option value="wife">Wife</option>
+                  <option value="husband">Husband</option>
+                  <option value="brother">Brother</option>
+                  <option value="sister">Sister</option>
+                  <option value="father">Father</option>
+                  <option value="mother">Mother</option>
+                  <option value="son">Son</option>
+                  <option value="daughter">Daughter</option>
+                  <option value="cousin">Cousin</option>
+                  <option value="friend">Friend</option>
+                  <option value="other">Other</option>
+                </select>
+                {errors.next_of_kin_relationship && <p className="mt-1 text-sm text-red-600">{errors.next_of_kin_relationship}</p>}
+              </div>
+            </div>
           </div>
 
           {/* Actions */}

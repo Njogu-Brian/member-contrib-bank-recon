@@ -326,6 +326,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/audits/{auditRun}/reanalyze', [AuditController::class, 'reanalyze']);
         Route::delete('/audits/{auditRun}', [AuditController::class, 'destroy']);
         Route::get('/audits/member/{member}', [AuditController::class, 'memberResults']);
+        Route::post('/audits/statements', [AuditController::class, 'auditStatements']);
 
         // Admin Management (under /v1/admin/admin/*)
         Route::prefix('admin')->group(function () {

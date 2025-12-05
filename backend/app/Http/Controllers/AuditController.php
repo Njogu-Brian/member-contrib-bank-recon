@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AuditExpenseLink;
 use App\Models\AuditRow;
 use App\Models\AuditRun;
+use App\Models\BankStatement;
 use App\Models\Expense;
 use App\Models\Member;
 use App\Models\Transaction;
@@ -12,6 +13,7 @@ use App\Models\TransactionSplit;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -704,5 +706,219 @@ class AuditController extends Controller
                 ];
             })->values(),
         ];
+    }
+
+    /**
+     * Audit statements by re-parsing them with the new parser and comparing with existing transactions
+     */
+    public function auditStatements(Request $request)
+    {
+        $statementId = $request->get('statement_id');
+        
+        $statements = $statementId 
+            ? BankStatement::where('id', $statementId)->get()
+            : BankStatement::where('status', 'completed')->get();
+        
+        if ($statements->isEmpty()) {
+            return response()->json([
+                'message' => 'No statements found to audit',
+                'results' => [],
+            ]);
+        }
+        
+        $results = [];
+        
+        foreach ($statements as $statement) {
+            try {
+                $auditResult = $this->auditStatement($statement);
+                $results[] = $auditResult;
+            } catch (\Exception $e) {
+                Log::error("Error auditing statement {$statement->id}: " . $e->getMessage());
+                $results[] = [
+                    'statement_id' => $statement->id,
+                    'filename' => $statement->filename,
+                    'status' => 'error',
+                    'error' => $e->getMessage(),
+                    'anomalies' => [],
+                ];
+            }
+        }
+        
+        return response()->json([
+            'message' => 'Statement audit completed',
+            'total_statements' => count($results),
+            'results' => $results,
+        ]);
+    }
+    
+    /**
+     * Audit a single statement by re-parsing and comparing
+     */
+    protected function auditStatement(BankStatement $statement): array
+    {
+        $filePath = Storage::disk('statements')->path($statement->file_path);
+        
+        if (!file_exists($filePath)) {
+            return [
+                'statement_id' => $statement->id,
+                'filename' => $statement->filename,
+                'status' => 'error',
+                'error' => 'Statement file not found',
+                'anomalies' => [],
+            ];
+        }
+        
+        // Re-parse the statement using the Python parser
+        $parserOutput = $this->reparseStatement($filePath);
+        
+        // Get existing transactions for this statement
+        $existingTransactions = $statement->transactions()
+            ->where('is_archived', false)
+            ->get()
+            ->keyBy(function ($txn) {
+                // Create a unique key: date|particulars|credit
+                $date = $txn->value_date ?? $txn->tran_date;
+                $dateStr = $date ? $date->format('Y-m-d') : '';
+                $particulars = trim($txn->particulars ?? '');
+                $credit = number_format((float)($txn->credit ?? 0), 2, '.', '');
+                return $dateStr . '|' . $particulars . '|' . $credit;
+            });
+        
+        // Compare parsed transactions with existing
+        $anomalies = [];
+        $parsedCount = count($parserOutput);
+        $existingCount = $existingTransactions->count();
+        
+        // Check for missing transactions (in parser but not in DB)
+        $parsedKeys = [];
+        foreach ($parserOutput as $parsed) {
+            $date = $parsed['tran_date'] ?? $parsed['value_date'] ?? null;
+            $dateStr = $date ? (is_string($date) ? $date : date('Y-m-d', strtotime($date))) : '';
+            $particulars = trim($parsed['particulars'] ?? '');
+            $credit = number_format((float)($parsed['credit'] ?? 0), 2, '.', '');
+            $key = $dateStr . '|' . $particulars . '|' . $credit;
+            $parsedKeys[] = $key;
+            
+            if (!$existingTransactions->has($key)) {
+                $anomalies[] = [
+                    'type' => 'missing_in_db',
+                    'transaction' => [
+                        'date' => $dateStr,
+                        'particulars' => substr($particulars, 0, 100),
+                        'credit' => $credit,
+                    ],
+                    'message' => 'Transaction found in parser but not in database',
+                ];
+            }
+        }
+        
+        // Check for extra transactions (in DB but not in parser)
+        foreach ($existingTransactions as $key => $txn) {
+            if (!in_array($key, $parsedKeys)) {
+                $anomalies[] = [
+                    'type' => 'extra_in_db',
+                    'transaction' => [
+                        'id' => $txn->id,
+                        'date' => ($txn->value_date ?? $txn->tran_date)?->format('Y-m-d'),
+                        'particulars' => substr($txn->particulars, 0, 100),
+                        'credit' => number_format((float)($txn->credit ?? 0), 2, '.', ''),
+                    ],
+                    'message' => 'Transaction in database but not found by parser',
+                ];
+            }
+        }
+        
+        // Calculate totals
+        $parsedTotal = array_sum(array_column($parserOutput, 'credit'));
+        $existingTotal = $existingTransactions->sum('credit');
+        $totalDiff = abs($parsedTotal - $existingTotal);
+        
+        $status = 'pass';
+        if (count($anomalies) > 0 || $totalDiff > 0.5) {
+            $status = 'fail';
+        } elseif ($parsedCount !== $existingCount) {
+            $status = 'warning';
+        }
+        
+        return [
+            'statement_id' => $statement->id,
+            'filename' => $statement->filename,
+            'status' => $status,
+            'parsed_count' => $parsedCount,
+            'existing_count' => $existingCount,
+            'parsed_total' => round($parsedTotal, 2),
+            'existing_total' => round($existingTotal, 2),
+            'total_difference' => round($totalDiff, 2),
+            'anomalies' => $anomalies,
+            'anomaly_count' => count($anomalies),
+        ];
+    }
+    
+    /**
+     * Re-parse a statement using the Python parser
+     */
+    protected function reparseStatement(string $filePath): array
+    {
+        // base_path() returns the backend directory, so we need to go up one level
+        $projectRoot = dirname(base_path());
+        $parserScript = $projectRoot . DIRECTORY_SEPARATOR . 'ocr-parser' . DIRECTORY_SEPARATOR . 'parse_pdf.py';
+        $outputFile = storage_path('app/temp_audit_' . uniqid() . '.json');
+        
+        // Check if parser script exists
+        if (!file_exists($parserScript)) {
+            throw new \Exception("Parser script not found at: {$parserScript}");
+        }
+        
+        // Run Python parser
+        // Use proc_open for better control over arguments, especially for Windows paths with spaces
+        $descriptorspec = [
+            0 => ['pipe', 'r'],  // stdin
+            1 => ['pipe', 'w'],  // stdout
+            2 => ['pipe', 'w'],  // stderr
+        ];
+        
+        $process = proc_open(
+            [
+                'python',
+                $parserScript,
+                $filePath,
+                '--output',
+                $outputFile,
+            ],
+            $descriptorspec,
+            $pipes
+        );
+        
+        if (!is_resource($process)) {
+            throw new \Exception('Failed to start Python parser process');
+        }
+        
+        // Close stdin
+        fclose($pipes[0]);
+        
+        // Read stdout and stderr
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        
+        // Get exit code
+        $returnCode = proc_close($process);
+        
+        if ($returnCode !== 0 || !file_exists($outputFile)) {
+            $errorMessage = trim($stderr ?: $stdout ?: 'Unknown error');
+            throw new \Exception('Failed to parse statement: ' . $errorMessage);
+        }
+        
+        $parsedData = json_decode(file_get_contents($outputFile), true);
+        
+        // Clean up temp file
+        @unlink($outputFile);
+        
+        if (!is_array($parsedData)) {
+            throw new \Exception('Invalid parser output');
+        }
+        
+        return $parsedData;
     }
 }

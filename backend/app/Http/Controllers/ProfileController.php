@@ -41,6 +41,9 @@ class ProfileController extends Controller
                     'email' => $member->email,
                     'id_number' => $member->id_number,
                     'church' => $member->church,
+                    'next_of_kin_name' => $member->next_of_kin_name,
+                    'next_of_kin_phone' => $member->next_of_kin_phone,
+                    'next_of_kin_relationship' => $member->next_of_kin_relationship,
                     'member_code' => $member->member_code,
                     'member_number' => $member->member_number,
                 ],
@@ -74,9 +77,13 @@ class ProfileController extends Controller
             'email' => 'required|email|max:255',
             'id_number' => ['required', 'string', 'regex:/^\d+$/', 'min:5', 'max:20'],
             'church' => 'required|string|max:255',
+            'next_of_kin_name' => 'nullable|string|max:255',
+            'next_of_kin_phone' => ['nullable', 'string', 'max:20', 'regex:/^\+\d{1,4}\d{6,14}$/'],
+            'next_of_kin_relationship' => 'nullable|string|max:255|in:wife,husband,brother,sister,father,mother,son,daughter,cousin,friend,other',
         ], [
             'phone.regex' => 'Phone number must start with + followed by country code and number (e.g., +254712345678)',
             'secondary_phone.regex' => 'WhatsApp number must start with + followed by country code and number',
+            'next_of_kin_phone.regex' => 'Next of kin phone number must start with + followed by country code and number',
             'id_number.regex' => 'ID Number must contain only digits',
             'id_number.min' => 'ID Number must be at least 5 digits',
         ]);
@@ -96,6 +103,9 @@ class ProfileController extends Controller
             'email' => $request->email,
             'id_number' => $request->id_number,
             'church' => $request->church,
+            'next_of_kin_name' => $request->next_of_kin_name,
+            'next_of_kin_phone' => $request->next_of_kin_phone,
+            'next_of_kin_relationship' => $request->next_of_kin_relationship,
         ]);
 
         // Mark profile as complete if all required fields are filled

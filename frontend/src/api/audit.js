@@ -38,3 +38,8 @@ export const getMemberAuditResults = async (memberId, params = {}) => {
   const response = await api.get(`/admin/audits/member/${memberId}`, { params })
   return response.data
 }
+
+export const auditStatements = async (statementId = null) => {
+  const response = await api.post('/admin/audits/statements', { statement_id: statementId })
+  return response.data
+}

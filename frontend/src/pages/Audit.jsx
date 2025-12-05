@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { deleteAuditRun, getAuditRun, getAuditRuns, reanalyzeAuditRun, uploadAuditWorkbook } from '../api/audit'
+import { auditStatements, deleteAuditRun, getAuditRun, getAuditRuns, reanalyzeAuditRun, uploadAuditWorkbook } from '../api/audit'
 
 const currency = (value = 0) => new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(value || 0)
 
@@ -65,6 +65,18 @@ export default function Audit() {
       alert('Audit deleted.')
     },
     onError: () => alert('Failed to delete audit.'),
+  })
+
+  const [statementAuditResults, setStatementAuditResults] = useState(null)
+  const statementAuditMutation = useMutation({
+    mutationFn: (statementId) => auditStatements(statementId),
+    onSuccess: (data) => {
+      setStatementAuditResults(data)
+    },
+    onError: (error) => {
+      const message = error.response?.data?.message || 'Failed to audit statements.'
+      alert(message)
+    },
   })
 
   const handleSubmit = (event) => {
@@ -139,6 +151,141 @@ export default function Audit() {
           </button>
         </div>
       </form>
+
+      {/* Statement Audit Section */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <div className="border-b pb-4 mb-4">
+          <h2 className="text-2xl font-semibold text-gray-900">Statement Audit</h2>
+          <p className="text-sm text-gray-500 mt-1">
+            Re-parse existing statements with the new parser and compare with database transactions to identify any anomalies.
+          </p>
+        </div>
+        
+        <div className="flex justify-between items-center mb-4">
+          <p className="text-sm text-gray-600">
+            This will re-parse all completed statements and check for mismatches between the parser output and existing transactions.
+          </p>
+          <button
+            onClick={() => statementAuditMutation.mutate(null)}
+            disabled={statementAuditMutation.isPending}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
+          >
+            {statementAuditMutation.isPending ? 'Auditing...' : 'Run Statement Audit'}
+          </button>
+        </div>
+
+        {statementAuditResults && (
+          <div className="mt-6 space-y-4">
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <p className="text-sm text-gray-500">Total Statements</p>
+                  <p className="text-2xl font-semibold">{statementAuditResults.total_statements}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Passed</p>
+                  <p className="text-2xl font-semibold text-green-600">
+                    {statementAuditResults.results.filter(r => r.status === 'pass').length}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Failed</p>
+                  <p className="text-2xl font-semibold text-red-600">
+                    {statementAuditResults.results.filter(r => r.status === 'fail').length}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Warnings</p>
+                  <p className="text-2xl font-semibold text-yellow-600">
+                    {statementAuditResults.results.filter(r => r.status === 'warning').length}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {statementAuditResults.results.map((result) => (
+                <div
+                  key={result.statement_id}
+                  className={`border rounded-lg p-4 ${
+                    result.status === 'pass' ? 'bg-green-50 border-green-200' :
+                    result.status === 'fail' ? 'bg-red-50 border-red-200' :
+                    'bg-yellow-50 border-yellow-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="font-semibold text-gray-900">{result.filename}</h3>
+                        <span
+                          className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            result.status === 'pass' ? 'bg-green-100 text-green-800' :
+                            result.status === 'fail' ? 'bg-red-100 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
+                          }`}
+                        >
+                          {result.status.toUpperCase()}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-500">Parsed Count</p>
+                          <p className="font-semibold">{result.parsed_count}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Existing Count</p>
+                          <p className="font-semibold">{result.existing_count}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Total Difference</p>
+                          <p className={`font-semibold ${result.total_difference > 0.5 ? 'text-red-600' : 'text-gray-900'}`}>
+                            {currency(result.total_difference)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Anomalies</p>
+                          <p className={`font-semibold ${result.anomaly_count > 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                            {result.anomaly_count}
+                          </p>
+                        </div>
+                      </div>
+
+                      {result.anomalies && result.anomalies.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-sm font-semibold text-gray-700 mb-2">Anomalies Found:</p>
+                          <div className="space-y-2">
+                            {result.anomalies.slice(0, 5).map((anomaly, idx) => (
+                              <div key={idx} className="bg-white rounded p-2 text-xs">
+                                <p className="font-semibold text-red-600">{anomaly.type.replace('_', ' ').toUpperCase()}</p>
+                                <p className="text-gray-600">{anomaly.message}</p>
+                                {anomaly.transaction && (
+                                  <p className="text-gray-500 mt-1">
+                                    {anomaly.transaction.date} | {anomaly.transaction.particulars} | {currency(anomaly.transaction.credit)}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                            {result.anomalies.length > 5 && (
+                              <p className="text-xs text-gray-500">... and {result.anomalies.length - 5} more</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {result.error && (
+                        <div className="mt-2 text-sm text-red-600">
+                          <strong>Error:</strong> {result.error}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
         <div className="space-y-6">

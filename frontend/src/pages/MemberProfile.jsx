@@ -171,6 +171,9 @@ export default function MemberProfile() {
         email: member.email || '',
         id_number: member.id_number || '',
         church: member.church || '',
+        next_of_kin_name: member.next_of_kin_name || '',
+        next_of_kin_phone: member.next_of_kin_phone || '',
+        next_of_kin_relationship: member.next_of_kin_relationship || '',
         member_number: member.member_number || '',
         notes: member.notes || '',
         is_active: member.is_active ?? true,
@@ -434,6 +437,21 @@ export default function MemberProfile() {
             <label className="text-sm font-medium text-gray-500">Church</label>
             <p className="text-gray-900">{member.church || <span className="text-gray-400">Not set</span>}</p>
           </div>
+          {member.next_of_kin_name && (
+            <div>
+              <label className="text-sm font-medium text-gray-500">Next of Kin</label>
+              <p className="text-gray-900">{member.next_of_kin_name}</p>
+              {member.next_of_kin_relationship && (
+                <p className="text-xs text-gray-500">({member.next_of_kin_relationship})</p>
+              )}
+            </div>
+          )}
+          {member.next_of_kin_phone && (
+            <div>
+              <label className="text-sm font-medium text-gray-500">Next of Kin Contact</label>
+              <p className="text-gray-900">{member.next_of_kin_phone}</p>
+            </div>
+          )}
           <div>
             <label className="text-sm font-medium text-gray-500">Member Number</label>
             <p className="text-gray-900 font-mono bg-gray-100 px-2 py-1 rounded">{member.member_number || '-'}</p>
@@ -1290,6 +1308,59 @@ export default function MemberProfile() {
                       placeholder="Church name"
                     />
                     <p className="mt-1 text-xs text-gray-500">Required for profile completion</p>
+                  </div>
+                  
+                  {/* Next of Kin Section */}
+                  <div className="border-t border-gray-200 pt-4 mt-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">Next of Kin Information</h4>
+                    <p className="text-xs text-gray-500 mb-3">Optional: Provide emergency contact information</p>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Next of Kin Name</label>
+                        <input
+                          type="text"
+                          value={formData.next_of_kin_name || ''}
+                          onChange={(e) => setFormData({ ...formData, next_of_kin_name: e.target.value })}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          placeholder="Enter next of kin full name"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Next of Kin Contact</label>
+                        <input
+                          type="text"
+                          value={formData.next_of_kin_phone || ''}
+                          onChange={(e) => setFormData({ ...formData, next_of_kin_phone: e.target.value })}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                          placeholder="+254712345678"
+                        />
+                        <p className="mt-1 text-xs text-gray-500">Format: +254712345678 (with country code)</p>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Relationship</label>
+                        <select
+                          value={formData.next_of_kin_relationship || ''}
+                          onChange={(e) => setFormData({ ...formData, next_of_kin_relationship: e.target.value })}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        >
+                          <option value="">Select relationship</option>
+                          <option value="wife">Wife</option>
+                          <option value="husband">Husband</option>
+                          <option value="brother">Brother</option>
+                          <option value="sister">Sister</option>
+                          <option value="father">Father</option>
+                          <option value="mother">Mother</option>
+                          <option value="son">Son</option>
+                          <option value="daughter">Daughter</option>
+                          <option value="cousin">Cousin</option>
+                          <option value="friend">Friend</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
                   
                   {/* Divider */}

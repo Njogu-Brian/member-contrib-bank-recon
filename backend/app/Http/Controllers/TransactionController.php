@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Member;
+use App\Models\StatementDuplicate;
 use App\Models\Transaction;
 use App\Models\TransactionMatchLog;
 use App\Models\TransactionSplit;
@@ -275,7 +276,7 @@ class TransactionController extends Controller
         $transactions = Transaction::whereIn('assignment_status', ['unassigned', 'draft', 'flagged'])
             ->where('is_archived', false)
             ->where('credit', '>', 0)
-            ->with(['member'])
+            ->with(['member', 'bankStatement'])
             ->get();
 
         if ($transactions->isEmpty()) {
@@ -288,6 +289,38 @@ class TransactionController extends Controller
                     ->where('credit', '>', 0)
                     ->count(),
                 'total_processed' => 0,
+                'duplicates_archived' => 0,
+            ]);
+        }
+
+        // Check for duplicates BEFORE auto-assignment
+        // Duplicates are identified by: value_date + particulars + credit (100% match)
+        $duplicatesArchived = $this->checkAndArchiveDuplicates($transactions);
+        
+        // Refresh transactions to exclude any that were just archived
+        $transactions = $transactions->filter(function ($transaction) {
+            return !$transaction->is_archived;
+        });
+        
+        // Re-fetch from database to ensure we have the latest state
+        $transactions = Transaction::whereIn('id', $transactions->pluck('id'))
+            ->where('is_archived', false)
+            ->whereIn('assignment_status', ['unassigned', 'draft', 'flagged'])
+            ->where('credit', '>', 0)
+            ->with(['member', 'bankStatement'])
+            ->get();
+
+        if ($transactions->isEmpty()) {
+            return response()->json([
+                'message' => 'No transactions eligible for auto-assignment after duplicate check',
+                'auto_assigned' => 0,
+                'draft_assigned' => 0,
+                'unassigned' => Transaction::where('assignment_status', 'unassigned')
+                    ->where('is_archived', false)
+                    ->where('credit', '>', 0)
+                    ->count(),
+                'total_processed' => 0,
+                'duplicates_archived' => $duplicatesArchived,
             ]);
         }
 
@@ -395,7 +428,117 @@ class TransactionController extends Controller
             'draft_assigned' => $draftAssigned,
             'unassigned' => $unassigned,
             'total_processed' => $processed,
+            'duplicates_archived' => $duplicatesArchived,
         ]);
+    }
+
+    /**
+     * Check for duplicate transactions and archive the older ones.
+     * Duplicates are identified by: value_date + particulars + credit (100% exact match)
+     * The transaction from the latest statement is kept, older ones are archived.
+     *
+     * @param \Illuminate\Database\Eloquent\Collection $transactions
+     * @return int Number of duplicates archived
+     */
+    protected function checkAndArchiveDuplicates($transactions): int
+    {
+        $duplicatesArchived = 0;
+        $processedKeys = []; // Track processed duplicate groups to avoid double-processing
+        
+        // Get all unarchived transactions for duplicate checking
+        $allTransactions = Transaction::where('is_archived', false)
+            ->where('credit', '>', 0)
+            ->with('bankStatement')
+            ->get();
+        
+        // Group all transactions by value_date + particulars + credit
+        $grouped = $allTransactions->groupBy(function ($transaction) {
+            // Use value_date if available, otherwise fall back to tran_date
+            $date = $transaction->value_date ?? $transaction->tran_date;
+            if (!$date) {
+                return null; // Skip transactions without a date
+            }
+            
+            // Normalize particulars (trim whitespace for exact match)
+            $particulars = trim($transaction->particulars ?? '');
+            if (empty($particulars)) {
+                return null; // Skip transactions without particulars
+            }
+            
+            // Credit amount (exact match required)
+            $credit = number_format((float)($transaction->credit ?? 0), 2, '.', '');
+            
+            // Create unique key: date|particulars|credit
+            return $date->format('Y-m-d') . '|' . $particulars . '|' . $credit;
+        })->filter(); // Remove null keys
+        
+        foreach ($grouped as $key => $group) {
+            // Only process groups with more than one transaction (duplicates)
+            if ($group->count() <= 1) {
+                continue;
+            }
+            
+            // Skip if already processed
+            if (isset($processedKeys[$key])) {
+                continue;
+            }
+            
+            $processedKeys[$key] = true;
+            
+            // Sort by statement ID (higher ID = newer statement)
+            // Keep the transaction from the latest statement
+            $sorted = $group->sortByDesc(function ($transaction) {
+                return $transaction->bank_statement_id ?? 0;
+            });
+            
+            $latest = $sorted->first();
+            $toArchive = $sorted->skip(1);
+            
+            foreach ($toArchive as $duplicate) {
+                // Skip if already archived (safety check)
+                if ($duplicate->is_archived) {
+                    continue;
+                }
+                
+                // Archive the older duplicate
+                $duplicate->update([
+                    'assignment_status' => 'duplicate',
+                    'is_archived' => true,
+                ]);
+                
+                // Record in statement_duplicates table
+                StatementDuplicate::updateOrCreate(
+                    [
+                        'bank_statement_id' => $duplicate->bank_statement_id,
+                        'transaction_id' => $latest->id,
+                        'tran_date' => $duplicate->tran_date,
+                        'transaction_code' => $duplicate->transaction_code,
+                    ],
+                    [
+                        'credit' => $duplicate->credit,
+                        'duplicate_reason' => 'auto_assign_duplicate',
+                        'particulars_snapshot' => $duplicate->particulars,
+                        'metadata' => [
+                            'duplicate_transaction_id' => $duplicate->id,
+                            'existing_statement_id' => $latest->bank_statement_id,
+                            'match_criteria' => 'value_date_particulars_credit_100_percent',
+                        ],
+                    ]
+                );
+                
+                $duplicatesArchived++;
+                
+                Log::info('Duplicate transaction archived during auto-assign', [
+                    'duplicate_id' => $duplicate->id,
+                    'kept_id' => $latest->id,
+                    'value_date' => $duplicate->value_date?->format('Y-m-d') ?? $duplicate->tran_date?->format('Y-m-d'),
+                    'particulars' => substr($duplicate->particulars, 0, 100),
+                    'credit' => $duplicate->credit,
+                ]);
+            }
+        }
+        
+        return $duplicatesArchived;
     }
 
     protected function evaluateMatchingServiceResult(array $matches): ?array

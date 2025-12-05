@@ -46,58 +46,19 @@ class ProcessBankStatement implements ShouldQueue
                     continue;
                 }
 
-                // Check duplicate by transaction code
-                if (!empty($normalized['transaction_code'])) {
-                    $existingByCode = Transaction::where('transaction_code', $normalized['transaction_code'])->first();
-                    if ($existingByCode) {
-                        $duplicateCount++;
-                        $this->recordDuplicate('transaction_code', $transactionData, $normalized, $existingByCode);
-                        continue;
-                    }
-                }
+                // DISABLED: Duplicate detection during parsing removed per user request
+                // ALL transactions are now saved to transactions table
+                // Duplicate detection will happen ONLY during auto-assign process
+                // This ensures:
+                // 1. Total credits match PDF statement (e.g., KES 913,600)
+                // 2. All transactions available for accurate narrative extraction
+                // 3. Duplicates only archived when user clicks auto-assign
 
-                // Check for duplicates using value_date + particulars + credit ONLY
-                // Do NOT use remarks, debit, or transaction_code for duplicate detection
-                if (empty($normalized['transaction_code'])) {
-                    $normalizedParticularsKey = $this->normalizeParticularsForDuplicate($normalized['particulars'] ?? '');
-                    $valueDate = $normalized['value_date'] ?? $normalized['tran_date'];
-                    $possibleDuplicate = Transaction::query()
-                        ->whereDate('value_date', $valueDate)
-                        ->where('credit', $normalized['credit'])
-                        ->where('bank_statement_id', '!=', $this->bankStatement->id)
-                        ->get()
-                        ->first(function ($existing) use ($normalizedParticularsKey) {
-                            return $this->normalizeParticularsForDuplicate($existing->particulars) === $normalizedParticularsKey;
-                        });
-
-                    if ($possibleDuplicate) {
-                        $duplicateCount++;
-                        $this->recordDuplicate('cross_statement', $transactionData, $normalized, $possibleDuplicate);
-                        continue;
-                    }
-                }
-
-                // Create row hash for duplicate detection
+                // Create row hash for future duplicate detection (during auto-assign)
                 $rowHash = $this->createRowHash($normalized);
 
-                // Check for duplicates
-                $existingByHash = Transaction::where('row_hash', $rowHash)->first();
-                if ($existingByHash) {
-                    $duplicateCount++;
-                    $this->recordDuplicate(
-                        $existingByHash->bank_statement_id === $this->bankStatement->id ? 'same_statement' : 'row_hash',
-                        $transactionData,
-                        $normalized,
-                        $existingByHash
-                    );
-                    continue;
-                }
-
-                // Check if transaction should be flagged (large amount)
+                // All transactions default to unassigned
                 $assignmentStatus = 'unassigned';
-                if (isset($transactionData['flagged']) && $transactionData['flagged']) {
-                    $assignmentStatus = 'flagged';
-                }
                 
                 // Store transaction
                 Transaction::create([
