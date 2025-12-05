@@ -464,12 +464,16 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
                 )
                 continue
             
-            # Skip footer sections
+            # Skip footer sections and statement summaries
             footer_keywords = [
                 "GRAND TOTAL", "TOTAL", "NOTE:", "ANY OMISSION", "ERRORS IN THIS STATEMENT",
                 "BRANCH MANAGER", "PROMPTLY ADVISED", "WITHIN 30 DAYS", "PRESUMED TO BE IN ORDER",
                 "ACCOUNT NO", "CUSTOMER NAME", "HEAD OFFICE", "P.O. BOX", "TEL:", "FAX:", "MOBILE:",
-                "EMAIL:", "EQUITY", "BANK", "STATEMENT", "PAGE"
+                "EMAIL:", "EQUITY", "BANK", "STATEMENT", "PAGE",
+                # CRITICAL: Statement summary keywords to prevent balance rows being parsed as transactions
+                "END OF STATEMENT", "SUMMARY", "OPENING BALANCE", "CLOSING BALANCE",
+                "TOTAL DEBITS", "TOTAL CREDITS", "IMPORTANT NOTICE", "OPENING", "CLOSING",
+                "BROUGHT FORWARD", "CARRIED FORWARD", "BALANCE B/F", "BALANCE C/F"
             ]
             footer_count = sum(1 for keyword in footer_keywords if keyword in row_str)
             # CRITICAL: Skip if "GRAND TOTAL" appears anywhere in the row (even in particulars)
@@ -551,6 +555,14 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
                                 next_cell_str = str(next_cell).strip()
                                 # Skip if it's clearly a date, amount, or header
                                 if next_cell_str and len(next_cell_str) > 0:
+                                    # CRITICAL: Stop merging if we hit summary/footer keywords
+                                    summary_keywords = [
+                                        "END OF STATEMENT", "SUMMARY", "OPENING", "CLOSING", 
+                                        "TOTAL DEBITS", "TOTAL CREDITS", "IMPORTANT NOTICE"
+                                    ]
+                                    if any(keyword in next_cell_str.upper() for keyword in summary_keywords):
+                                        break  # Don't merge summary text into particulars
+                                    
                                     is_date = bool(re.search(r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}', next_cell_str))
                                     is_amount = parse_amount(next_cell_str) is not None
                                     is_header = any(keyword in next_cell_str.upper() for keyword in ["CREDIT", "DEBIT", "BALANCE", "INSTRUMENT"])
@@ -678,9 +690,13 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
             if credit is None and possible_balance_idx is not None and possible_balance_idx < len(row):
                 possible_value = str(row[possible_balance_idx]).strip() if row[possible_balance_idx] else ""
                 if possible_value:
-                    # Skip if the row context explicitly references balance carry forward/backward
+                    # CRITICAL: Skip if the row context references balance, summary, or statement end
                     context_upper = row_str.upper()
-                    if not any(keyword in context_upper for keyword in ["BALANCE", "BAL.", "B/F", "C/F", "CARRIED FORWARD", "BROUGHT FORWARD"]):
+                    balance_indicators = [
+                        "BALANCE", "BAL.", "B/F", "C/F", "CARRIED FORWARD", "BROUGHT FORWARD",
+                        "OPENING", "CLOSING", "SUMMARY", "END OF STATEMENT", "TOTAL DEBITS", "TOTAL CREDITS"
+                    ]
+                    if not any(keyword in context_upper for keyword in balance_indicators):
                         possible_amount = parse_amount(possible_value)
                         if possible_amount and possible_amount > 0:
                             credit = possible_amount
@@ -862,6 +878,9 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
                 )
                 continue
             
+            # Extract transaction code from particulars
+            transaction_code = extract_transaction_code(particulars)
+            
             transaction_data = {
                 'tran_date': parsed_date,
                 'value_date': parsed_date,
@@ -869,7 +888,7 @@ def parse_bank_table(rows, header_row=None, page_number=None, table_index=None):
                 'credit': credit,
                 'debit': debit,
                 'balance': None,
-                'transaction_code': None
+                'transaction_code': transaction_code
             }
             
             transaction_data['page_number'] = page_number
@@ -920,12 +939,16 @@ def detect_table_rows(text, page_number=None, initial_balance=None):
     date_pattern = r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}'
     amount_pattern = r'[\d,]+\.?\d{0,2}'
     
-    # Footer keywords to skip
+    # Footer keywords to skip (including statement summaries)
     footer_keywords = [
         "GRAND TOTAL", "TOTAL", "NOTE:", "ANY OMISSION", "ERRORS IN THIS STATEMENT",
         "BRANCH MANAGER", "PROMPTLY ADVISED", "WITHIN 30 DAYS", "PRESUMED TO BE IN ORDER",
         "ACCOUNT NO", "CUSTOMER NAME", "HEAD OFFICE", "P.O. BOX", "TEL:", "FAX:", "MOBILE:",
-        "EMAIL:", "EQUITY", "BANK", "STATEMENT", "PAGE"
+        "EMAIL:", "EQUITY", "BANK", "STATEMENT", "PAGE",
+        # CRITICAL: Statement summary keywords
+        "END OF STATEMENT", "SUMMARY", "OPENING BALANCE", "CLOSING BALANCE",
+        "TOTAL DEBITS", "TOTAL CREDITS", "IMPORTANT NOTICE", "OPENING", "CLOSING",
+        "BROUGHT FORWARD", "CARRIED FORWARD", "BALANCE B/F", "BALANCE C/F"
     ]
     
     # Header keywords to skip
@@ -971,13 +994,18 @@ def detect_table_rows(text, page_number=None, initial_balance=None):
         
         # Skip footer sections (check for multiple footer keywords)
         footer_count = sum(1 for keyword in footer_keywords if keyword in line_upper)
-        if footer_count >= 2 or any(keyword in line_upper for keyword in ["NOTE:", "ANY OMISSION", "BRANCH MANAGER"]):
+        # CRITICAL: Also check for statement summary keywords
+        summary_indicators = ["END OF STATEMENT", "SUMMARY", "OPENING BALANCE", "CLOSING BALANCE", 
+                              "TOTAL DEBITS", "TOTAL CREDITS", "IMPORTANT NOTICE"]
+        has_summary = any(keyword in line_upper for keyword in summary_indicators)
+        
+        if footer_count >= 2 or has_summary or any(keyword in line_upper for keyword in ["NOTE:", "ANY OMISSION", "BRANCH MANAGER"]):
             log_text_skip(
-                "footer_line",
+                "footer_or_summary_line",
                 line=line,
                 page_number=page_number,
                 line_index=line_index,
-                extra={'footer_keywords_found': footer_count}
+                extra={'footer_keywords_found': footer_count, 'has_summary': has_summary}
             )
             i += 1
             continue
@@ -1342,6 +1370,9 @@ def detect_table_rows(text, page_number=None, initial_balance=None):
             continue
         
         if particulars:
+            # Extract transaction code from particulars
+            transaction_code = extract_transaction_code(particulars)
+            
             transactions.append({
                 'tran_date': tran_date,
                 'value_date': tran_date,
@@ -1349,7 +1380,7 @@ def detect_table_rows(text, page_number=None, initial_balance=None):
                 'credit': credit,
                 'debit': 0.0,
                 'balance': balance_value,
-                'transaction_code': None,
+                'transaction_code': transaction_code,
                 'page_number': page_number,
                 'row_index': line_index,
                 'source': 'text'
@@ -1450,6 +1481,57 @@ def parse_amount(amount_str):
         return round(value, 2)
     except:
         return None
+
+
+def extract_transaction_code(particulars):
+    """
+    Extract transaction code from particulars field.
+    Looks for common patterns like:
+    - TL4SU4EMEF, TL54U4EMEF (M-Pesa transaction codes)
+    - S54508048, S45903272 (Statement reference codes)
+    - Reference numbers at the start or embedded in text
+    """
+    if not particulars:
+        return None
+    
+    particulars_str = str(particulars).strip()
+    
+    # Pattern 1: M-Pesa transaction codes (TL followed by alphanumeric, 8-12 chars)
+    mpesa_match = re.search(r'\b(TL[A-Z0-9]{6,10})\b', particulars_str, re.IGNORECASE)
+    if mpesa_match:
+        return mpesa_match.group(1).upper()
+    
+    # Pattern 2: Statement reference codes (S followed by 8-11 digits)
+    ref_match = re.search(r'\b(S\d{8,11})\b', particulars_str, re.IGNORECASE)
+    if ref_match:
+        return ref_match.group(1).upper()
+    
+    # Pattern 3: Numeric transaction codes (8-15 digits, not phone numbers)
+    # Avoid matching phone numbers (254XXXXXXXXX)
+    numeric_match = re.search(r'\b(?!254)(\d{8,15})\b', particulars_str)
+    if numeric_match:
+        code = numeric_match.group(1)
+        # Exclude if it looks like a phone number
+        if not code.startswith('254') and not code.startswith('0'):
+            return code
+    
+    # Pattern 4: Other alphanumeric codes (like REMITLY reference numbers)
+    # Look for standalone alphanumeric strings (6-15 chars)
+    alphanum_match = re.search(r'\b([A-Z0-9]{8,15})\b', particulars_str, re.IGNORECASE)
+    if alphanum_match:
+        code = alphanum_match.group(1).upper()
+        # Exclude common words/patterns
+        excluded_patterns = ['EVIMERIA', 'INITIATIVE', 'ENTERPRISE', 'REMITLY', 'PAYBILL', 'ACCOUNT']
+        if not any(pattern in code for pattern in excluded_patterns):
+            return code
+    
+    # Pattern 5: Extract first meaningful code-like string from start of particulars
+    # (fallback for cases where code is at the beginning)
+    first_token_match = re.match(r'^([A-Z0-9]{6,15})', particulars_str, re.IGNORECASE)
+    if first_token_match:
+        return first_token_match.group(1).upper()
+    
+    return None
 
 
 def main():
