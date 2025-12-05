@@ -55,3 +55,8 @@ export const exportAllMemberStatements = async (params = {}) => {
   return response
 }
 
+export const getProfileUpdateStatus = async (params = {}) => {
+  const response = await api.get('/admin/members/profile-update-status', { params })
+  return response.data
+}
+

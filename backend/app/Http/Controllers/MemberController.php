@@ -41,6 +41,129 @@ class MemberController extends Controller
         return response()->json($query->paginate($request->get('per_page', 20)));
     }
 
+    /**
+     * Get profile update status for all members
+     */
+    public function profileUpdateStatus(Request $request)
+    {
+        $query = Member::query();
+
+        // Filter by status
+        if ($request->has('status')) {
+            $status = $request->get('status');
+            if ($status === 'completed') {
+                $query->whereNotNull('profile_completed_at');
+            } elseif ($status === 'incomplete') {
+                $query->whereNull('profile_completed_at');
+            }
+        }
+
+        // Filter by active status
+        if ($request->has('is_active')) {
+            $query->where('is_active', $request->boolean('is_active'));
+        }
+
+        // Search
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('member_code', 'like', "%{$search}%");
+            });
+        }
+
+        // Get paginated results
+        $members = $query->orderBy('profile_completed_at', 'desc')
+            ->orderBy('name', 'asc')
+            ->paginate($request->get('per_page', 50));
+
+        // Transform data to include profile status
+        $fieldLabels = [
+            'name' => 'Name',
+            'phone' => 'Phone',
+            'email' => 'Email',
+            'id_number' => 'ID Number',
+            'church' => 'Church',
+            'next_of_kin_name' => 'Next of Kin Name',
+            'next_of_kin_phone' => 'Next of Kin Phone',
+            'next_of_kin_relationship' => 'Next of Kin Relationship',
+        ];
+
+        // Transform data to include profile status
+        $transformedData = $members->getCollection()->map(function ($member) use ($fieldLabels) {
+            $missingFields = $member->getMissingProfileFields();
+            $missingFieldsLabels = array_map(function ($field) use ($fieldLabels) {
+                return $fieldLabels[$field] ?? ucfirst(str_replace('_', ' ', $field));
+            }, $missingFields);
+
+            $profileCompletedAt = null;
+            if ($member->profile_completed_at) {
+                if ($member->profile_completed_at instanceof \Carbon\Carbon) {
+                    $profileCompletedAt = $member->profile_completed_at->toDateTimeString();
+                } else {
+                    $profileCompletedAt = $member->profile_completed_at;
+                }
+            }
+
+            return [
+                'id' => $member->id,
+                'name' => $member->name ?? '',
+                'phone' => $member->phone ?? '',
+                'email' => $member->email ?? '',
+                'member_code' => $member->member_code ?? '',
+                'is_active' => $member->is_active ?? false,
+                'profile_completed_at' => $profileCompletedAt,
+                'is_profile_complete' => $member->isProfileComplete(),
+                'missing_fields' => $missingFieldsLabels,
+                'has_public_token' => !empty($member->public_share_token),
+            ];
+        });
+
+        // Get summary statistics
+        $totalMembers = Member::count();
+        $completedCount = Member::whereNotNull('profile_completed_at')->count();
+        $incompleteCount = Member::whereNull('profile_completed_at')->count();
+        $activeCompleted = Member::where('is_active', true)
+            ->whereNotNull('profile_completed_at')
+            ->count();
+        $activeIncomplete = Member::where('is_active', true)
+            ->whereNull('profile_completed_at')
+            ->count();
+
+        // Return paginated response with statistics
+        // Use standard Laravel pagination response format
+        return response()->json([
+            'data' => $transformedData->values()->all(),
+            'meta' => [
+                'current_page' => $members->currentPage(),
+                'from' => $members->firstItem(),
+                'last_page' => $members->lastPage(),
+                'per_page' => $members->perPage(),
+                'to' => $members->lastItem(),
+                'total' => $members->total(),
+            ],
+            'links' => [
+                'first' => $members->url(1),
+                'last' => $members->url($members->lastPage()),
+                'prev' => $members->previousPageUrl(),
+                'next' => $members->nextPageUrl(),
+            ],
+            'statistics' => [
+                'total_members' => $totalMembers,
+                'completed' => $completedCount,
+                'incomplete' => $incompleteCount,
+                'active_completed' => $activeCompleted,
+                'active_incomplete' => $activeIncomplete,
+                'completion_rate' => $totalMembers > 0 ? round(($completedCount / $totalMembers) * 100, 2) : 0,
+                'active_completion_rate' => ($activeCompleted + $activeIncomplete) > 0 
+                    ? round(($activeCompleted / ($activeCompleted + $activeIncomplete)) * 100, 2) 
+                    : 0,
+            ],
+        ]);
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([

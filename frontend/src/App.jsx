@@ -5,6 +5,7 @@ import ResetPassword from './pages/ResetPassword'
 import ChangePassword from './pages/ChangePassword'
 import Dashboard from './pages/Dashboard'
 import Members from './pages/Members'
+import ProfileUpdateStatus from './pages/ProfileUpdateStatus'
 import Statements from './pages/Statements'
 import StatementTransactions from './pages/StatementTransactions'
 import StatementViewer from './pages/StatementViewer'
@@ -174,6 +175,7 @@ function App() {
         <Route index element={<Dashboard />} />
         <Route path="members">
           <Route index element={<Members />} />
+          <Route path="profile-update-status" element={<ProfileUpdateStatus />} />
           <Route path=":id" element={<MemberProfile />} />
         </Route>
         <Route path="statements">

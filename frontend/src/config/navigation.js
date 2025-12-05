@@ -25,7 +25,10 @@ export const NAVIGATION = [
     title: 'Overview',
     items: [
       { label: 'Dashboard', icon: HiOutlineHome, path: '/', roles: [] },
-      { label: 'Members', icon: HiOutlineUsers, path: '/members', roles: [] },
+      { label: 'Members', icon: HiOutlineUsers, path: '/members', roles: [], submenu: [
+        { label: 'All Members', path: '/members' },
+        { label: 'Profile Update Status', path: '/members/profile-update-status' },
+      ]},
       { label: 'Statements', icon: HiOutlineDocumentText, path: '/statements', roles: [] },
       { label: 'Wallets', icon: HiOutlineCreditCard, path: '/wallets', roles: [] },
     ],

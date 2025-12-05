@@ -166,8 +166,10 @@ Route::prefix('v1')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index']);
 
         // Members
-        Route::apiResource('members', MemberController::class);
+        // IMPORTANT: Specific routes must come before apiResource to avoid route conflicts
+        Route::get('/members/profile-update-status', [MemberController::class, 'profileUpdateStatus']);
         Route::post('/members/bulk-upload', [MemberController::class, 'bulkUpload']);
+        Route::apiResource('members', MemberController::class);
         Route::get('/members/{member}/statement', [MemberController::class, 'statement']);
         Route::get('/members/{member}/statement/export', [MemberController::class, 'exportStatement']);
         Route::get('/members/{member}/investment-report/export', [MemberController::class, 'exportInvestmentReport']);
