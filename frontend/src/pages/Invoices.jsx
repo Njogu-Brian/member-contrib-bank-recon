@@ -85,7 +85,7 @@ export default function Invoices() {
         }
         alert(message)
       } else {
-        alert('Invoice created successfully!')
+      alert('Invoice created successfully!')
       }
     },
     onError: (error) => {
@@ -555,27 +555,27 @@ export default function Invoices() {
                     </div>
                   )}
                   {!formData.all_members && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Member *</label>
-                      <div className="mt-1">
-                        <button
-                          type="button"
-                          onClick={() => setShowMemberSearch(true)}
-                          disabled={!!editingInvoice}
-                          className="w-full flex items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-left shadow-sm hover:bg-gray-50 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
-                        >
-                          <span className={selectedMember ? 'text-gray-900' : 'text-gray-500'}>
-                            {selectedMember ? selectedMember.name : 'Click to search and select a member...'}
-                          </span>
-                          <svg className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-                          </svg>
-                        </button>
-                        {selectedMember && (
-                          <p className="mt-1 text-xs text-gray-500">
-                            {[selectedMember.phone, selectedMember.email, selectedMember.member_code].filter(Boolean).join(' • ')}
-                          </p>
-                        )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Member *</label>
+                    <div className="mt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowMemberSearch(true)}
+                        disabled={!!editingInvoice}
+                        className="w-full flex items-center justify-between rounded-md border border-gray-300 bg-white px-3 py-2 text-left shadow-sm hover:bg-gray-50 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 sm:text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      >
+                        <span className={selectedMember ? 'text-gray-900' : 'text-gray-500'}>
+                          {selectedMember ? selectedMember.name : 'Click to search and select a member...'}
+                        </span>
+                        <svg className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                      {selectedMember && (
+                        <p className="mt-1 text-xs text-gray-500">
+                          {[selectedMember.phone, selectedMember.email, selectedMember.member_code].filter(Boolean).join(' • ')}
+                        </p>
+                      )}
                         <input type="hidden" required={!formData.all_members} value={formData.member_id} />
                       </div>
                     </div>
@@ -675,13 +675,13 @@ export default function Invoices() {
                       }
                       
                       return (
-                        <input
-                          type="date"
-                          required
-                          value={formData.issue_date}
-                          onChange={(e) => setFormData({ ...formData, issue_date: e.target.value })}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                        />
+                    <input
+                      type="date"
+                      required
+                      value={formData.issue_date}
+                      onChange={(e) => setFormData({ ...formData, issue_date: e.target.value })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
                       )
                     })()}
                   </div>

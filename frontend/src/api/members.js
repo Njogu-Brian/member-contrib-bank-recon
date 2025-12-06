@@ -60,3 +60,13 @@ export const getProfileUpdateStatus = async (params = {}) => {
   return response.data
 }
 
+export const resetMemberProfileLink = async (memberId) => {
+  const response = await api.post(`/admin/members/${memberId}/reset-profile-link`)
+  return response.data
+}
+
+export const resetAllProfileLinks = async () => {
+  const response = await api.post('/admin/members/reset-all-profile-links')
+  return response.data
+}
+

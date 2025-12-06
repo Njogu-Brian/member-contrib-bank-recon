@@ -29,6 +29,7 @@ export default function PublicStatement() {
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [profileData, setProfileData] = useState(null)
   const [profileIncompleteError, setProfileIncompleteError] = useState(null)
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false)
 
   // Ensure we have a token
   if (!token) {
@@ -234,6 +235,82 @@ export default function PublicStatement() {
         isPublic={true}
         onDownloadPDF={handleDownloadPDF}
       />
+
+      {/* Edit Profile Button - Show if member exists (profile is already complete to view statement) */}
+      {member && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <button
+            onClick={async () => {
+              // Fetch current profile data
+              try {
+                const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+                let url = `${baseUrl}/public/profile/${token}/status`
+                if (url.startsWith('/')) {
+                  url = window.location.origin + url
+                }
+                const response = await fetch(url, {
+                  headers: { 'Accept': 'application/json' },
+                  credentials: 'include',
+                })
+                if (response.ok) {
+                  const profileInfo = await response.json()
+                  setProfileData(profileInfo.member)
+                } else {
+                  setProfileData(member)
+                }
+              } catch (error) {
+                setProfileData(member)
+              }
+              setShowEditProfileModal(true)
+            }}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 shadow-md"
+          >
+            ✏️ Edit Profile
+          </button>
+        </div>
+      )}
+
+      {/* Edit Profile Modal */}
+      {showEditProfileModal && (
+        <ProfileUpdateModal
+          isOpen={showEditProfileModal}
+          onClose={() => setShowEditProfileModal(false)}
+          onUpdate={async (data) => {
+            try {
+              const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+              let url = `${baseUrl}/public/profile/${token}/update`
+              if (url.startsWith('/')) {
+                url = window.location.origin + url
+              }
+
+              const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json',
+                },
+                body: JSON.stringify(data),
+                credentials: 'include',
+              })
+
+              const result = await response.json()
+
+              if (!response.ok) {
+                throw new Error(result.message || 'Failed to update profile')
+              }
+
+              alert(result.message || 'Profile changes submitted for admin approval.')
+              setShowEditProfileModal(false)
+              // Optionally refetch statement data
+              refetch()
+            } catch (error) {
+              alert('Error: ' + (error.message || 'Failed to update profile'))
+            }
+          }}
+          token={token}
+          initialData={profileData}
+        />
+      )}
 
       {/* Summary Cards */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">

@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { getProfileUpdateStatus } from '../api/members'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { getProfileUpdateStatus, resetMemberProfileLink, resetAllProfileLinks } from '../api/members'
 import Pagination from '../components/Pagination'
 import PageHeader from '../components/PageHeader'
-import { HiCheckCircle, HiXCircle, HiOutlineUser } from 'react-icons/hi2'
+import { HiCheckCircle, HiXCircle, HiOutlineUser, HiArrowPath } from 'react-icons/hi2'
 import { Link } from 'react-router-dom'
 
 export default function ProfileUpdateStatus() {
@@ -11,6 +11,7 @@ export default function ProfileUpdateStatus() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all') // all, completed, incomplete
   const [activeFilter, setActiveFilter] = useState('all') // all, active, inactive
+  const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
     queryKey: ['profile-update-status', page, searchTerm, statusFilter, activeFilter],
@@ -22,8 +23,35 @@ export default function ProfileUpdateStatus() {
     }),
   })
 
+  const resetLinkMutation = useMutation({
+    mutationFn: resetMemberProfileLink,
+    onSuccess: () => {
+      queryClient.invalidateQueries(['profile-update-status'])
+      alert('Profile link reset successfully')
+    },
+    onError: (error) => {
+      alert(error.response?.data?.message || 'Failed to reset profile link')
+    },
+  })
+
+  const resetAllLinksMutation = useMutation({
+    mutationFn: resetAllProfileLinks,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(['profile-update-status'])
+      alert(`Profile links reset successfully for ${data.count || 0} member(s)`)
+    },
+    onError: (error) => {
+      alert(error.response?.data?.message || 'Failed to reset profile links')
+    },
+  })
+
   const members = data?.data || []
-  const pagination = data?.meta || {}
+  const pagination = data?.meta ? {
+    current_page: data.meta.current_page || page,
+    last_page: data.meta.last_page || 1,
+    per_page: data.meta.per_page || 50,
+    total: data.meta.total || 0,
+  } : null
   const stats = data?.statistics || {}
 
   const formatDate = (dateString) => {
@@ -46,6 +74,22 @@ export default function ProfileUpdateStatus() {
         metricLabel="Completed Profiles"
         gradient="from-green-600 to-emerald-600"
       />
+
+      {/* Reset Links Button */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => {
+            if (confirm('Are you sure you want to reset profile links for ALL members? This action cannot be undone.')) {
+              resetAllLinksMutation.mutate()
+            }
+          }}
+          disabled={resetAllLinksMutation.isPending}
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <HiArrowPath className={`w-4 h-4 mr-2 ${resetAllLinksMutation.isPending ? 'animate-spin' : ''}`} />
+          Reset All Profile Links
+        </button>
+      </div>
 
       {/* Statistics Cards */}
       {stats && (
@@ -252,12 +296,28 @@ export default function ProfileUpdateStatus() {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <Link
-                        to={`/members/${member.id}`}
-                        className="text-indigo-600 hover:text-indigo-900 font-medium"
-                      >
-                        View Profile
-                      </Link>
+                      <div className="flex items-center gap-3">
+                        <Link
+                          to={`/members/${member.id}`}
+                          className="text-indigo-600 hover:text-indigo-900 font-medium"
+                        >
+                          View Profile
+                        </Link>
+                        {member.has_public_token && (
+                          <button
+                            onClick={() => {
+                              if (confirm(`Reset profile link for ${member.name}?`)) {
+                                resetLinkMutation.mutate(member.id)
+                              }
+                            }}
+                            disabled={resetLinkMutation.isPending}
+                            className="text-red-600 hover:text-red-900 font-medium text-xs disabled:opacity-50"
+                            title="Reset profile share link"
+                          >
+                            <HiArrowPath className={`w-4 h-4 inline ${resetLinkMutation.isPending ? 'animate-spin' : ''}`} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -265,15 +325,10 @@ export default function ProfileUpdateStatus() {
             </tbody>
           </table>
         </div>
-        {pagination && pagination.last_page > 1 && (
+        {pagination && (
           <div className="border-t border-gray-200 bg-gray-50 px-4 py-3">
             <Pagination
-              pagination={{
-                current_page: pagination.current_page || page,
-                last_page: pagination.last_page || 1,
-                per_page: pagination.per_page || 50,
-                total: pagination.total || 0,
-              }}
+              pagination={pagination}
               onPageChange={(newPage) => setPage(newPage)}
             />
           </div>

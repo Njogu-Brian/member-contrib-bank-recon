@@ -486,6 +486,37 @@ export default function MemberProfile() {
               </p>
             </div>
           )}
+          <div className="col-span-2 md:col-span-3">
+            <label className="text-sm font-medium text-gray-500">Public Statement Link</label>
+            <div className="mt-2 flex items-center gap-2">
+              {member.public_share_token ? (
+                <>
+                  <input
+                    type="text"
+                    readOnly
+                    value={`${window.location.origin}/s/${member.public_share_token}`}
+                    className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-sm font-mono"
+                    onClick={(e) => e.target.select()}
+                  />
+                  <button
+                    onClick={() => {
+                      const link = `${window.location.origin}/s/${member.public_share_token}`
+                      navigator.clipboard.writeText(link)
+                      alert('Link copied to clipboard!')
+                    }}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
+                  >
+                    Copy Link
+                  </button>
+                </>
+              ) : (
+                <span className="text-gray-400 text-sm">No public link available</span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Share this link with members who don't receive SMS. They can view their statement without logging in.
+            </p>
+          </div>
         </div>
         {member.notes && (
           <div className="mt-4">

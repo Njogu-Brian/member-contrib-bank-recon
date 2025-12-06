@@ -18,6 +18,7 @@ import {
   HiOutlineSparkles,
   HiOutlineChatBubbleLeftRight,
   HiOutlineClock,
+  HiOutlineEnvelope,
 } from 'react-icons/hi2'
 
 export const NAVIGATION = [
@@ -28,6 +29,7 @@ export const NAVIGATION = [
       { label: 'Members', icon: HiOutlineUsers, path: '/members', roles: [], submenu: [
         { label: 'All Members', path: '/members' },
         { label: 'Profile Update Status', path: '/members/profile-update-status' },
+        { label: 'Pending Profile Changes', path: '/members/pending-profile-changes', roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER] },
       ]},
       { label: 'Statements', icon: HiOutlineDocumentText, path: '/statements', roles: [] },
       { label: 'Wallets', icon: HiOutlineCreditCard, path: '/wallets', roles: [] },
@@ -127,6 +129,12 @@ export const NAVIGATION = [
         label: 'Bulk SMS',
         icon: HiOutlineChatBubbleLeftRight,
         path: '/bulk-sms',
+        roles: [ROLES.SUPER_ADMIN, ROLES.SECRETARY, ROLES.CHAIRMAN],
+      },
+      {
+        label: 'Bulk Email',
+        icon: HiOutlineEnvelope,
+        path: '/bulk-email',
         roles: [ROLES.SUPER_ADMIN, ROLES.SECRETARY, ROLES.CHAIRMAN],
       },
       {

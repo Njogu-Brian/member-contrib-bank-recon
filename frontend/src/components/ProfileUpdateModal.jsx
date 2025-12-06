@@ -247,6 +247,13 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
         } else {
           alert(data.message || 'Failed to update profile')
         }
+      } else {
+        // Show success message about pending approval
+        const message = data.message || 'Profile changes submitted for admin approval. You will be notified once approved.'
+        alert(message)
+        if (onUpdate) {
+          onUpdate(formData)
+        }
         setIsSubmitting(false)
         return
       }

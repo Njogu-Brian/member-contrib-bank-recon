@@ -1,15 +1,15 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getMembers } from '../api/members'
-import { sendBulkSms, getSmsLogs, getSmsStatistics } from '../api/sms'
+import { sendBulkEmail, getEmailLogs, getEmailStatistics } from '../api/emails'
 import Pagination from '../components/Pagination'
 import PageHeader from '../components/PageHeader'
 import { HiEnvelope, HiCheckCircle, HiXCircle, HiCalendar } from 'react-icons/hi2'
 
-export default function BulkSms() {
+export default function BulkEmail() {
   const [selectedMembers, setSelectedMembers] = useState([])
+  const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
-  const [senderId, setSenderId] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [page, setPage] = useState(1)
   const [logsPage, setLogsPage] = useState(1)
@@ -18,27 +18,27 @@ export default function BulkSms() {
   const [activeTab, setActiveTab] = useState('compose')
   const [includeContributionStatus, setIncludeContributionStatus] = useState(false)
   const [includeStatementLink, setIncludeStatementLink] = useState(false)
-  const [customNumbers, setCustomNumbers] = useState('')
-  const [showCustomNumbers, setShowCustomNumbers] = useState(false)
+  const [customEmails, setCustomEmails] = useState('')
+  const [showCustomEmails, setShowCustomEmails] = useState(false)
   const [expandedMessageId, setExpandedMessageId] = useState(null)
 
   const queryClient = useQueryClient()
 
   const { data: membersData, isLoading: membersLoading } = useQuery({
-    queryKey: ['members', 'sms', searchTerm, page],
+    queryKey: ['members', 'email', searchTerm, page],
     queryFn: () => getMembers({ search: searchTerm, per_page: 50, page }),
   })
 
   // Query to fetch all members for "Select All" functionality
   const { data: allMembersData } = useQuery({
-    queryKey: ['members', 'sms', 'all', searchTerm],
+    queryKey: ['members', 'email', 'all', searchTerm],
     queryFn: () => getMembers({ search: searchTerm, per_page: 10000, page: 1 }),
     enabled: false, // Only fetch when needed
   })
 
   const { data: logsData, isLoading: logsLoading } = useQuery({
-    queryKey: ['sms-logs', logsPage, logsSearchTerm, logsStatusFilter],
-    queryFn: () => getSmsLogs({ 
+    queryKey: ['email-logs', logsPage, logsSearchTerm, logsStatusFilter],
+    queryFn: () => getEmailLogs({ 
       page: logsPage, 
       per_page: 25,
       search: logsSearchTerm || undefined,
@@ -48,26 +48,27 @@ export default function BulkSms() {
   })
 
   const { data: statsData } = useQuery({
-    queryKey: ['sms-statistics'],
-    queryFn: () => getSmsStatistics(),
+    queryKey: ['email-statistics'],
+    queryFn: () => getEmailStatistics(),
     enabled: activeTab === 'logs',
   })
 
   const sendMutation = useMutation({
-    mutationFn: ({ memberIds, customNumbers, message, senderId, includeContributionStatus, includeStatementLink }) => 
-      sendBulkSms(memberIds, message, senderId, customNumbers, includeContributionStatus, includeStatementLink),
+    mutationFn: ({ memberIds, customEmails, subject, message, includeContributionStatus, includeStatementLink }) => 
+      sendBulkEmail(memberIds, subject, message, customEmails, includeContributionStatus, includeStatementLink),
     onSuccess: (data) => {
-      queryClient.invalidateQueries(['sms-logs'])
-      queryClient.invalidateQueries(['sms-statistics'])
+      queryClient.invalidateQueries(['email-logs'])
+      queryClient.invalidateQueries(['email-statistics'])
       setSelectedMembers([])
+      setSubject('')
       setMessage('')
-      setCustomNumbers('')
+      setCustomEmails('')
       setIncludeContributionStatus(false)
       setIncludeStatementLink(false)
-      alert(`SMS sent successfully!\n\nSent: ${data.results?.success || 0}\nFailed: ${data.results?.failed || 0}\nTotal: ${data.results?.total || 0}`)
+      alert(`Email sent successfully!\n\nSent: ${data.results?.success || 0}\nFailed: ${data.results?.failed || 0}\nTotal: ${data.results?.total || 0}`)
     },
     onError: (error) => {
-      alert(error.response?.data?.message || 'Failed to send SMS')
+      alert(error.response?.data?.message || 'Failed to send email')
     },
   })
 
@@ -99,23 +100,23 @@ export default function BulkSms() {
     if (allMembersData?.data) {
       // Use cached data
       allSelectableIds = allMembersData.data
-        .filter((m) => m.is_active && m.phone)
+        .filter((m) => m.is_active && m.email)
         .map((m) => m.id)
     } else {
       // Fetch all members
       try {
         const data = await queryClient.fetchQuery({
-          queryKey: ['members', 'sms', 'all', searchTerm],
+          queryKey: ['members', 'email', 'all', searchTerm],
           queryFn: () => getMembers({ search: searchTerm, per_page: 10000, page: 1 }),
         })
         const fetchedMembers = data?.data || []
         allSelectableIds = fetchedMembers
-          .filter((m) => m.is_active && m.phone)
+          .filter((m) => m.is_active && m.email)
           .map((m) => m.id)
       } catch (error) {
         console.error('Failed to fetch all members:', error)
         // Fallback to current page only
-        allSelectableIds = members.filter((m) => m.is_active && m.phone).map((m) => m.id)
+        allSelectableIds = members.filter((m) => m.is_active && m.email).map((m) => m.id)
       }
     }
     
@@ -135,13 +136,17 @@ export default function BulkSms() {
   }
 
   const handleSend = () => {
-    const customNumbersArray = customNumbers
+    const customEmailsArray = customEmails
       .split(/[,\n]/)
-      .map(num => num.trim())
-      .filter(num => num.length > 0)
+      .map(email => email.trim())
+      .filter(email => email.length > 0 && email.includes('@'))
 
-    if (selectedMembers.length === 0 && customNumbersArray.length === 0) {
-      alert('Please select at least one member or enter custom phone numbers')
+    if (selectedMembers.length === 0 && customEmailsArray.length === 0) {
+      alert('Please select at least one member or enter custom email addresses')
+      return
+    }
+    if (!subject.trim()) {
+      alert('Please enter a subject')
       return
     }
     if (!message.trim()) {
@@ -149,60 +154,66 @@ export default function BulkSms() {
       return
     }
     
-    const totalRecipients = selectedMembers.length + customNumbersArray.length
-    if (!confirm(`Send SMS to ${totalRecipients} recipient(s)?`)) {
+    const totalRecipients = selectedMembers.length + customEmailsArray.length
+    if (!confirm(`Send email to ${totalRecipients} recipient(s)?`)) {
       return
     }
     
     sendMutation.mutate({ 
       memberIds: selectedMembers.length > 0 ? selectedMembers : undefined,
-      customNumbers: customNumbersArray.length > 0 ? customNumbersArray : undefined,
+      customEmails: customEmailsArray.length > 0 ? customEmailsArray : undefined,
+      subject,
       message, 
-      senderId: senderId || null,
       includeContributionStatus,
       includeStatementLink,
     })
   }
 
-  const insertPlaceholder = (placeholder) => {
-    const textarea = document.querySelector('textarea')
+  const insertPlaceholder = (placeholder, target = 'message') => {
+    const textarea = document.querySelector(`textarea[name="${target}"]`) || 
+                     (target === 'message' ? document.querySelector('textarea') : null)
     if (textarea) {
       const start = textarea.selectionStart
       const end = textarea.selectionEnd
-      const text = message
+      const text = target === 'subject' ? subject : message
       const before = text.substring(0, start)
       const after = text.substring(end)
-      setMessage(before + placeholder + after)
+      if (target === 'subject') {
+        setSubject(before + placeholder + after)
+      } else {
+        setMessage(before + placeholder + after)
+      }
       setTimeout(() => {
         textarea.focus()
         textarea.setSelectionRange(start + placeholder.length, start + placeholder.length)
       }, 0)
     } else {
-      setMessage(message + placeholder)
+      if (target === 'subject') {
+        setSubject(subject + placeholder)
+      } else {
+        setMessage(message + placeholder)
+      }
     }
   }
 
   const selectedCount = selectedMembers.length
-  // Get selectable count for current page (for display)
-  const currentPageSelectableCount = members.filter((m) => m.is_active && m.phone).length
-  const customNumbersArray = customNumbers.split(/[,\n]/).map(n => n.trim()).filter(n => n.length > 0)
-  const totalRecipients = selectedCount + customNumbersArray.length
+  const customEmailsArray = customEmails.split(/[,\n]/).map(e => e.trim()).filter(e => e.length > 0 && e.includes('@'))
+  const totalRecipients = selectedCount + customEmailsArray.length
   
   // Check if all members across all pages are selected
-  // First try to use cached all members data, otherwise use current page
   const allSelectableIds = (allMembersData?.data || members)
-    .filter((m) => m.is_active && m.phone)
+    .filter((m) => m.is_active && m.email)
     .map((m) => m.id)
   const allSelected = allSelectableIds.length > 0 && allSelectableIds.every((id) => selectedMembers.includes(id))
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Bulk SMS"
-        description="Send SMS messages to members with dynamic placeholders"
+        title="Bulk Email"
+        description="Send email messages to members with dynamic placeholders"
         metric={statsData?.total || 0}
-        metricLabel="Total Messages"
-        gradient="from-purple-600 to-pink-600"
+        metricLabel="Total Emails"
+        gradient="from-blue-600 to-cyan-600"
       />
 
       <div className="bg-white rounded-xl shadow-sm">
@@ -211,23 +222,23 @@ export default function BulkSms() {
             onClick={() => setActiveTab('compose')}
             className={`${
               activeTab === 'compose'
-                ? 'border-purple-500 text-purple-600 bg-purple-50'
+                ? 'border-blue-500 text-blue-600 bg-blue-50'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
             } flex-1 py-4 px-6 border-b-2 font-medium text-sm transition-all rounded-tl-xl`}
           >
-            ✍️ Compose Message
+            ✍️ Compose Email
           </button>
           <button
             onClick={() => setActiveTab('logs')}
             className={`${
               activeTab === 'logs'
-                ? 'border-purple-500 text-purple-600 bg-purple-50'
+                ? 'border-blue-500 text-blue-600 bg-blue-50'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
             } flex-1 py-4 px-6 border-b-2 font-medium text-sm transition-all rounded-tr-xl relative`}
           >
-            📋 SMS Logs
+            📋 Email Logs
             {statsData && (
-              <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full font-semibold">
+              <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-semibold">
                 {statsData.total || 0}
               </span>
             )}
@@ -239,15 +250,55 @@ export default function BulkSms() {
         <div className="space-y-6">
           <div className="bg-white rounded-2xl shadow-lg p-6">
             <div className="flex items-center mb-6">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mr-4">
-                <span className="text-2xl">✍️</span>
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center mr-4">
+                <span className="text-2xl">✉️</span>
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">Compose Message</h2>
-                <p className="text-sm text-gray-500">Create and send SMS to your members</p>
+                <h2 className="text-2xl font-bold text-gray-900">Compose Email</h2>
+                <p className="text-sm text-gray-500">Create and send emails to your members</p>
               </div>
             </div>
             <div className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Subject <span className="text-red-500">*</span>
+                  </label>
+                  <div className="text-xs text-gray-500">
+                    Click placeholders to insert
+                  </div>
+                </div>
+                <div className="mb-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => insertPlaceholder('{name}', 'subject')}
+                    className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border border-gray-300"
+                    title="Member name"
+                  >
+                    {'{name}'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => insertPlaceholder('{member_code}', 'subject')}
+                    className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border border-gray-300"
+                    title="Member code"
+                  >
+                    {'{member_code}'}
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  name="subject"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  maxLength={255}
+                  placeholder="Enter email subject..."
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                />
+                <div className="mt-1 text-sm text-gray-500">
+                  {subject.length} / 255 characters
+                </div>
+              </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-sm font-medium text-gray-700">
@@ -273,6 +324,14 @@ export default function BulkSms() {
                     title="Phone number"
                   >
                     {'{phone}'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => insertPlaceholder('{email}')}
+                    className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded border border-gray-300"
+                    title="Email address"
+                  >
+                    {'{email}'}
                   </button>
                   <button
                     type="button"
@@ -364,16 +423,16 @@ export default function BulkSms() {
                   </button>
                 </div>
                 <textarea
+                  name="message"
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  rows={6}
-                  maxLength={1000}
+                  rows={10}
                   placeholder="Enter your message here. Use placeholders like {name}, {total_contributions}, etc."
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                 />
                 <div className="mt-1 flex items-center justify-between text-sm">
                   <span className="text-gray-500">
-                    {message.length} / 1000 characters
+                    {message.length} characters
                   </span>
                   {message.includes('{statement_link}') && !includeStatementLink && (
                     <span className="text-amber-600 text-xs">
@@ -416,60 +475,44 @@ export default function BulkSms() {
                   </p>
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Sender ID (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={senderId}
-                  onChange={(e) => setSenderId(e.target.value)}
-                  maxLength={11}
-                  placeholder="EVIMERIA"
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                />
-                <div className="mt-1 text-xs text-gray-500">
-                  Leave empty to use default sender ID
-                </div>
-              </div>
               <div className="border-t pt-4">
                 <button
                   type="button"
-                  onClick={() => setShowCustomNumbers(!showCustomNumbers)}
+                  onClick={() => setShowCustomEmails(!showCustomEmails)}
                   className="text-sm text-indigo-600 hover:text-indigo-800 mb-3"
                 >
-                  {showCustomNumbers ? '−' : '+'} Add Custom Phone Numbers
+                  {showCustomEmails ? '−' : '+'} Add Custom Email Addresses
                 </button>
-                {showCustomNumbers && (
+                {showCustomEmails && (
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Custom Phone Numbers
+                      Custom Email Addresses
                     </label>
                     <textarea
-                      value={customNumbers}
-                      onChange={(e) => setCustomNumbers(e.target.value)}
+                      value={customEmails}
+                      onChange={(e) => setCustomEmails(e.target.value)}
                       rows={3}
-                      placeholder="Enter phone numbers separated by commas or new lines (e.g., 254712345678, 254798765432)"
+                      placeholder="Enter email addresses separated by commas or new lines (e.g., user@example.com, admin@example.com)"
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
                     />
                     <div className="mt-1 text-xs text-gray-500">
-                      Format: 254XXXXXXXXX or 0XXXXXXXXX (one per line or comma-separated)
+                      Format: valid email addresses (one per line or comma-separated)
                     </div>
-                    {customNumbersArray.length > 0 && (
+                    {customEmailsArray.length > 0 && (
                       <div className="mt-2 text-sm text-gray-600">
-                        {customNumbersArray.length} custom number(s) added
+                        {customEmailsArray.length} custom email(s) added
                       </div>
                     )}
                   </div>
                 )}
               </div>
-              {(selectedCount > 0 || customNumbersArray.length > 0) && (
+              {(selectedCount > 0 || customEmailsArray.length > 0) && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-blue-900">
                       {totalRecipients} recipient{totalRecipients !== 1 ? 's' : ''} selected
                       {selectedCount > 0 && ` (${selectedCount} member${selectedCount !== 1 ? 's' : ''})`}
-                      {customNumbersArray.length > 0 && ` (${customNumbersArray.length} custom)`}
+                      {customEmailsArray.length > 0 && ` (${customEmailsArray.length} custom)`}
                     </span>
                     <div className="flex gap-2">
                       {selectedCount > 0 && (
@@ -480,9 +523,9 @@ export default function BulkSms() {
                           Clear members
                         </button>
                       )}
-                      {customNumbersArray.length > 0 && (
+                      {customEmailsArray.length > 0 && (
                         <button
-                          onClick={() => setCustomNumbers('')}
+                          onClick={() => setCustomEmails('')}
                           className="text-sm text-blue-600 hover:text-blue-800 underline"
                         >
                           Clear custom
@@ -495,7 +538,7 @@ export default function BulkSms() {
               <div className="flex justify-end">
                 <button
                   onClick={handleSend}
-                  disabled={sendMutation.isPending || totalRecipients === 0 || !message.trim()}
+                  disabled={sendMutation.isPending || totalRecipients === 0 || !message.trim() || !subject.trim()}
                   className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {sendMutation.isPending ? 'Sending...' : `Send to ${totalRecipients} Recipient(s)`}
@@ -505,10 +548,10 @@ export default function BulkSms() {
           </div>
 
           <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-            <div className="bg-gradient-to-r from-indigo-500 to-purple-500 px-6 py-4">
+            <div className="bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-4">
               <div>
                 <h2 className="text-xl font-bold text-white">👥 Select Recipients</h2>
-                <p className="text-indigo-100 text-sm mt-1">Choose members to send SMS</p>
+                <p className="text-blue-100 text-sm mt-1">Choose members to send email</p>
               </div>
               <div className="flex items-center gap-3 mt-3">
                 <input
@@ -519,11 +562,11 @@ export default function BulkSms() {
                     setPage(1)
                   }}
                   placeholder="🔍 Search members..."
-                  className="bg-white rounded-lg border-white shadow-md focus:border-purple-300 focus:ring-purple-300 text-sm px-4 py-2"
+                  className="bg-white rounded-lg border-white shadow-md focus:border-blue-300 focus:ring-blue-300 text-sm px-4 py-2"
                 />
                 <button
                   onClick={toggleSelectAll}
-                  className="px-4 py-2 bg-white text-purple-600 rounded-lg hover:bg-purple-50 font-semibold text-sm shadow-md transition-colors"
+                  className="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 font-semibold text-sm shadow-md transition-colors"
                 >
                   {allSelected
                     ? '✗ Deselect All'
@@ -544,8 +587,8 @@ export default function BulkSms() {
                       />
                     </th>
                     <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Phone</th>
-                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Email</th>
+                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Email</th>
+                    <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Phone</th>
                     <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Status</th>
                   </tr>
                 </thead>
@@ -564,7 +607,7 @@ export default function BulkSms() {
                     </tr>
                   ) : (
                     members.map((member) => {
-                      const isSelectable = member.is_active && member.phone
+                      const isSelectable = member.is_active && member.email
                       const isSelected = selectedMembers.includes(member.id)
                       return (
                         <tr
@@ -582,18 +625,18 @@ export default function BulkSms() {
                           </td>
                           <td className="px-2 py-2 text-sm text-gray-900">
                             <div className="font-medium">{member.name}</div>
-                            {!member.phone && (
-                              <div className="text-xs text-red-500">No phone number</div>
+                            {!member.email && (
+                              <div className="text-xs text-red-500">No email address</div>
                             )}
                             {!member.is_active && (
                               <div className="text-xs text-gray-500">Inactive</div>
                             )}
                           </td>
                           <td className="px-2 py-2 text-sm text-gray-500 hidden md:table-cell">
-                            {member.phone || '-'}
+                            {member.email || '-'}
                           </td>
                           <td className="px-2 py-2 text-sm text-gray-500 hidden lg:table-cell">
-                            {member.email || '-'}
+                            {member.phone || '-'}
                           </td>
                           <td className="px-2 py-2 hidden lg:table-cell">
                             <span
@@ -662,10 +705,10 @@ export default function BulkSms() {
                   </div>
                 </div>
               </div>
-              <div className="bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform">
+              <div className="bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-purple-100 uppercase tracking-wide">This Month</p>
+                    <p className="text-sm font-medium text-blue-100 uppercase tracking-wide">This Month</p>
                     <p className="mt-3 text-4xl font-bold">{statsData.this_month || 0}</p>
                   </div>
                   <div className="bg-white bg-opacity-20 rounded-full p-3">
@@ -677,9 +720,9 @@ export default function BulkSms() {
           )}
 
           <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-            <div className="bg-gradient-to-r from-purple-500 to-pink-500 px-6 py-4">
-              <h2 className="text-xl font-bold text-white">📨 SMS History</h2>
-              <p className="text-purple-100 text-sm mt-1">Click on any message to view full content</p>
+            <div className="bg-gradient-to-r from-blue-500 to-cyan-500 px-6 py-4">
+              <h2 className="text-xl font-bold text-white">📧 Email History</h2>
+              <p className="text-blue-100 text-sm mt-1">Click on any message to view full content</p>
               <div className="flex items-center gap-3 mt-4">
                 <input
                   type="text"
@@ -688,8 +731,8 @@ export default function BulkSms() {
                     setLogsSearchTerm(e.target.value)
                     setLogsPage(1)
                   }}
-                  placeholder="🔍 Search by member, phone, message, or sender..."
-                  className="flex-1 bg-white rounded-lg border-white shadow-md focus:border-purple-300 focus:ring-purple-300 text-sm px-4 py-2"
+                  placeholder="🔍 Search by member, email, subject, or sender..."
+                  className="flex-1 bg-white rounded-lg border-white shadow-md focus:border-blue-300 focus:ring-blue-300 text-sm px-4 py-2"
                 />
                 <select
                   value={logsStatusFilter}
@@ -697,7 +740,7 @@ export default function BulkSms() {
                     setLogsStatusFilter(e.target.value)
                     setLogsPage(1)
                   }}
-                  className="bg-white rounded-lg border-white shadow-md focus:border-purple-300 focus:ring-purple-300 text-sm px-4 py-2"
+                  className="bg-white rounded-lg border-white shadow-md focus:border-blue-300 focus:ring-blue-300 text-sm px-4 py-2"
                 >
                   <option value="">All Status</option>
                   <option value="sent">Sent</option>
@@ -711,7 +754,7 @@ export default function BulkSms() {
                       setLogsStatusFilter('')
                       setLogsPage(1)
                     }}
-                    className="px-4 py-2 bg-white text-purple-600 rounded-lg hover:bg-purple-50 font-semibold text-sm shadow-md transition-colors"
+                    className="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 font-semibold text-sm shadow-md transition-colors"
                   >
                     Clear
                   </button>
@@ -724,8 +767,8 @@ export default function BulkSms() {
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Date</th>
                     <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Member</th>
-                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider hidden md:table-cell">Phone</th>
-                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Message</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider hidden md:table-cell">Email</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Subject</th>
                     <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
                     <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider hidden lg:table-cell">Sent By</th>
                   </tr>
@@ -735,8 +778,8 @@ export default function BulkSms() {
                     <tr>
                       <td colSpan="6" className="px-4 py-12 text-center">
                         <div className="flex flex-col items-center">
-                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mb-4"></div>
-                          <p className="text-gray-500">Loading SMS logs...</p>
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                          <p className="text-gray-500">Loading email logs...</p>
                         </div>
                       </td>
                     </tr>
@@ -745,14 +788,14 @@ export default function BulkSms() {
                       <td colSpan="6" className="px-4 py-12 text-center">
                         <div className="flex flex-col items-center">
                           <div className="text-6xl mb-4">📭</div>
-                          <p className="text-lg font-medium text-gray-900">No SMS logs found</p>
-                          <p className="text-sm text-gray-500 mt-2">Send your first message to see it here</p>
+                          <p className="text-lg font-medium text-gray-900">No email logs found</p>
+                          <p className="text-sm text-gray-500 mt-2">Send your first email to see it here</p>
                         </div>
                       </td>
                     </tr>
                   ) : (
                     logs.map((log) => (
-                      <tr key={log.id} className="hover:bg-purple-50 transition-colors">
+                      <tr key={log.id} className="hover:bg-blue-50 transition-colors">
                         <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
                           <div className="flex flex-col">
                             <span className="font-medium text-gray-900">
@@ -777,19 +820,22 @@ export default function BulkSms() {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
                           <span className="font-mono bg-gray-100 px-2 py-1 rounded">
-                            {log.phone}
+                            {log.email}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm">
                           <button
                             onClick={() => setExpandedMessageId(expandedMessageId === log.id ? null : log.id)}
-                            className="text-left w-full hover:bg-purple-50 p-2 rounded-lg transition-colors"
+                            className="text-left w-full hover:bg-blue-50 p-2 rounded-lg transition-colors"
                           >
-                            <div className={`text-gray-900 ${expandedMessageId === log.id ? '' : 'line-clamp-2'}`}>
+                            <div className="font-medium text-gray-900 mb-1">
+                              {log.subject}
+                            </div>
+                            <div className={`text-gray-600 text-xs ${expandedMessageId === log.id ? '' : 'line-clamp-2'}`}>
                               {log.message}
                             </div>
                             {log.message.length > 100 && (
-                              <span className="text-xs text-purple-600 font-medium mt-1 inline-block">
+                              <span className="text-xs text-blue-600 font-medium mt-1 inline-block">
                                 {expandedMessageId === log.id ? '▼ Show less' : '▶ Show more'}
                               </span>
                             )}
@@ -818,7 +864,7 @@ export default function BulkSms() {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600 hidden lg:table-cell">
                           <div className="flex items-center">
-                            <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-700 font-semibold text-xs mr-2">
+                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-semibold text-xs mr-2">
                               {log.sent_by?.name?.charAt(0) || '?'}
                             </div>
                             <span>{log.sent_by?.name || '-'}</span>

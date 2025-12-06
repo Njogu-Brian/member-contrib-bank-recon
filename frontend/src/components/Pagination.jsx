@@ -1,9 +1,9 @@
 export default function Pagination({ pagination, onPageChange }) {
-  if (!pagination || pagination.last_page <= 1) {
+  if (!pagination) {
     return null
   }
 
-  const { current_page, last_page, per_page, total } = pagination
+  const { current_page = 1, last_page = 1, per_page = 20, total = 0 } = pagination
 
   const getPageNumbers = () => {
     const pages = []

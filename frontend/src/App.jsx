@@ -6,6 +6,7 @@ import ChangePassword from './pages/ChangePassword'
 import Dashboard from './pages/Dashboard'
 import Members from './pages/Members'
 import ProfileUpdateStatus from './pages/ProfileUpdateStatus'
+import PendingProfileChanges from './pages/PendingProfileChanges'
 import Statements from './pages/Statements'
 import StatementTransactions from './pages/StatementTransactions'
 import StatementViewer from './pages/StatementViewer'
@@ -31,6 +32,7 @@ import Budgets from './pages/Budgets'
 import Notifications from './pages/Notifications'
 import Compliance from './pages/Compliance'
 import BulkSms from './pages/BulkSms'
+import BulkEmail from './pages/BulkEmail'
 import Unauthorized from './pages/Unauthorized'
 import PublicStatement from './pages/PublicStatement'
 import UiKit from './pages/UiKit'
@@ -212,6 +214,7 @@ function App() {
         <Route path="budgets" element={<Budgets />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="bulk-sms" element={<BulkSms />} />
+        <Route path="bulk-email" element={<BulkEmail />} />
         <Route path="compliance" element={<Compliance />} />
         <Route path="attendance-uploads" element={<AttendanceUploads />} />
         <Route
