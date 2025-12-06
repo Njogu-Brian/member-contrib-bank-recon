@@ -46,38 +46,39 @@ class MemberController extends Controller
      */
     public function profileUpdateStatus(Request $request)
     {
-        $query = Member::query();
+        try {
+            $query = Member::query();
 
-        // Filter by status
-        if ($request->has('status')) {
-            $status = $request->get('status');
-            if ($status === 'completed') {
-                $query->whereNotNull('profile_completed_at');
-            } elseif ($status === 'incomplete') {
-                $query->whereNull('profile_completed_at');
+            // Filter by status
+            if ($request->has('status')) {
+                $status = $request->get('status');
+                if ($status === 'completed') {
+                    $query->whereNotNull('profile_completed_at');
+                } elseif ($status === 'incomplete') {
+                    $query->whereNull('profile_completed_at');
+                }
             }
-        }
 
-        // Filter by active status
-        if ($request->has('is_active')) {
-            $query->where('is_active', $request->boolean('is_active'));
-        }
+            // Filter by active status
+            if ($request->has('is_active')) {
+                $query->where('is_active', $request->boolean('is_active'));
+            }
 
-        // Search
-        if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('member_code', 'like', "%{$search}%");
-            });
-        }
+            // Search
+            if ($request->has('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('phone', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%")
+                      ->orWhere('member_code', 'like', "%{$search}%");
+                });
+            }
 
-        // Get paginated results
-        $members = $query->orderBy('profile_completed_at', 'desc')
-            ->orderBy('name', 'asc')
-            ->paginate($request->get('per_page', 50));
+            // Get paginated results
+            $members = $query->orderBy('profile_completed_at', 'desc')
+                ->orderBy('name', 'asc')
+                ->paginate($request->get('per_page', 50));
 
         // Transform data to include profile status
         $fieldLabels = [
@@ -162,24 +163,38 @@ class MemberController extends Controller
                     : 0,
             ],
         ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error fetching profile update status: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'request' => $request->all(),
+            ]);
+            return response()->json([
+                'message' => 'Error fetching profile update status',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred while fetching profile update status',
+            ], 500);
+        }
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'phone' => 'nullable|string|max:20',
-            'secondary_phone' => 'nullable|string|max:20',
+            'phone' => ['nullable', 'string', 'max:20', 'regex:/^(\+?254[17]|0[17])\d{8,9}$/'],
+            'secondary_phone' => ['nullable', 'string', 'max:20', 'regex:/^(\+?254[17]|0[17])\d{8,9}$/'],
             'email' => 'nullable|email|max:255',
             'id_number' => 'nullable|string|max:50|unique:members,id_number',
             'gender' => 'nullable|string|in:male,female,other',
             'next_of_kin_name' => 'nullable|string|max:255',
-            'next_of_kin_phone' => 'nullable|string|max:255',
+            'next_of_kin_phone' => ['nullable', 'string', 'max:255', 'regex:/^(\+?254[17]|0[17])\d{8,9}$/'],
             'next_of_kin_relationship' => 'nullable|string|max:255',
             'member_code' => 'nullable|string|max:50|unique:members',
             'member_number' => 'nullable|string|max:50',
             'notes' => 'nullable|string',
             'is_active' => 'boolean',
+        ], [
+            'phone.regex' => 'Phone number must be a valid Kenyan number starting with 2547, 2541, 07, or 01',
+            'secondary_phone.regex' => 'Secondary phone must be a valid Kenyan number starting with 2547, 2541, 07, or 01',
+            'next_of_kin_phone.regex' => 'Next of kin phone must be a valid Kenyan number starting with 2547, 2541, 07, or 01',
         ]);
 
         $member = Member::create($validated);
@@ -197,6 +212,12 @@ class MemberController extends Controller
         $member->total_contributions = $member->total_contributions;
         $member->expected_contributions = $member->expected_contributions;
         $member->contribution_status = $member->contribution_status;
+        
+        // Ensure public share token exists
+        if (!$member->public_share_token) {
+            $member->getPublicShareToken();
+            $member->refresh();
+        }
         
         return response()->json($member);
     }
@@ -769,17 +790,23 @@ class MemberController extends Controller
     {
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
-            'phone' => 'nullable|string|max:20',
-            'secondary_phone' => 'nullable|string|max:20',
+            'phone' => ['nullable', 'string', 'max:20', 'regex:/^(\+?254[17]|0[17])\d{8,9}$/'],
+            'secondary_phone' => ['nullable', 'string', 'max:20', 'regex:/^(\+?254[17]|0[17])\d{8,9}$/'],
             'email' => 'nullable|email|max:255',
+            'id_number' => 'nullable|string|max:50|unique:members,id_number,' . $member->id,
             'gender' => 'nullable|string|in:male,female,other',
-            'next_of_kin_name' => 'required|string|max:255',
-            'next_of_kin_phone' => ['required', 'string', 'max:20', 'regex:/^\+\d{1,4}\d{6,14}$/'],
-            'next_of_kin_relationship' => 'required|string|max:255|in:wife,husband,brother,sister,father,mother,son,daughter,cousin,friend,other',
+            'next_of_kin_name' => 'nullable|string|max:255',
+            'next_of_kin_phone' => ['nullable', 'string', 'max:255', 'regex:/^(\+?254[17]|0[17])\d{8,9}$/'],
+            'next_of_kin_relationship' => 'nullable|string|max:255',
             'member_code' => 'nullable|string|max:50|unique:members,member_code,' . $member->id,
             'member_number' => 'nullable|string|max:50',
             'notes' => 'nullable|string',
             'is_active' => 'boolean',
+            'date_of_registration' => 'nullable|date',
+        ], [
+            'phone.regex' => 'Phone number must be a valid Kenyan number starting with 2547, 2541, 07, or 01',
+            'secondary_phone.regex' => 'Secondary phone must be a valid Kenyan number starting with 2547, 2541, 07, or 01',
+            'next_of_kin_phone.regex' => 'Next of kin phone must be a valid Kenyan number starting with 2547, 2541, 07, or 01',
         ]);
 
         $member->update($validated);
@@ -792,6 +819,67 @@ class MemberController extends Controller
         $member->delete();
 
         return response()->json(['message' => 'Member deleted successfully']);
+    }
+
+    /**
+     * Reset profile share link for a single member
+     */
+    public function resetProfileLink(Request $request, Member $member)
+    {
+        try {
+            $member->public_share_token = null;
+            $member->public_share_token_expires_at = null;
+            $member->public_share_last_accessed_at = null;
+            $member->public_share_access_count = 0;
+            $member->save();
+
+            return response()->json([
+                'message' => 'Profile share link reset successfully',
+                'member' => [
+                    'id' => $member->id,
+                    'name' => $member->name,
+                    'public_share_token' => null,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error resetting profile link: ' . $e->getMessage(), [
+                'member_id' => $member->id,
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'message' => 'Error resetting profile link',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
+    }
+
+    /**
+     * Reset profile share links for all members
+     */
+    public function resetAllProfileLinks(Request $request)
+    {
+        try {
+            $count = Member::whereNotNull('public_share_token')
+                ->update([
+                    'public_share_token' => null,
+                    'public_share_token_expires_at' => null,
+                    'public_share_last_accessed_at' => null,
+                    'public_share_access_count' => 0,
+                ]);
+
+            return response()->json([
+                'message' => "Profile share links reset successfully for {$count} member(s)",
+                'count' => $count,
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error resetting all profile links: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'message' => 'Error resetting profile links',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
     }
 
     public function bulkUpload(Request $request)

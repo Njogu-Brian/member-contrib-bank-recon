@@ -98,8 +98,8 @@ class ProfileController extends Controller
             ], 422);
         }
 
-        // Update member
-        $member->update([
+        // Store changes as pending instead of directly updating
+        $fieldsToUpdate = [
             'name' => $request->name,
             'phone' => $request->phone,
             'secondary_phone' => $request->secondary_phone,
@@ -109,18 +109,51 @@ class ProfileController extends Controller
             'next_of_kin_name' => $request->next_of_kin_name,
             'next_of_kin_phone' => $request->next_of_kin_phone,
             'next_of_kin_relationship' => $request->next_of_kin_relationship,
-        ]);
+        ];
 
-        // Mark profile as complete if all required fields are filled
-        $member->markProfileComplete();
+        $pendingChanges = [];
+        foreach ($fieldsToUpdate as $field => $newValue) {
+            $oldValue = $member->$field;
+            // Only create pending change if value actually changed
+            if ($oldValue != $newValue) {
+                // Delete any existing pending changes for this field
+                \App\Models\PendingProfileChange::where('member_id', $member->id)
+                    ->where('field_name', $field)
+                    ->where('status', 'pending')
+                    ->delete();
 
-        // Clear cached profile status after update
+                $pendingChanges[] = \App\Models\PendingProfileChange::create([
+                    'member_id' => $member->id,
+                    'field_name' => $field,
+                    'old_value' => $oldValue,
+                    'new_value' => $newValue,
+                    'status' => 'pending',
+                ]);
+            }
+        }
+
+        // If this is the first profile update and profile is now complete, mark as complete
+        // But changes still need approval
+        $isFirstUpdate = !$member->profile_completed_at;
+        $wouldBeComplete = true;
+        foreach (['name', 'phone', 'email', 'id_number', 'church', 'next_of_kin_name', 'next_of_kin_phone', 'next_of_kin_relationship'] as $requiredField) {
+            $value = $fieldsToUpdate[$requiredField] ?? $member->$requiredField;
+            if (empty($value)) {
+                $wouldBeComplete = false;
+                break;
+            }
+        }
+
+        // Clear cached profile status
         Cache::forget('profile-status:' . $token);
 
         return response()->json([
-            'message' => 'Profile updated successfully',
-            'is_complete' => $member->isProfileComplete(),
-            'profile_completed_at' => $member->profile_completed_at,
+            'message' => count($pendingChanges) > 0 
+                ? 'Profile changes submitted for admin approval. You will be notified once approved.'
+                : 'No changes detected.',
+            'pending_changes_count' => count($pendingChanges),
+            'is_first_update' => $isFirstUpdate,
+            'would_be_complete' => $wouldBeComplete,
         ]);
     }
 }

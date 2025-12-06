@@ -71,6 +71,18 @@ class SmsService
             ];
         }
 
+        // Check if phone number is Kenyan - skip if not
+        if (!$this->isKenyanPhone($mobile)) {
+            $errorMessage = 'Non-Kenyan phone number. Only Kenyan numbers (2547XXXXXXXXX or 2541XXXXXXXXX) are supported.';
+            Log::warning('Skipping non-Kenyan phone number', ['mobile' => $mobile]);
+            return [
+                'success' => false,
+                'error' => $errorMessage,
+                'status' => 'failed',
+                'mobile' => $mobile,
+            ];
+        }
+
         // Normalize phone number
         $mobile = $this->normalizePhone($mobile);
         if (!$mobile) {
@@ -244,6 +256,24 @@ class SmsService
                 continue;
             }
 
+            // Check if phone number is Kenyan - skip if not
+            if (!$this->isKenyanPhone($mobile)) {
+                $errorMessage = 'Non-Kenyan phone number. Only Kenyan numbers (2547XXXXXXXXX or 2541XXXXXXXXX) are supported.';
+                Log::warning('Skipping non-Kenyan phone number in bulk send', [
+                    'mobile' => $mobile,
+                    'member_id' => is_array($recipient) ? ($recipient['member_id'] ?? null) : null,
+                ]);
+                $results['failed']++;
+                $results['details'][] = [
+                    'mobile' => $mobile,
+                    'success' => false,
+                    'error' => $errorMessage,
+                    'status' => 'failed',
+                ];
+                // Continue to next recipient - don't send SMS
+                continue;
+            }
+
             // Replace placeholders if member data is provided
             $message = $messageTemplate;
             if (is_array($recipient) && isset($recipient['member_data'])) {
@@ -297,6 +327,37 @@ class SmsService
 
         // Invalid format
         return null;
+    }
+
+    /**
+     * Check if phone number is Kenyan
+     * Kenyan numbers: 254XXXXXXXXX (12-13 digits starting with 254)
+     * Mobile prefixes: 7 (mobile) or 1 (landline/mobile)
+     *
+     * @param string $phone
+     * @return bool
+     */
+    protected function isKenyanPhone(string $phone): bool
+    {
+        $normalized = $this->normalizePhone($phone);
+        if (!$normalized) {
+            return false;
+        }
+
+        // Must start with 254 (Kenya country code)
+        if (strpos($normalized, '254') !== 0) {
+            return false;
+        }
+
+        // Must be 12 or 13 digits total (254 + 9 or 10 digits)
+        $length = strlen($normalized);
+        if ($length < 12 || $length > 13) {
+            return false;
+        }
+
+        // Check if the number after 254 starts with 7 or 1 (Kenyan mobile/landline prefixes)
+        $mobilePrefix = substr($normalized, 3, 1);
+        return in_array($mobilePrefix, ['7', '1']);
     }
 
     /**

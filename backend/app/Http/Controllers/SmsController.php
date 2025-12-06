@@ -126,7 +126,7 @@ class SmsController extends Controller
 
         $results = $this->smsService->sendBulk($recipients, $request->message, $baseUrl);
 
-        // Log SMS sends
+        // Log SMS sends - always log both success and failures
         foreach ($results['details'] as $index => $detail) {
             if (isset($detail['mobile'])) {
                 $recipient = $recipients[$index] ?? null;
@@ -134,13 +134,26 @@ class SmsController extends Controller
                     ? $members->firstWhere('id', $recipient['member_id'])
                     : null;
 
+                // Determine status - use 'failed' for any non-success, not 'skipped'
+                $status = $detail['success'] ? 'sent' : 'failed';
+                
+                // Ensure error message exists for failed attempts
+                $errorMessage = null;
+                if (!$detail['success']) {
+                    $errorMessage = $detail['error'] ?? 'SMS sending failed';
+                    // If status was 'skipped', change to 'failed'
+                    if (isset($detail['status']) && $detail['status'] === 'skipped') {
+                        $status = 'failed';
+                    }
+                }
+
                 SmsLog::create([
                     'member_id' => $member?->id,
                     'phone' => $detail['mobile'],
                     'message' => $detail['processed_message'] ?? $request->message,
-                    'status' => $detail['success'] ? 'sent' : 'failed',
+                    'status' => $status,
                     'response' => $detail['response'] ?? null,
-                    'error' => $detail['error'] ?? null,
+                    'error' => $errorMessage,
                     'sent_by' => $request->user()->id,
                     'sent_at' => $detail['success'] ? now() : null,
                 ]);
@@ -220,6 +233,25 @@ class SmsController extends Controller
 
         if ($request->filled('date_to')) {
             $query->where('created_at', '<=', $request->date_to);
+        }
+
+        // Search functionality
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('phone', 'like', "%{$search}%")
+                  ->orWhere('message', 'like', "%{$search}%")
+                  ->orWhere('error', 'like', "%{$search}%")
+                  ->orWhereHas('member', function ($memberQuery) use ($search) {
+                      $memberQuery->where('name', 'like', "%{$search}%")
+                                  ->orWhere('phone', 'like', "%{$search}%")
+                                  ->orWhere('email', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('sentBy', function ($userQuery) use ($search) {
+                      $userQuery->where('name', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%");
+                  });
+            });
         }
 
         $logs = $query->paginate($request->get('per_page', 25));

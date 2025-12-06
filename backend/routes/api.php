@@ -35,6 +35,7 @@ use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\AccountingController;
 use App\Http\Controllers\KycController;
+use App\Http\Controllers\PendingProfileChangeController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -168,8 +169,18 @@ Route::prefix('v1')->group(function () {
         // Members
         // IMPORTANT: Specific routes must come before apiResource to avoid route conflicts
         Route::get('/members/profile-update-status', [MemberController::class, 'profileUpdateStatus']);
+        Route::post('/members/{member}/reset-profile-link', [MemberController::class, 'resetProfileLink']);
+        Route::post('/members/reset-all-profile-links', [MemberController::class, 'resetAllProfileLinks']);
         Route::post('/members/bulk-upload', [MemberController::class, 'bulkUpload']);
         Route::apiResource('members', MemberController::class);
+
+        // Pending Profile Changes
+        Route::get('/pending-profile-changes', [PendingProfileChangeController::class, 'index']);
+        Route::get('/pending-profile-changes/statistics', [PendingProfileChangeController::class, 'statistics']);
+        Route::post('/pending-profile-changes/{change}/approve', [PendingProfileChangeController::class, 'approve']);
+        Route::post('/pending-profile-changes/{change}/reject', [PendingProfileChangeController::class, 'reject']);
+        Route::post('/pending-profile-changes/member/{member}/approve-all', [PendingProfileChangeController::class, 'approveMemberChanges']);
+        Route::post('/pending-profile-changes/approve-all', [PendingProfileChangeController::class, 'approveAllChanges']);
         Route::get('/members/{member}/statement', [MemberController::class, 'statement']);
         Route::get('/members/{member}/statement/export', [MemberController::class, 'exportStatement']);
         Route::get('/members/{member}/investment-report/export', [MemberController::class, 'exportInvestmentReport']);
@@ -320,6 +331,11 @@ Route::prefix('v1')->group(function () {
         Route::get('/sms/statistics', [SmsController::class, 'statistics']);
         Route::post('/sms/bulk', [SmsController::class, 'sendBulk']);
         Route::post('/sms/members/{member}', [SmsController::class, 'sendSingle']);
+
+        // Email
+        Route::get('/emails/logs', [\App\Http\Controllers\EmailController::class, 'logs']);
+        Route::get('/emails/statistics', [\App\Http\Controllers\EmailController::class, 'statistics']);
+        Route::post('/emails/bulk', [\App\Http\Controllers\EmailController::class, 'sendBulk']);
 
         // Notifications
         Route::post('/notifications/whatsapp/send', [\App\Http\Controllers\NotificationController::class, 'sendWhatsApp']);
