@@ -223,31 +223,54 @@ class AuditController extends Controller
             $changes = $query->paginate($perPage);
 
             // Get audit rows for members with pending changes
-            $memberIds = $changes->pluck('member_id')->unique()->filter();
-            $auditRows = [];
+            $memberIds = $changes->pluck('member_id')->unique()->filter()->values();
+            $auditRows = collect();
             if ($memberIds->isNotEmpty()) {
-                $auditRows = AuditRow::with('run')
-                    ->whereIn('member_id', $memberIds)
-                    ->orderByDesc('created_at')
-                    ->get()
-                    ->groupBy('member_id');
+                try {
+                    $auditRows = AuditRow::with('run')
+                        ->whereIn('member_id', $memberIds->toArray())
+                        ->orderByDesc('created_at')
+                        ->get()
+                        ->groupBy('member_id');
+                } catch (\Exception $e) {
+                    Log::warning('Error fetching audit rows for pending profile changes: ' . $e->getMessage());
+                    $auditRows = collect();
+                }
             }
 
             // Transform items
             $items = $changes->items();
             $transformedItems = array_map(function ($change) use ($auditRows) {
                 $member = $change->member ?? null;
-                $memberAudits = $auditRows->get($change->member_id, collect())->take(5)->map(function ($row) {
-                    return [
-                        'run_id' => $row->run_id,
-                        'year' => $row->run->year ?? null,
-                        'status' => $row->status,
-                        'expected_total' => $row->expected_total,
-                        'system_total' => $row->system_total,
-                        'difference' => $row->difference,
-                        'created_at' => $row->created_at ? $row->created_at->toDateTimeString() : null,
-                    ];
-                })->values();
+                $memberId = $change->member_id ?? null;
+                $memberAudits = collect();
+                
+                if ($memberId && $auditRows->has($memberId)) {
+                    try {
+                        $memberAudits = $auditRows->get($memberId, collect())->take(5)->map(function ($row) {
+                            try {
+                                return [
+                                    'run_id' => $row->run_id ?? null,
+                                    'year' => ($row->run && isset($row->run->year)) ? $row->run->year : null,
+                                    'status' => $row->status ?? null,
+                                    'expected_total' => $row->expected_total ?? 0,
+                                    'system_total' => $row->system_total ?? 0,
+                                    'difference' => $row->difference ?? 0,
+                                    'created_at' => $row->created_at ? $row->created_at->toDateTimeString() : null,
+                                ];
+                            } catch (\Exception $e) {
+                                Log::debug('Error processing single audit row: ' . $e->getMessage());
+                                return null;
+                            }
+                        })->filter()->values();
+                    } catch (\Exception $e) {
+                        Log::warning('Error processing audit rows for member: ' . $e->getMessage(), [
+                            'member_id' => $memberId,
+                            'trace' => $e->getTraceAsString()
+                        ]);
+                        $memberAudits = collect();
+                    }
+                }
 
                 return [
                     'id' => $change->id ?? null,

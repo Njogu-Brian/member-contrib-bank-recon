@@ -406,7 +406,7 @@ class PendingProfileChangeController extends Controller
                 
                 // Get basic statement summary for member if available
                 $statementSummary = null;
-                if ($member) {
+                if ($member && isset($member->id)) {
                     try {
                         $memberModel = Member::find($member->id);
                         if ($memberModel) {

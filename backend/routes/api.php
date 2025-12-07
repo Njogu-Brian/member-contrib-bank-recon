@@ -176,6 +176,8 @@ Route::prefix('v1')->group(function () {
 
         // Members
         // IMPORTANT: Specific routes must come before apiResource to avoid route conflicts
+        // This route prevents /members/pending-profile-changes from matching /members/{member}
+        Route::get('/members/pending-profile-changes', [PendingProfileChangeController::class, 'index']);
         Route::get('/members/pending-profile-changes/statement', [PendingProfileChangeController::class, 'statement']);
         Route::get('/members/profile-update-status', [MemberController::class, 'profileUpdateStatus']);
         Route::post('/members/{member}/reset-profile-link', [MemberController::class, 'resetProfileLink'])->where('member', '[0-9]+');
