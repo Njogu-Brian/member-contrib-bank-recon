@@ -179,8 +179,8 @@ class MemberController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'phone' => ['nullable', 'string', 'max:20', 'regex:/^(\+?254[17]|0[17])\d{8,9}$/'],
-            'secondary_phone' => ['nullable', 'string', 'max:20', 'regex:/^(\+?254[17]|0[17])\d{8,9}$/'],
+            'phone' => ['nullable', 'string', 'max:20', 'regex:/^(\+?254[17]|0[17])\d{8,9}$/', 'unique:members,phone'],
+            'secondary_phone' => ['nullable', 'string', 'max:20', 'regex:/^(\+?254[17]|0[17])\d{8,9}$/', 'unique:members,secondary_phone'],
             'email' => 'nullable|email|max:255',
             'id_number' => 'nullable|string|max:50|unique:members,id_number',
             'gender' => 'nullable|string|in:male,female,other',
@@ -193,7 +193,10 @@ class MemberController extends Controller
             'is_active' => 'boolean',
         ], [
             'phone.regex' => 'Phone number must be a valid Kenyan number starting with 2547, 2541, 07, or 01',
+            'phone.unique' => 'This phone number is already registered to another member.',
             'secondary_phone.regex' => 'Secondary phone must be a valid Kenyan number starting with 2547, 2541, 07, or 01',
+            'secondary_phone.unique' => 'This WhatsApp number is already registered to another member.',
+            'id_number.unique' => 'This ID number is already registered to another member.',
             'next_of_kin_phone.regex' => 'Next of kin phone must be a valid Kenyan number starting with 2547, 2541, 07, or 01',
         ]);
 
@@ -790,8 +793,8 @@ class MemberController extends Controller
     {
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
-            'phone' => ['nullable', 'string', 'max:20', 'regex:/^(\+?254[17]|0[17])\d{8,9}$/'],
-            'secondary_phone' => ['nullable', 'string', 'max:20', 'regex:/^(\+?254[17]|0[17])\d{8,9}$/'],
+            'phone' => ['nullable', 'string', 'max:20', 'regex:/^(\+?254[17]|0[17])\d{8,9}$/', 'unique:members,phone,' . $member->id],
+            'secondary_phone' => ['nullable', 'string', 'max:20', 'regex:/^(\+?254[17]|0[17])\d{8,9}$/', 'unique:members,secondary_phone,' . $member->id],
             'email' => 'nullable|email|max:255',
             'id_number' => 'nullable|string|max:50|unique:members,id_number,' . $member->id,
             'gender' => 'nullable|string|in:male,female,other',
@@ -805,7 +808,10 @@ class MemberController extends Controller
             'date_of_registration' => 'nullable|date',
         ], [
             'phone.regex' => 'Phone number must be a valid Kenyan number starting with 2547, 2541, 07, or 01',
+            'phone.unique' => 'This phone number is already registered to another member.',
             'secondary_phone.regex' => 'Secondary phone must be a valid Kenyan number starting with 2547, 2541, 07, or 01',
+            'secondary_phone.unique' => 'This WhatsApp number is already registered to another member.',
+            'id_number.unique' => 'This ID number is already registered to another member.',
             'next_of_kin_phone.regex' => 'Next of kin phone must be a valid Kenyan number starting with 2547, 2541, 07, or 01',
         ]);
 

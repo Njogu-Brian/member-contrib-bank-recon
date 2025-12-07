@@ -248,19 +248,30 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
           alert(data.message || 'Failed to update profile')
         }
       } else {
-        // Show success message about pending approval
-        const message = data.message || 'Profile changes submitted for admin approval. You will be notified once approved.'
-        alert(message)
+        // Show success message
+        const message = data.message || 'Profile updated successfully.'
+        
+        // Close modal first
+        onClose()
+        
+        // Show alert after a brief delay to allow modal to close
+        setTimeout(() => {
+          alert(message)
+        }, 100)
+        
+        // For pending changes, we still call onUpdate but with a flag to indicate pending
         if (onUpdate) {
-          onUpdate(formData)
+          onUpdate({ ...formData, pending: true })
         }
         setIsSubmitting(false)
         return
       }
 
-      // Success!
-      onUpdate(data)
+      // Success! (This case is for immediate approval, which shouldn't happen)
       onClose()
+      if (onUpdate) {
+        onUpdate(data)
+      }
     } catch (error) {
       console.error('Error updating profile:', error)
       alert('An error occurred while updating your profile. Please try again.')

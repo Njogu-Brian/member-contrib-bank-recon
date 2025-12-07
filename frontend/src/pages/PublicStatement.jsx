@@ -110,8 +110,17 @@ export default function PublicStatement() {
   })
 
   const handleProfileUpdate = async (updatedData) => {
-    // Profile updated successfully, refetch statement
+    // Profile updated successfully
     setShowProfileModal(false)
+    
+    // If changes are pending approval, don't refetch yet - show message instead
+    if (updatedData?.pending) {
+      // Don't clear profileIncompleteError since profile is still incomplete
+      // The user needs to wait for admin approval
+      return
+    }
+    
+    // If profile is now complete (shouldn't happen with pending system, but just in case)
     setProfileIncompleteError(null)
     await refetch()
   }

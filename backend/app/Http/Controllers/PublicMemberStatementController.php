@@ -58,8 +58,8 @@ class PublicMemberStatementController extends Controller
             ], 410); // 410 Gone
         }
 
-        // Check if profile is complete - if not, require update first
-        if (!$member->isProfileComplete()) {
+        // Check if profile is complete (including pending changes) - if not, require update first
+        if (!$member->isProfileCompleteWithPending()) {
             return response()->json([
                 'error' => 'Profile Incomplete',
                 'message' => 'Please complete your profile before viewing your statement.',
@@ -157,8 +157,8 @@ class PublicMemberStatementController extends Controller
             ], 410); // 410 Gone
         }
 
-        // Check if profile is complete - if not, require update first
-        if (!$member->isProfileComplete()) {
+        // Check if profile is complete (including pending changes) - if not, require update first
+        if (!$member->isProfileCompleteWithPending()) {
             return response()->json([
                 'error' => 'Profile Incomplete',
                 'message' => 'Please complete your profile before downloading your statement.',

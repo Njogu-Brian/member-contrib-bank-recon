@@ -178,6 +178,7 @@ function App() {
         <Route path="members">
           <Route index element={<Members />} />
           <Route path="profile-update-status" element={<ProfileUpdateStatus />} />
+          <Route path="pending-profile-changes" element={<PendingProfileChanges />} />
           <Route path=":id" element={<MemberProfile />} />
         </Route>
         <Route path="statements">

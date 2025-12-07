@@ -188,6 +188,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/members/{member}/investment-report/export', [MemberController::class, 'exportInvestmentReport'])->where('member', '[0-9]+');
         Route::get('/members/statements/export', [MemberController::class, 'exportBulkStatements']);
         Route::post('/members/{member}/activate', [KycController::class, 'activateMember'])->where('member', '[0-9]+');
+        
+        // Members API Resource - must come after specific routes
+        Route::apiResource('members', MemberController::class);
 
         // KYC Management
         Route::get('/kyc/pending', [KycController::class, 'pending']);

@@ -296,6 +296,47 @@ class Member extends Model
     }
 
     /**
+     * Check if member profile is complete including pending changes
+     * This allows members to access their statement even if admin hasn't approved changes yet
+     */
+    public function isProfileCompleteWithPending(): bool
+    {
+        // Get current values
+        $values = [
+            'name' => $this->name,
+            'phone' => $this->phone,
+            'email' => $this->email,
+            'id_number' => $this->id_number,
+            'church' => $this->church,
+            'next_of_kin_name' => $this->next_of_kin_name,
+            'next_of_kin_phone' => $this->next_of_kin_phone,
+            'next_of_kin_relationship' => $this->next_of_kin_relationship,
+        ];
+
+        // Override with pending values if they exist
+        $pendingChanges = \App\Models\PendingProfileChange::where('member_id', $this->id)
+            ->where('status', 'pending')
+            ->get()
+            ->keyBy('field_name');
+
+        foreach ($pendingChanges as $fieldName => $change) {
+            if (isset($values[$fieldName])) {
+                $values[$fieldName] = $change->new_value;
+            }
+        }
+
+        // Check if all required fields are filled
+        return !empty($values['name']) &&
+               !empty($values['phone']) &&
+               !empty($values['email']) &&
+               !empty($values['id_number']) &&
+               !empty($values['church']) &&
+               !empty($values['next_of_kin_name']) &&
+               !empty($values['next_of_kin_phone']) &&
+               !empty($values['next_of_kin_relationship']);
+    }
+
+    /**
      * Get list of missing profile fields
      */
     public function getMissingProfileFields(): array

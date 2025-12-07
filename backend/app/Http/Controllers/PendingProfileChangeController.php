@@ -7,6 +7,7 @@ use App\Models\Member;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class PendingProfileChangeController extends Controller
 {
@@ -123,6 +124,28 @@ class PendingProfileChangeController extends Controller
             $fieldName = $change->field_name;
             $newValue = $change->new_value;
 
+            // Validate uniqueness for unique fields before approving
+            $uniqueFields = ['id_number', 'phone', 'secondary_phone'];
+            if (in_array($fieldName, $uniqueFields) && !empty($newValue)) {
+                $existingMember = Member::where($fieldName, $newValue)
+                    ->where('id', '!=', $member->id)
+                    ->first();
+                
+                if ($existingMember) {
+                    DB::rollBack();
+                    $fieldLabels = [
+                        'id_number' => 'ID number',
+                        'phone' => 'phone number',
+                        'secondary_phone' => 'WhatsApp number',
+                    ];
+                    $fieldLabel = $fieldLabels[$fieldName] ?? $fieldName;
+                    
+                    return response()->json([
+                        'message' => "Cannot approve: This {$fieldLabel} is already registered to another member ({$existingMember->name}).",
+                    ], 422);
+                }
+            }
+
             // Update the member field
             $member->$fieldName = $newValue;
             $member->save();
@@ -138,6 +161,9 @@ class PendingProfileChangeController extends Controller
             if ($member->isProfileComplete() && !$member->profile_completed_at) {
                 $member->markProfileComplete();
             }
+
+            // Clear cached profile status for this member's token
+            Cache::forget('profile-status:' . $member->public_share_token);
 
             DB::commit();
 
@@ -212,6 +238,39 @@ class PendingProfileChangeController extends Controller
 
             DB::beginTransaction();
 
+            // Validate uniqueness for all changes before applying them
+            $uniqueFields = ['id_number', 'phone', 'secondary_phone'];
+            $conflicts = [];
+            
+            foreach ($pendingChanges as $change) {
+                $fieldName = $change->field_name;
+                $newValue = $change->new_value;
+                
+                if (in_array($fieldName, $uniqueFields) && !empty($newValue)) {
+                    $existingMember = Member::where($fieldName, $newValue)
+                        ->where('id', '!=', $member->id)
+                        ->first();
+                    
+                    if ($existingMember) {
+                        $fieldLabels = [
+                            'id_number' => 'ID number',
+                            'phone' => 'phone number',
+                            'secondary_phone' => 'WhatsApp number',
+                        ];
+                        $fieldLabel = $fieldLabels[$fieldName] ?? $fieldName;
+                        $conflicts[] = "{$fieldLabel} is already registered to {$existingMember->name}";
+                    }
+                }
+            }
+            
+            if (!empty($conflicts)) {
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'Cannot approve changes: ' . implode(', ', $conflicts),
+                    'conflicts' => $conflicts,
+                ], 422);
+            }
+
             $approvedCount = 0;
             foreach ($pendingChanges as $change) {
                 $fieldName = $change->field_name;
@@ -238,6 +297,9 @@ class PendingProfileChangeController extends Controller
             if ($member->isProfileComplete() && !$member->profile_completed_at) {
                 $member->markProfileComplete();
             }
+
+            // Clear cached profile status for this member's token
+            Cache::forget('profile-status:' . $member->public_share_token);
 
             DB::commit();
 
@@ -280,11 +342,42 @@ class PendingProfileChangeController extends Controller
 
             $totalApproved = 0;
             $membersProcessed = 0;
+            $conflicts = [];
 
             foreach ($pendingChanges as $memberId => $changes) {
                 $member = Member::find($memberId);
                 if (!$member) {
                     continue;
+                }
+
+                // Validate uniqueness for this member's changes
+                $uniqueFields = ['id_number', 'phone', 'secondary_phone'];
+                $memberConflicts = [];
+                
+                foreach ($changes as $change) {
+                    $fieldName = $change->field_name;
+                    $newValue = $change->new_value;
+                    
+                    if (in_array($fieldName, $uniqueFields) && !empty($newValue)) {
+                        $existingMember = Member::where($fieldName, $newValue)
+                            ->where('id', '!=', $member->id)
+                            ->first();
+                        
+                        if ($existingMember) {
+                            $fieldLabels = [
+                                'id_number' => 'ID number',
+                                'phone' => 'phone number',
+                                'secondary_phone' => 'WhatsApp number',
+                            ];
+                            $fieldLabel = $fieldLabels[$fieldName] ?? $fieldName;
+                            $memberConflicts[] = "{$member->name}: {$fieldLabel} already registered to {$existingMember->name}";
+                        }
+                    }
+                }
+                
+                if (!empty($memberConflicts)) {
+                    $conflicts = array_merge($conflicts, $memberConflicts);
+                    continue; // Skip this member
                 }
 
                 foreach ($changes as $change) {
@@ -310,7 +403,20 @@ class PendingProfileChangeController extends Controller
                     $member->markProfileComplete();
                 }
 
+                // Clear cached profile status for this member's token
+                Cache::forget('profile-status:' . $member->public_share_token);
+
                 $membersProcessed++;
+            }
+
+            if (!empty($conflicts)) {
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'Cannot approve all changes due to conflicts: ' . implode('; ', $conflicts),
+                    'conflicts' => $conflicts,
+                    'approved_count' => $totalApproved,
+                    'members_processed' => $membersProcessed,
+                ], 422);
             }
 
             DB::commit();

@@ -26,6 +26,38 @@
         sessionStorage.setItem('session_active', 'true')
       }
     }
+
+    // Suppress browser extension errors from console
+    const originalError = console.error
+    console.error = function(...args) {
+      // Filter out browser extension errors
+      const errorMessage = args[0]?.toString() || ''
+      if (
+        errorMessage.includes('runtime.lastError') ||
+        errorMessage.includes('Could not establish connection') ||
+        errorMessage.includes('Receiving end does not exist') ||
+        errorMessage.includes('Extension context invalidated')
+      ) {
+        // Silently ignore browser extension errors
+        return
+      }
+      // Call original console.error for other errors
+      originalError.apply(console, args)
+    }
+
+    // Also suppress unhandled promise rejections from extensions
+    window.addEventListener('unhandledrejection', (event) => {
+      const reason = event.reason?.message || event.reason?.toString() || ''
+      if (
+        reason.includes('runtime.lastError') ||
+        reason.includes('Could not establish connection') ||
+        reason.includes('Receiving end does not exist') ||
+        reason.includes('Extension context invalidated')
+      ) {
+        event.preventDefault()
+        return false
+      }
+    })
   }
 })()
 
@@ -73,7 +105,12 @@ function RootApp() {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <RootApp />
       </BrowserRouter>
     </QueryClientProvider>

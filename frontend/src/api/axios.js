@@ -91,23 +91,37 @@ api.interceptors.response.use(
         } else if (isUserAction) {
           // User-initiated action failed with 401 - this is a real auth issue
           // But give a more graceful error message instead of immediate logout
+          // Don't logout on POST/PUT/DELETE requests that might be transient errors
+          // Only logout if we get multiple failures in quick succession
           console.error('Authentication failed for user action:', errorMessage)
-          // Only logout if this is NOT the first failure
-          const failureCount = parseInt(sessionStorage.getItem('auth_failure_count') || '0')
-          if (failureCount > 0) {
-            // Second failure - logout
-            localStorage.removeItem('token')
-            localStorage.removeItem('token_timestamp')
-            sessionStorage.removeItem('session_active')
-            sessionStorage.removeItem('auth_failure_count')
-            if (window.location.pathname !== '/login') {
-              window.location.href = '/login'
+          
+          // Check if this is a pending profile changes approval endpoint
+          // These endpoints should not cause logout on 401 (might be session timeout during approval)
+          const isPendingChangesEndpoint = config?.url?.includes('/pending-profile-changes')
+          
+          if (!isPendingChangesEndpoint) {
+            // Only logout if this is NOT the first failure
+            const failureCount = parseInt(sessionStorage.getItem('auth_failure_count') || '0')
+            if (failureCount > 0) {
+              // Second failure - logout
+              localStorage.removeItem('token')
+              localStorage.removeItem('token_timestamp')
+              sessionStorage.removeItem('session_active')
+              sessionStorage.removeItem('auth_failure_count')
+              if (window.location.pathname !== '/login') {
+                window.location.href = '/login'
+              }
+            } else {
+              // First failure - just track it
+              sessionStorage.setItem('auth_failure_count', '1')
+              // Clear the count after 5 seconds (transient error recovery)
+              setTimeout(() => sessionStorage.removeItem('auth_failure_count'), 5000)
             }
           } else {
-            // First failure - just track it
-            sessionStorage.setItem('auth_failure_count', '1')
-            // Clear the count after 5 seconds (transient error recovery)
-            setTimeout(() => sessionStorage.removeItem('auth_failure_count'), 5000)
+            // For pending changes endpoints, just reject without logging out
+            // The user can refresh and try again
+            console.warn('Authentication error on pending changes action:', errorMessage)
+            return Promise.reject(error)
           }
         } else {
           // GET request with 401 - just log and reject, don't logout

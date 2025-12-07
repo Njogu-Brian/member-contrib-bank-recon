@@ -30,23 +30,38 @@ class ProfileController extends Controller
         $data = Cache::remember($cacheKey, 300, function () use ($token) {
             $member = Member::where('public_share_token', $token)->firstOrFail();
 
+            // Get member data with pending changes applied
+            $memberData = [
+                'name' => $member->name,
+                'phone' => $member->phone,
+                'secondary_phone' => $member->secondary_phone,
+                'email' => $member->email,
+                'id_number' => $member->id_number,
+                'church' => $member->church,
+                'next_of_kin_name' => $member->next_of_kin_name,
+                'next_of_kin_phone' => $member->next_of_kin_phone,
+                'next_of_kin_relationship' => $member->next_of_kin_relationship,
+            ];
+
+            // Override with pending values
+            $pendingChanges = \App\Models\PendingProfileChange::where('member_id', $member->id)
+                ->where('status', 'pending')
+                ->get();
+            
+            foreach ($pendingChanges as $change) {
+                if (isset($memberData[$change->field_name])) {
+                    $memberData[$change->field_name] = $change->new_value;
+                }
+            }
+
             return [
-                'is_complete' => $member->isProfileComplete(),
+                'is_complete' => $member->isProfileCompleteWithPending(),
                 'missing_fields' => $member->getMissingProfileFields(),
                 'profile_completed_at' => $member->profile_completed_at,
-                'member' => [
-                    'name' => $member->name,
-                    'phone' => $member->phone,
-                    'secondary_phone' => $member->secondary_phone,
-                    'email' => $member->email,
-                    'id_number' => $member->id_number,
-                    'church' => $member->church,
-                    'next_of_kin_name' => $member->next_of_kin_name,
-                    'next_of_kin_phone' => $member->next_of_kin_phone,
-                    'next_of_kin_relationship' => $member->next_of_kin_relationship,
+                'member' => array_merge($memberData, [
                     'member_code' => $member->member_code,
                     'member_number' => $member->member_number,
-                ],
+                ]),
             ];
         });
 
@@ -72,23 +87,26 @@ class ProfileController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'phone' => ['required', 'string', 'max:20', 'regex:/^\+\d{1,4}\d{6,14}$/'],
-            'secondary_phone' => ['nullable', 'string', 'max:20', 'regex:/^\+\d{1,4}\d{6,14}$/'],
+            'phone' => ['required', 'string', 'max:20', 'regex:/^\+\d{1,4}\d{6,14}$/', 'unique:members,phone,' . $member->id],
+            'secondary_phone' => ['nullable', 'string', 'max:20', 'regex:/^\+\d{1,4}\d{6,14}$/', 'unique:members,secondary_phone,' . $member->id],
             'email' => 'required|email|max:255',
-            'id_number' => ['required', 'string', 'regex:/^\d+$/', 'min:5', 'max:20'],
+            'id_number' => ['required', 'string', 'regex:/^\d+$/', 'min:5', 'max:20', 'unique:members,id_number,' . $member->id],
             'church' => 'required|string|max:255',
             'next_of_kin_name' => 'required|string|max:255',
             'next_of_kin_phone' => ['required', 'string', 'max:20', 'regex:/^\+\d{1,4}\d{6,14}$/'],
             'next_of_kin_relationship' => 'required|string|max:255|in:wife,husband,brother,sister,father,mother,son,daughter,cousin,friend,other',
         ], [
             'phone.regex' => 'Phone number must start with + followed by country code and number (e.g., +254712345678)',
+            'phone.unique' => 'This phone number is already registered to another member.',
             'secondary_phone.regex' => 'WhatsApp number must start with + followed by country code and number',
+            'secondary_phone.unique' => 'This WhatsApp number is already registered to another member.',
             'next_of_kin_name.required' => 'Next of kin name is required',
             'next_of_kin_phone.required' => 'Next of kin phone number is required',
             'next_of_kin_phone.regex' => 'Next of kin phone number must start with + followed by country code and number',
             'next_of_kin_relationship.required' => 'Next of kin relationship is required',
             'id_number.regex' => 'ID Number must contain only digits',
             'id_number.min' => 'ID Number must be at least 5 digits',
+            'id_number.unique' => 'This ID number is already registered to another member.',
         ]);
 
         if ($validator->fails()) {
@@ -149,7 +167,7 @@ class ProfileController extends Controller
 
         return response()->json([
             'message' => count($pendingChanges) > 0 
-                ? 'Profile changes submitted for admin approval. You will be notified once approved.'
+                ? 'Profile updated successfully.'
                 : 'No changes detected.',
             'pending_changes_count' => count($pendingChanges),
             'is_first_update' => $isFirstUpdate,
