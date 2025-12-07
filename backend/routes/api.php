@@ -349,6 +349,8 @@ Route::prefix('v1')->group(function () {
         Route::post('/audits/contributions', [AuditController::class, 'upload']);
         Route::post('/audits/{auditRun}/reanalyze', [AuditController::class, 'reanalyze']);
         Route::delete('/audits/{auditRun}', [AuditController::class, 'destroy']);
+        // IMPORTANT: Specific routes must come before parameterized routes to avoid conflicts
+        Route::get('/audits/member/pending-profile-changes', [AuditController::class, 'pendingProfileChangesAudit']);
         Route::get('/audits/member/{member}', [AuditController::class, 'memberResults']);
         Route::post('/audits/statements', [AuditController::class, 'auditStatements']);
 

@@ -8,6 +8,7 @@ use App\Models\AuditRun;
 use App\Models\BankStatement;
 use App\Models\Expense;
 use App\Models\Member;
+use App\Models\PendingProfileChange;
 use App\Models\Transaction;
 use App\Models\TransactionSplit;
 use Carbon\Carbon;
@@ -179,6 +180,114 @@ class AuditController extends Controller
         });
 
         return response()->json(['message' => 'Audit deleted']);
+    }
+
+    /**
+     * Get audit information for members with pending profile changes
+     */
+    public function pendingProfileChangesAudit(Request $request)
+    {
+        try {
+            $perPage = max(1, min(100, (int) $request->get('per_page', 25)));
+            $page = max(1, (int) $request->get('page', 1));
+
+            // Get pending profile changes with member and audit information
+            $query = PendingProfileChange::with([
+                'member' => function ($q) {
+                    $q->select('id', 'name', 'phone', 'email', 'member_code');
+                },
+                'reviewedBy' => function ($q) {
+                    $q->select('id', 'name', 'email');
+                }
+            ])
+            ->where('status', 'pending')
+            ->orderBy('created_at', 'desc');
+
+            if ($request->filled('member_id')) {
+                $query->where('member_id', $request->member_id);
+            }
+
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->whereHas('member', function ($memberQuery) use ($search) {
+                        $memberQuery->where('name', 'like', "%{$search}%")
+                          ->orWhere('phone', 'like', "%{$search}%")
+                          ->orWhere('email', 'like', "%{$search}%")
+                          ->orWhere('member_code', 'like', "%{$search}%");
+                    })
+                    ->orWhere('field_name', 'like', "%{$search}%");
+                });
+            }
+
+            $changes = $query->paginate($perPage);
+
+            // Get audit rows for members with pending changes
+            $memberIds = $changes->pluck('member_id')->unique()->filter();
+            $auditRows = [];
+            if ($memberIds->isNotEmpty()) {
+                $auditRows = AuditRow::with('run')
+                    ->whereIn('member_id', $memberIds)
+                    ->orderByDesc('created_at')
+                    ->get()
+                    ->groupBy('member_id');
+            }
+
+            // Transform items
+            $items = $changes->items();
+            $transformedItems = array_map(function ($change) use ($auditRows) {
+                $member = $change->member ?? null;
+                $memberAudits = $auditRows->get($change->member_id, collect())->take(5)->map(function ($row) {
+                    return [
+                        'run_id' => $row->run_id,
+                        'year' => $row->run->year ?? null,
+                        'status' => $row->status,
+                        'expected_total' => $row->expected_total,
+                        'system_total' => $row->system_total,
+                        'difference' => $row->difference,
+                        'created_at' => $row->created_at ? $row->created_at->toDateTimeString() : null,
+                    ];
+                })->values();
+
+                return [
+                    'id' => $change->id ?? null,
+                    'member_id' => $change->member_id ?? null,
+                    'field_name' => $change->field_name ?? '',
+                    'old_value' => $change->old_value ?? null,
+                    'new_value' => $change->new_value ?? '',
+                    'status' => $change->status ?? 'pending',
+                    'created_at' => $change->created_at ? $change->created_at->toDateTimeString() : null,
+                    'member' => $member ? [
+                        'id' => $member->id ?? null,
+                        'name' => $member->name ?? '',
+                        'phone' => $member->phone ?? '',
+                        'email' => $member->email ?? '',
+                        'member_code' => $member->member_code ?? '',
+                    ] : null,
+                    'audits' => $memberAudits,
+                ];
+            }, $items);
+
+            return response()->json([
+                'data' => $transformedItems,
+                'current_page' => $changes->currentPage(),
+                'last_page' => $changes->lastPage(),
+                'per_page' => $changes->perPage(),
+                'total' => $changes->total(),
+                'from' => $changes->firstItem(),
+                'to' => $changes->lastItem(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching pending profile changes audit: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            return response()->json([
+                'message' => 'Error fetching pending profile changes audit',
+                'error' => config('app.debug') ? $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() : 'An error occurred',
+            ], 500);
+        }
     }
 
     protected function processAudit(AuditRun $run, string $path, $user = null, ?UploadedFile $uploadedFile = null)
