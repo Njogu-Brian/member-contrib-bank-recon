@@ -357,4 +357,119 @@ class PendingProfileChangeController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get pending profile changes with statement information
+     * This endpoint returns pending profile changes, similar to index but structured for statement view
+     */
+    public function statement(Request $request)
+    {
+        try {
+            $query = PendingProfileChange::with([
+                'member' => function ($q) {
+                    $q->select('id', 'name', 'phone', 'email', 'member_code');
+                },
+                'reviewedBy' => function ($q) {
+                    $q->select('id', 'name', 'email');
+                }
+            ])
+            ->where('status', 'pending')
+            ->orderBy('created_at', 'desc');
+
+            if ($request->filled('member_id')) {
+                $query->where('member_id', $request->member_id);
+            }
+
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->whereHas('member', function ($memberQuery) use ($search) {
+                        $memberQuery->where('name', 'like', "%{$search}%")
+                          ->orWhere('phone', 'like', "%{$search}%")
+                          ->orWhere('email', 'like', "%{$search}%")
+                          ->orWhere('member_code', 'like', "%{$search}%");
+                    })
+                    ->orWhere('field_name', 'like', "%{$search}%")
+                    ->orWhere('old_value', 'like', "%{$search}%")
+                    ->orWhere('new_value', 'like', "%{$search}%");
+                });
+            }
+
+            $perPage = max(1, min(100, (int) $request->get('per_page', 25)));
+            $changes = $query->paginate($perPage);
+
+            // Transform items to ensure member data is properly formatted
+            $items = $changes->items();
+            $transformedItems = array_map(function ($change) {
+                $member = $change->member ?? null;
+                $reviewedBy = $change->reviewedBy ?? null;
+                
+                // Get basic statement summary for member if available
+                $statementSummary = null;
+                if ($member) {
+                    try {
+                        $memberModel = Member::find($member->id);
+                        if ($memberModel) {
+                            $statementSummary = [
+                                'total_contributions' => $memberModel->total_contributions ?? 0,
+                                'expected_contributions' => $memberModel->expected_contributions ?? 0,
+                                'contribution_status' => $memberModel->contribution_status ?? 'unknown',
+                            ];
+                        }
+                    } catch (\Exception $e) {
+                        // Ignore errors when fetching statement summary
+                        Log::debug('Error fetching statement summary for member: ' . $e->getMessage());
+                    }
+                }
+                
+                return [
+                    'id' => $change->id ?? null,
+                    'member_id' => $change->member_id ?? null,
+                    'field_name' => $change->field_name ?? '',
+                    'old_value' => $change->old_value ?? null,
+                    'new_value' => $change->new_value ?? '',
+                    'status' => $change->status ?? 'pending',
+                    'reviewed_by' => $change->reviewed_by ?? null,
+                    'reviewed_at' => $change->reviewed_at ? $change->reviewed_at->toDateTimeString() : null,
+                    'rejection_reason' => $change->rejection_reason ?? null,
+                    'created_at' => $change->created_at ? $change->created_at->toDateTimeString() : null,
+                    'updated_at' => $change->updated_at ? $change->updated_at->toDateTimeString() : null,
+                    'member' => $member ? [
+                        'id' => $member->id ?? null,
+                        'name' => $member->name ?? '',
+                        'phone' => $member->phone ?? '',
+                        'email' => $member->email ?? '',
+                        'member_code' => $member->member_code ?? '',
+                    ] : null,
+                    'reviewed_by_user' => $reviewedBy ? [
+                        'id' => $reviewedBy->id ?? null,
+                        'name' => $reviewedBy->name ?? '',
+                        'email' => $reviewedBy->email ?? '',
+                    ] : null,
+                    'statement_summary' => $statementSummary,
+                ];
+            }, $items);
+
+            // Return in standard Laravel pagination format
+            return response()->json([
+                'data' => $transformedItems,
+                'current_page' => $changes->currentPage(),
+                'last_page' => $changes->lastPage(),
+                'per_page' => $changes->perPage(),
+                'total' => $changes->total(),
+                'from' => $changes->firstItem(),
+                'to' => $changes->lastItem(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Error fetching pending profile changes statement: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            return response()->json([
+                'message' => 'Error fetching pending profile changes statement',
+                'error' => config('app.debug') ? $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() : 'An error occurred',
+            ], 500);
+        }
+    }
 }
