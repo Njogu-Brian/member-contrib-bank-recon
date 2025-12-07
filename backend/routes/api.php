@@ -166,26 +166,25 @@ Route::prefix('v1')->group(function () {
         // Dashboard
         Route::get('/dashboard', [DashboardController::class, 'index']);
 
-        // Members
-        // IMPORTANT: Specific routes must come before apiResource to avoid route conflicts
-        Route::get('/members/profile-update-status', [MemberController::class, 'profileUpdateStatus']);
-        Route::post('/members/{member}/reset-profile-link', [MemberController::class, 'resetProfileLink']);
-        Route::post('/members/reset-all-profile-links', [MemberController::class, 'resetAllProfileLinks']);
-        Route::post('/members/bulk-upload', [MemberController::class, 'bulkUpload']);
-        Route::apiResource('members', MemberController::class);
-
-        // Pending Profile Changes
+        // Pending Profile Changes - MUST come before members routes to avoid route conflicts
         Route::get('/pending-profile-changes', [PendingProfileChangeController::class, 'index']);
         Route::get('/pending-profile-changes/statistics', [PendingProfileChangeController::class, 'statistics']);
         Route::post('/pending-profile-changes/{change}/approve', [PendingProfileChangeController::class, 'approve']);
         Route::post('/pending-profile-changes/{change}/reject', [PendingProfileChangeController::class, 'reject']);
         Route::post('/pending-profile-changes/member/{member}/approve-all', [PendingProfileChangeController::class, 'approveMemberChanges']);
         Route::post('/pending-profile-changes/approve-all', [PendingProfileChangeController::class, 'approveAllChanges']);
-        Route::get('/members/{member}/statement', [MemberController::class, 'statement']);
-        Route::get('/members/{member}/statement/export', [MemberController::class, 'exportStatement']);
-        Route::get('/members/{member}/investment-report/export', [MemberController::class, 'exportInvestmentReport']);
+
+        // Members
+        // IMPORTANT: Specific routes must come before apiResource to avoid route conflicts
+        Route::get('/members/profile-update-status', [MemberController::class, 'profileUpdateStatus']);
+        Route::post('/members/{member}/reset-profile-link', [MemberController::class, 'resetProfileLink'])->where('member', '[0-9]+');
+        Route::post('/members/reset-all-profile-links', [MemberController::class, 'resetAllProfileLinks']);
+        Route::post('/members/bulk-upload', [MemberController::class, 'bulkUpload']);
+        Route::get('/members/{member}/statement', [MemberController::class, 'statement'])->where('member', '[0-9]+');
+        Route::get('/members/{member}/statement/export', [MemberController::class, 'exportStatement'])->where('member', '[0-9]+');
+        Route::get('/members/{member}/investment-report/export', [MemberController::class, 'exportInvestmentReport'])->where('member', '[0-9]+');
         Route::get('/members/statements/export', [MemberController::class, 'exportBulkStatements']);
-        Route::post('/members/{member}/activate', [KycController::class, 'activateMember']);
+        Route::post('/members/{member}/activate', [KycController::class, 'activateMember'])->where('member', '[0-9]+');
 
         // KYC Management
         Route::get('/kyc/pending', [KycController::class, 'pending']);
@@ -197,8 +196,8 @@ Route::prefix('v1')->group(function () {
         Route::post('/wallets', [WalletController::class, 'store']);
         Route::get('/wallets/{wallet}', [WalletController::class, 'show']);
         Route::post('/wallets/{wallet}/contributions', [WalletController::class, 'contribute']);
-        Route::get('/members/{member}/penalties', [WalletController::class, 'penalties']);
-        Route::post('/members/{member}/sync-transactions', [WalletController::class, 'syncTransactions']);
+        Route::get('/members/{member}/penalties', [WalletController::class, 'penalties'])->where('member', '[0-9]+');
+        Route::post('/members/{member}/sync-transactions', [WalletController::class, 'syncTransactions'])->where('member', '[0-9]+');
 
         // Payments
         Route::post('/payments/{payment}/receipt', [PaymentController::class, 'issueReceipt']);
@@ -330,7 +329,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/sms/logs', [SmsController::class, 'logs']);
         Route::get('/sms/statistics', [SmsController::class, 'statistics']);
         Route::post('/sms/bulk', [SmsController::class, 'sendBulk']);
-        Route::post('/sms/members/{member}', [SmsController::class, 'sendSingle']);
+        Route::post('/sms/members/{member}', [SmsController::class, 'sendSingle'])->where('member', '[0-9]+');
 
         // Email
         Route::get('/emails/logs', [\App\Http\Controllers\EmailController::class, 'logs']);
