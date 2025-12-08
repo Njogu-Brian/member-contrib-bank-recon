@@ -17,7 +17,10 @@ class SessionTimeout
     public function handle(Request $request, Closure $next): Response
     {
         if (Auth::check()) {
-            $timeout = config('session.lifetime') * 60; // Convert minutes to seconds
+            // Get timeout from settings, fallback to config, default to 30 minutes
+            $timeoutMinutes = \App\Models\Setting::get('session_timeout_minutes', config('session.lifetime', 30));
+            $timeout = $timeoutMinutes * 60; // Convert minutes to seconds
+            
             $lastActivity = session('last_activity_time');
             
             if ($lastActivity && (time() - $lastActivity) > $timeout) {
@@ -27,6 +30,7 @@ class SessionTimeout
                 
                 return response()->json([
                     'message' => 'Your session has expired due to inactivity. Please log in again.',
+                    'session_timeout' => $timeoutMinutes,
                 ], 401);
             }
             

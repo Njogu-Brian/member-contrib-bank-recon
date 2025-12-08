@@ -356,9 +356,14 @@ class AuthController extends Controller
             'request_data' => $request->only(['password', 'password_confirmation', 'current_password']),
         ]);
         
-        // Validation rules
+        // Validation rules - enforce password policy
         $rules = [
-            'password' => 'required|string|min:8',
+            'password' => [
+                'required',
+                'string',
+                'min:8',
+                'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/',
+            ],
             'password_confirmation' => 'required|string|same:password',
         ];
         
