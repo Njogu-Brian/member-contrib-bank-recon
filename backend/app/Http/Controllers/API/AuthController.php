@@ -417,10 +417,44 @@ class AuthController extends Controller
     private function uploadKycDocument(Request $request, string $documentType): JsonResponse
     {
         $request->validate([
-            'document' => ['required', 'file', 'mimes:jpg,jpeg,png', 'max:5120'], // Only images for validation
+            'document' => [
+                'required',
+                'file',
+                'mimes:jpg,jpeg,png,pdf',
+                'max:5120', // 5MB max
+                function ($attribute, $value, $fail) {
+                    // Additional validation: check file size in bytes
+                    if ($value && $value->getSize() > 5242880) { // 5MB in bytes
+                        $fail('The document must not be larger than 5MB.');
+                    }
+                    // Check if file is actually an image or PDF
+                    $mimeType = $value->getMimeType();
+                    $allowedMimes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+                    if (!in_array($mimeType, $allowedMimes)) {
+                        $fail('The document must be a JPEG, PNG image, or PDF file.');
+                    }
+                },
+            ],
         ]);
 
         $file = $request->file('document');
+        
+        // Additional security: validate file content
+        try {
+            $documentValidationService = app(\App\Services\DocumentValidationService::class);
+            $validationResult = $documentValidationService->validate($file);
+            
+            if (!$validationResult['valid']) {
+                return response()->json([
+                    'message' => 'Document validation failed: ' . ($validationResult['error'] ?? 'Invalid file'),
+                ], 422);
+            }
+        } catch (\Exception $e) {
+            \Log::warning('Document validation service error', [
+                'error' => $e->getMessage(),
+            ]);
+            // Continue if validation service fails - don't block upload
+        }
 
         // Validate document quality and type
         $validationResults = $this->validationService->validateDocument($file, $documentType);

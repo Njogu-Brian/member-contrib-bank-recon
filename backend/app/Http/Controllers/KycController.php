@@ -106,5 +106,65 @@ class KycController extends Controller
             ], 422);
         }
     }
+
+    /**
+     * Upload KYC document (Admin - for member)
+     */
+    public function uploadDocument(Request $request, Member $member): JsonResponse
+    {
+        $validated = $request->validate([
+            'document_type' => 'required|string|in:front_id,back_id,selfie,kra_pin,profile_photo',
+            'document' => [
+                'required',
+                'file',
+                'mimes:jpg,jpeg,png,pdf',
+                'max:5120', // 5MB
+            ],
+        ]);
+
+        $file = $request->file('document');
+        
+        // Validate file
+        try {
+            $documentValidationService = app(\App\Services\DocumentValidationService::class);
+            $validationResult = $documentValidationService->validate($file);
+            
+            if (!$validationResult['valid']) {
+                return response()->json([
+                    'message' => 'Document validation failed: ' . ($validationResult['error'] ?? 'Invalid file'),
+                ], 422);
+            }
+        } catch (\Exception $e) {
+            \Log::warning('Document validation error', ['error' => $e->getMessage()]);
+        }
+
+        // Store file
+        $path = $file->store('kyc', 'public');
+        $fileName = $file->getClientOriginalName();
+
+        // Delete any existing pending document of the same type for this member
+        KycDocument::where('member_id', $member->id)
+            ->where('document_type', $validated['document_type'])
+            ->where('status', 'pending')
+            ->delete();
+
+        // Create document record
+        $document = KycDocument::create([
+            'user_id' => auth()->id(),
+            'member_id' => $member->id,
+            'document_type' => $validated['document_type'],
+            'file_name' => $fileName,
+            'disk' => 'public',
+            'path' => $path,
+            'status' => 'pending',
+        ]);
+
+        $this->kycService->logDocumentUpload($document, auth()->id());
+
+        return response()->json([
+            'message' => 'Document uploaded successfully',
+            'document' => $document->load('member'),
+        ], 201);
+    }
 }
 

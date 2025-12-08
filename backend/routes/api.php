@@ -207,6 +207,10 @@ Route::prefix('v1')->group(function () {
         Route::get('/members/{member}/penalties', [WalletController::class, 'penalties'])->where('member', '[0-9]+');
         Route::post('/members/{member}/sync-transactions', [WalletController::class, 'syncTransactions'])->where('member', '[0-9]+');
 
+        // Savings Goals
+        Route::apiResource('savings-goals', \App\Http\Controllers\SavingsGoalController::class);
+        Route::post('/savings-goals/{savingsGoal}/contribute', [\App\Http\Controllers\SavingsGoalController::class, 'addContribution']);
+
         // Payments
         Route::post('/payments/{payment}/receipt', [PaymentController::class, 'issueReceipt']);
         Route::post('/payments/reconcile', [PaymentController::class, 'reconcile']);

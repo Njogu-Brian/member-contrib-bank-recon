@@ -10,7 +10,49 @@ use Intervention\Image\Drivers\Gd\Driver;
 class DocumentValidationService
 {
     /**
-     * Validate uploaded document
+     * Simple validate method for basic file validation
+     */
+    public function validate(UploadedFile $file): array
+    {
+        $results = [
+            'valid' => true,
+            'error' => null,
+        ];
+
+        try {
+            // Check file size
+            if ($file->getSize() > 5242880) { // 5MB
+                $results['valid'] = false;
+                $results['error'] = 'File size exceeds 5MB limit';
+                return $results;
+            }
+
+            // Check MIME type
+            $mimeType = $file->getMimeType();
+            $allowedMimes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+            if (!in_array($mimeType, $allowedMimes)) {
+                $results['valid'] = false;
+                $results['error'] = 'Invalid file type. Only JPEG, PNG, and PDF files are allowed';
+                return $results;
+            }
+
+            // Basic file integrity check
+            if (!$file->isValid()) {
+                $results['valid'] = false;
+                $results['error'] = 'File upload failed or file is corrupted';
+                return $results;
+            }
+        } catch (\Exception $e) {
+            Log::error('Document validation error: ' . $e->getMessage());
+            $results['valid'] = false;
+            $results['error'] = 'Validation error: ' . $e->getMessage();
+        }
+
+        return $results;
+    }
+
+    /**
+     * Validate uploaded document with detailed checks
      * 
      * @param UploadedFile $file
      * @param string $documentType (front_id, back_id, selfie)
