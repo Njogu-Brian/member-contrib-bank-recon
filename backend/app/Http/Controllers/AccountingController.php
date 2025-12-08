@@ -59,11 +59,22 @@ class AccountingController extends Controller
 
             return response()->json([
                 'message' => 'Journal entry posted successfully',
-                'entry' => $entry->fresh(),
+                'entry' => $entry->fresh(['lines.account', 'period']),
             ]);
         } catch (\Exception $e) {
+            \Log::error('Journal entry posting failed', [
+                'entry_id' => $entry->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
                 'message' => 'Failed to post journal entry: ' . $e->getMessage(),
+                'error' => config('app.debug') ? [
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ] : null,
             ], 422);
         }
     }

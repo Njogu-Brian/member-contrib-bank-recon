@@ -61,12 +61,34 @@ class DoubleEntryService
      */
     public function postJournalEntry(JournalEntry $entry): void
     {
+        // Reload entry with lines to ensure we have fresh data
+        $entry = $entry->fresh('lines');
+
         if ($entry->is_posted) {
             throw new \Exception('Journal entry is already posted');
         }
 
         if (!$entry->isBalanced()) {
-            throw new \Exception('Journal entry is not balanced and cannot be posted');
+            throw new \Exception('Journal entry is not balanced and cannot be posted. Total debit: ' . $entry->total_debit . ', Total credit: ' . $entry->total_credit);
+        }
+
+        // Validate entry has lines
+        if ($entry->lines->isEmpty()) {
+            throw new \Exception('Journal entry must have at least one line to be posted');
+        }
+
+        // Validate period exists and is not closed
+        if (!$entry->period_id) {
+            throw new \Exception('Journal entry must have a valid accounting period');
+        }
+
+        $period = AccountingPeriod::find($entry->period_id);
+        if (!$period) {
+            throw new \Exception("Accounting period with ID {$entry->period_id} not found");
+        }
+
+        if ($period->is_closed) {
+            throw new \Exception("Cannot post to closed accounting period: {$period->period_name}");
         }
 
         DB::transaction(function () use ($entry) {
@@ -86,25 +108,58 @@ class DoubleEntryService
      */
     protected function postToLedger(JournalEntry $entry, JournalEntryLine $line): void
     {
+        // Validate account exists and is active
+        $account = ChartOfAccount::find($line->account_id);
+        if (!$account) {
+            throw new \Exception("Account with ID {$line->account_id} not found");
+        }
+
+        if (!$account->is_active) {
+            throw new \Exception("Account {$account->code} ({$account->name}) is not active and cannot be used");
+        }
+
+        // Validate period exists
+        if (!$entry->period_id) {
+            throw new \Exception('Journal entry must have a valid period');
+        }
+
+        $period = AccountingPeriod::find($entry->period_id);
+        if (!$period) {
+            throw new \Exception("Accounting period with ID {$entry->period_id} not found");
+        }
+
+        // Validate entry date is within period
+        $entryDate = is_string($entry->entry_date) ? \Carbon\Carbon::parse($entry->entry_date) : $entry->entry_date;
+        if ($entryDate->lt($period->start_date) || $entryDate->gt($period->end_date)) {
+            throw new \Exception("Entry date {$entryDate->toDateString()} is outside the accounting period ({$period->start_date} to {$period->end_date})");
+        }
+
         // Calculate running balance
         $lastBalance = GeneralLedger::where('account_id', $line->account_id)
-            ->where('entry_date', '<=', $entry->entry_date)
+            ->where('entry_date', '<=', $entryDate)
             ->orderBy('entry_date', 'desc')
             ->orderBy('id', 'desc')
             ->value('running_balance') ?? 0;
 
-        $account = ChartOfAccount::find($line->account_id);
         $balanceChange = $this->calculateBalanceChange($account, $line);
-
         $runningBalance = $lastBalance + $balanceChange;
+
+        // Validate debit and credit are non-negative
+        $debit = max(0, (float) ($line->debit ?? 0));
+        $credit = max(0, (float) ($line->credit ?? 0));
+
+        // Ensure at least one of debit or credit is non-zero
+        if ($debit == 0 && $credit == 0) {
+            throw new \Exception('Journal entry line must have either a debit or credit amount');
+        }
 
         GeneralLedger::create([
             'account_id' => $line->account_id,
             'journal_entry_id' => $entry->id,
             'period_id' => $entry->period_id,
-            'entry_date' => $entry->entry_date,
-            'debit' => $line->debit,
-            'credit' => $line->credit,
+            'entry_date' => $entryDate,
+            'debit' => $debit,
+            'credit' => $credit,
             'running_balance' => $runningBalance,
             'reference_type' => $entry->reference_type,
             'reference_id' => $entry->reference_id,
