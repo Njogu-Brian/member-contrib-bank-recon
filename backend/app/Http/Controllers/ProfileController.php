@@ -3,15 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Member;
-use App\Models\KycDocument;
-use App\Services\DocumentValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 
 class ProfileController extends Controller
 {
