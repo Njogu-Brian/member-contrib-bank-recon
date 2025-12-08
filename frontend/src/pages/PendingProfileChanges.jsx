@@ -53,6 +53,22 @@ export default function PendingProfileChanges() {
     },
   })
 
+  // KYC Documents Query
+  const { data: kycDocumentsData, isLoading: isLoadingKyc } = useQuery({
+    queryKey: ['kyc-pending', searchTerm],
+    queryFn: async () => {
+      try {
+        const result = await getPendingKycDocuments({ search: searchTerm })
+        return Array.isArray(result) ? result : []
+      } catch (error) {
+        console.error('Error fetching KYC documents:', error)
+        return []
+      }
+    },
+  })
+
+  const kycDocuments = Array.isArray(kycDocumentsData) ? kycDocumentsData : []
+
   const approveMutation = useMutation({
     mutationFn: async (changeId) => {
       const response = await api.post(`/admin/pending-profile-changes/${changeId}/approve`)
@@ -194,7 +210,7 @@ export default function PendingProfileChanges() {
       <PageHeader
         title="Profile & KYC Approvals"
         description="Review and approve member profile updates and KYC documents"
-        metric={(stats?.total_pending || 0) + (kycDocuments?.length || 0)}
+        metric={(stats?.total_pending || 0) + kycDocuments.length}
         metricLabel="Total Pending"
         gradient="from-orange-600 to-red-600"
       >
@@ -236,7 +252,7 @@ export default function PendingProfileChanges() {
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              KYC Documents ({kycDocuments?.length || 0})
+              KYC Documents ({kycDocuments.length})
             </button>
           </nav>
         </div>
