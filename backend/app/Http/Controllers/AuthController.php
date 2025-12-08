@@ -376,7 +376,9 @@ class AuthController extends Controller
         // This ensures Laravel doesn't validate it even if it's sent
         
         try {
-            $validated = $request->validate($rules);
+            $validated = $request->validate($rules, [
+                'password.regex' => 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)',
+            ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::warning('Password change validation failed', [
                 'user_id' => $user->id,
