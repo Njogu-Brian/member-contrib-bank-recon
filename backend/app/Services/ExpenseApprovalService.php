@@ -19,6 +19,12 @@ class ExpenseApprovalService
             'required_role' => null,
         ];
 
+        // Validate expense amount
+        if ($expense->amount <= 0) {
+            $result['reason'] = 'Invalid expense amount';
+            return $result;
+        }
+
         // Admin can always approve
         if ($user->hasRole('admin') || $user->hasRole('super_admin')) {
             $result['can_approve'] = true;

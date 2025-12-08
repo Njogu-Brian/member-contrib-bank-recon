@@ -110,7 +110,12 @@ class StaffController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:8',
+            'password' => [
+                'required',
+                'string',
+                'min:8',
+                'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/',
+            ],
             'phone' => 'nullable|string|max:20',
             'member_id' => 'nullable|exists:members,id',
             'roles' => 'required|array|min:1',
@@ -118,10 +123,29 @@ class StaffController extends Controller
             'is_active' => 'boolean',
             'send_credentials_sms' => 'boolean',
             'send_credentials_email' => 'boolean',
+        ], [
+            'password.regex' => 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)',
+            'roles.required' => 'At least one role must be assigned',
+            'roles.*.exists' => 'One or more selected roles do not exist',
         ]);
 
         DB::beginTransaction();
         try {
+            // Verify all roles exist before creating user
+            $roleIds = $validated['roles'];
+            $existingRoles = Role::whereIn('id', $roleIds)->pluck('id')->toArray();
+            $missingRoles = array_diff($roleIds, $existingRoles);
+            
+            if (!empty($missingRoles)) {
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'One or more selected roles do not exist',
+                    'errors' => [
+                        'roles' => ['The following role IDs do not exist: ' . implode(', ', $missingRoles)],
+                    ],
+                ], 422);
+            }
+
             $user = User::create([
                 'name' => $validated['name'],
                 'email' => $validated['email'],

@@ -79,6 +79,15 @@ class PaymentService
             ]);
 
             if ($payment->status === 'completed') {
+                // Validate amount is positive
+                if ($payment->amount <= 0) {
+                    Log::error('Invalid payment amount', [
+                        'payment_id' => $payment->id,
+                        'amount' => $payment->amount,
+                    ]);
+                    throw new \RuntimeException('Payment amount must be greater than 0');
+                }
+
                 $contribution = $this->walletService->contribute($wallet->id, [
                     'amount' => $payment->amount,
                     'source' => 'mpesa',
