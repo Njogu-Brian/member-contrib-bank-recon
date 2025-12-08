@@ -267,12 +267,47 @@ class MemberController extends Controller
             }
         }
 
+        // Calculate running balance using StatementBalanceCalculator
+        $balanceCalculator = app(StatementBalanceCalculator::class);
+        $startDate = $validated['start_date'] ?? $validated['month'] ?? null;
+        $openingBalance = 0;
+        
+        if ($startDate) {
+            $openingBalance = $balanceCalculator->getOpeningBalance($member, $startDate);
+        }
+        
+        // Sort by date before calculating running balance
+        $sortedCollection = $collection->sortBy('date')->values();
+        
+        // Calculate running balance
+        $runningBalance = $openingBalance;
+        $collectionWithBalance = $sortedCollection->map(function ($entry) use (&$runningBalance) {
+            // Add credits (contributions, deposits)
+            if (isset($entry['credit']) && $entry['credit'] > 0) {
+                $runningBalance += (float) $entry['credit'];
+            }
+            
+            // Subtract debits (expenses, withdrawals)
+            if (isset($entry['debit']) && $entry['debit'] > 0) {
+                $runningBalance -= (float) $entry['debit'];
+            }
+            
+            // Handle amount field
+            if (isset($entry['amount'])) {
+                $amount = (float) $entry['amount'];
+                $runningBalance += $amount;
+            }
+            
+            $entry['running_balance'] = round($runningBalance, 2);
+            return $entry;
+        });
+
         $perPage = max(1, (int) $request->get('per_page', 25));
         $page = max(1, (int) $request->get('page', 1));
-        $total = $collection->count();
+        $total = $collectionWithBalance->count();
 
         $paginatedStatement = new LengthAwarePaginator(
-            $collection->slice(($page - 1) * $perPage, $perPage)->values(),
+            $collectionWithBalance->slice(($page - 1) * $perPage, $perPage)->values(),
             $total,
             $perPage,
             $page,
@@ -295,7 +330,10 @@ class MemberController extends Controller
         return response()->json([
             'member' => $memberData,
             'statement' => $paginatedStatement->items(),
-            'summary' => $data['summary'],
+            'summary' => array_merge($data['summary'], [
+                'opening_balance' => $openingBalance,
+                'closing_balance' => $runningBalance,
+            ]),
             'pagination' => [
                 'current_page' => $paginatedStatement->currentPage(),
                 'per_page' => $paginatedStatement->perPage(),
@@ -695,22 +733,43 @@ class MemberController extends Controller
         $sheet->setCellValue('A4', 'Registration Date: ' . $registrationDate);
         $sheet->mergeCells('A4:F4');
 
-        $headers = ['Date', 'Type', 'Description', 'Reference', 'Amount (KES)'];
+        $headers = ['Date', 'Type', 'Description', 'Reference', 'Debit (KES)', 'Credit (KES)', 'Balance (KES)'];
         $sheet->fromArray($headers, null, 'A6');
-        $sheet->getStyle('A6:E6')->getFont()->setBold(true);
+        $sheet->getStyle('A6:G6')->getFont()->setBold(true);
 
+        // Calculate opening balance
+        $balanceCalculator = app(StatementBalanceCalculator::class);
+        $startDate = $data['filters']['start_date'] ?? $data['filters']['month'] ?? null;
+        $runningBalance = $startDate ? $balanceCalculator->getOpeningBalance($member, $startDate) : 0;
+        
+        // Sort entries by date
+        $sortedEntries = collect($entries)->sortBy('date')->values();
+        
         $row = 7;
-        foreach ($entries as $entry) {
+        foreach ($sortedEntries as $entry) {
             // Handle both 'amount' property and 'credit'/'debit' properties
             $amount = isset($entry['amount']) 
                 ? (float) $entry['amount'] 
                 : (float) (($entry['credit'] ?? 0) - ($entry['debit'] ?? 0));
             
+            $debit = isset($entry['debit']) && $entry['debit'] > 0 ? (float) $entry['debit'] : 0;
+            $credit = isset($entry['credit']) && $entry['credit'] > 0 ? (float) $entry['credit'] : ($amount > 0 ? $amount : 0);
+            
+            if ($amount < 0) {
+                $debit = abs($amount);
+                $credit = 0;
+            }
+            
+            // Update running balance
+            $runningBalance += $credit - $debit;
+            
             $sheet->setCellValue('A' . $row, Carbon::parse($entry['date'])->format('d-M-Y'));
             $sheet->setCellValue('B' . $row, ucwords(str_replace('_', ' ', $entry['type'])));
             $sheet->setCellValue('C' . $row, $entry['description']);
             $sheet->setCellValue('D' . $row, $entry['reference'] ?? '-');
-            $sheet->setCellValue('E' . $row, $amount);
+            $sheet->setCellValue('E' . $row, $debit > 0 ? $debit : '');
+            $sheet->setCellValue('F' . $row, $credit > 0 ? $credit : '');
+            $sheet->setCellValue('G' . $row, round($runningBalance, 2));
             $row++;
         }
 

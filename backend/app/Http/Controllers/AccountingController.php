@@ -189,5 +189,62 @@ class AccountingController extends Controller
 
         return response()->json($periods);
     }
+
+    /**
+     * Get expense report
+     */
+    public function getExpenseReport(Request $request): JsonResponse
+    {
+        $startDate = $request->has('start_date') ? \Carbon\Carbon::parse($request->start_date) : null;
+        $endDate = $request->has('end_date') ? \Carbon\Carbon::parse($request->end_date) : null;
+        $category = $request->get('category');
+
+        $query = \App\Models\Expense::with(['requestedBy', 'approvedBy', 'members'])
+            ->where('approval_status', 'approved');
+
+        if ($startDate) {
+            $query->where('expense_date', '>=', $startDate);
+        }
+
+        if ($endDate) {
+            $query->where('expense_date', '<=', $endDate);
+        }
+
+        if ($category) {
+            $query->where('category', $category);
+        }
+
+        $expenses = $query->orderBy('expense_date', 'desc')->get();
+
+        $total = $expenses->sum('amount');
+        $byCategory = $expenses->groupBy('category')->map(function ($group) {
+            return [
+                'category' => $group->first()->category ?? 'Uncategorized',
+                'count' => $group->count(),
+                'total' => $group->sum('amount'),
+            ];
+        })->values();
+
+        return response()->json([
+            'start_date' => $startDate?->toDateString(),
+            'end_date' => $endDate?->toDateString(),
+            'total' => $total,
+            'count' => $expenses->count(),
+            'by_category' => $byCategory,
+            'expenses' => $expenses->map(function ($expense) {
+                return [
+                    'id' => $expense->id,
+                    'description' => $expense->description,
+                    'amount' => $expense->amount,
+                    'category' => $expense->category,
+                    'expense_date' => $expense->expense_date,
+                    'requested_by' => $expense->requestedBy?->name,
+                    'approved_by' => $expense->approvedBy?->name,
+                    'approved_at' => $expense->approved_at,
+                    'members_count' => $expense->members->count(),
+                ];
+            }),
+        ]);
+    }
 }
 

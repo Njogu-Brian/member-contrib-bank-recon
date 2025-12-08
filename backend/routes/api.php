@@ -334,6 +334,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/accounting/cash-flow', [AccountingController::class, 'getCashFlow']);
         Route::get('/accounting/chart-of-accounts', [AccountingController::class, 'getChartOfAccounts']);
         Route::get('/accounting/periods', [AccountingController::class, 'getAccountingPeriods']);
+        Route::get('/accounting/expense-report', [AccountingController::class, 'getExpenseReport']);
 
         // Duplicates
         Route::get('/duplicates', [DuplicateController::class, 'index']);

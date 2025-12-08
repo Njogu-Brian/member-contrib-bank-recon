@@ -109,18 +109,72 @@ class AccountingService
             $endDate = $endDate ?? now()->endOfMonth();
         }
 
-        $revenue = $this->getAccountsTotal('revenue', $startDate, $endDate);
-        $expenses = $this->getAccountsTotal('expense', $startDate, $endDate);
-        $netIncome = $revenue - $expenses;
+        // Get revenue accounts breakdown
+        $revenueAccounts = ChartOfAccount::where('type', 'revenue')
+            ->where('is_active', true)
+            ->get();
+        
+        $revenueBreakdown = [];
+        $totalRevenue = 0;
+        
+        foreach ($revenueAccounts as $account) {
+            $amount = $this->getAccountsTotalForAccount($account, $startDate, $endDate, 'credit');
+            if (abs($amount) > 0.01) {
+                $revenueBreakdown[] = [
+                    'account_code' => $account->code,
+                    'account_name' => $account->name,
+                    'amount' => $amount,
+                ];
+                $totalRevenue += $amount;
+            }
+        }
+
+        // Get expense accounts breakdown
+        $expenseAccounts = ChartOfAccount::where('type', 'expense')
+            ->where('is_active', true)
+            ->get();
+        
+        $expenseBreakdown = [];
+        $totalExpenses = 0;
+        
+        foreach ($expenseAccounts as $account) {
+            $amount = $this->getAccountsTotalForAccount($account, $startDate, $endDate, 'debit');
+            if (abs($amount) > 0.01) {
+                $expenseBreakdown[] = [
+                    'account_code' => $account->code,
+                    'account_name' => $account->name,
+                    'amount' => $amount,
+                ];
+                $totalExpenses += $amount;
+            }
+        }
+
+        $netIncome = $totalRevenue - $totalExpenses;
 
         return [
             'period' => $period,
             'start_date' => $startDate->toDateString(),
             'end_date' => $endDate->toDateString(),
-            'revenue' => $revenue,
-            'expenses' => $expenses,
+            'revenue' => [
+                'total' => $totalRevenue,
+                'breakdown' => $revenueBreakdown,
+            ],
+            'expenses' => [
+                'total' => $totalExpenses,
+                'breakdown' => $expenseBreakdown,
+            ],
             'net_income' => $netIncome,
         ];
+    }
+
+    /**
+     * Get total for a specific account in date range
+     */
+    protected function getAccountsTotalForAccount(ChartOfAccount $account, Carbon $startDate, Carbon $endDate, string $side = 'debit'): float
+    {
+        return GeneralLedger::where('account_id', $account->id)
+            ->whereBetween('entry_date', [$startDate, $endDate])
+            ->sum($side);
     }
 
     /**
