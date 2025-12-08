@@ -40,7 +40,6 @@ import StaffManagement from './pages/StaffManagement'
 import RoleManagement from './pages/RoleManagement'
 import ActivityLogs from './pages/ActivityLogs'
 import MfaSetup from './pages/MfaSetup'
-import KycManagement from './pages/KycManagement'
 import Accounting from './pages/Accounting'
 import MpesaReconciliation from './pages/MpesaReconciliation'
 import ScheduledReports from './pages/ScheduledReports'
@@ -218,14 +217,6 @@ function App() {
         <Route path="bulk-email" element={<BulkEmail />} />
         <Route path="compliance" element={<Compliance />} />
         <Route path="attendance-uploads" element={<AttendanceUploads />} />
-        <Route
-          path="kyc-management"
-          element={
-            <ProtectedRoute roles={[ROLES.SUPER_ADMIN, ROLES.TREASURER]}>
-              <KycManagement />
-            </ProtectedRoute>
-          }
-        />
         <Route
           path="accounting"
           element={

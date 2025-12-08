@@ -143,12 +143,6 @@ export const NAVIGATION = [
         path: '/compliance',
         roles: [ROLES.SUPER_ADMIN, ROLES.IT_SUPPORT],
       },
-      {
-        label: 'KYC Management',
-        icon: HiOutlineShieldExclamation,
-        path: '/kyc-management',
-        roles: [ROLES.SUPER_ADMIN, ROLES.TREASURER],
-      },
     ],
   },
   {

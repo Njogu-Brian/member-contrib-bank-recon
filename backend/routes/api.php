@@ -69,10 +69,6 @@ Route::prefix('v1')->group(function () {
         Route::get('/profile/{token}/status', [ProfileController::class, 'checkProfileStatus']);
         Route::get('/profile/{token}/check-duplicate', [ProfileController::class, 'checkDuplicate']);
         Route::post('/profile/{token}/update', [ProfileController::class, 'updateProfile']);
-        
-        // Public KYC document uploads
-        Route::post('/profile/{token}/kyc/upload', [ProfileController::class, 'uploadKycDocument']);
-        Route::get('/profile/{token}/kyc/status', [ProfileController::class, 'getKycStatus']);
     });
 
     Route::prefix('webhooks')->group(function () {

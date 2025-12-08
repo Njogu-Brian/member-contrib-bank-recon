@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\UserProfile;
 use App\Services\AuditLogger;
 use App\Services\MfaService;
+use App\Services\DocumentValidationService;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Http\JsonResponse;
@@ -20,7 +21,8 @@ class AuthController extends Controller
 {
     public function __construct(
         private readonly MfaService $mfaService,
-        private readonly AuditLogger $auditLogger
+        private readonly AuditLogger $auditLogger,
+        private readonly DocumentValidationService $validationService
     ) {
     }
 
@@ -410,28 +412,75 @@ class AuthController extends Controller
     }
 
     /**
-     * Helper: Upload KYC document
+     * Helper: Upload KYC document with validation
      */
     private function uploadKycDocument(Request $request, string $documentType): JsonResponse
     {
         $request->validate([
-            'document' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            'document' => ['required', 'file', 'mimes:jpg,jpeg,png', 'max:5120'], // Only images for validation
         ]);
 
-        $path = $request->file('document')->store('kyc', 'public');
+        $file = $request->file('document');
 
+        // Validate document quality and type
+        $validationResults = $this->validationService->validateDocument($file, $documentType);
+
+        // Check if validation passed
+        $hasErrors = !empty($validationResults['errors']);
+        $hasWarnings = !empty($validationResults['warnings']);
+
+        // Store the file
+        $path = $file->store('kyc', 'public');
+        $fileName = $file->getClientOriginalName();
+
+        // Delete any existing pending document of the same type
+        KycDocument::where('member_id', $request->user()->member_id)
+            ->where('document_type', $documentType)
+            ->where('status', 'pending')
+            ->delete();
+
+        // Create KYC document record with validation results
         $document = KycDocument::create([
             'user_id' => $request->user()->id,
             'member_id' => $request->user()->member_id,
             'document_type' => $documentType,
-            'file_name' => $request->file('document')->getClientOriginalName(),
+            'file_name' => $fileName,
+            'disk' => 'public',
             'path' => $path,
-            'status' => 'pending',
+            'status' => $hasErrors ? 'rejected' : 'pending',
+            'is_clear' => $validationResults['is_clear'],
+            'has_face' => $validationResults['has_face'],
+            'is_kenyan_id' => $validationResults['is_kenyan_id'],
+            'is_readable' => $validationResults['is_readable'],
+            'validation_results' => $validationResults,
+            'rejection_reason' => $hasErrors ? implode(' ', $validationResults['errors']) : null,
+            'validation_errors' => $hasErrors ? implode(' | ', $validationResults['errors']) : null,
         ]);
 
-        $this->auditLogger->log($request->user()->id, 'kyc.document_uploaded', $document, ['type' => $documentType]);
+        $this->auditLogger->log($request->user()->id, 'kyc.document_uploaded', $document, [
+            'type' => $documentType,
+            'validation' => $validationResults,
+        ]);
 
-        return response()->json($document, 201);
+        if ($hasErrors) {
+            return response()->json([
+                'message' => 'Document validation failed',
+                'errors' => $validationResults['errors'],
+                'document' => $document,
+            ], 422);
+        }
+
+        return response()->json([
+            'message' => 'Document uploaded successfully' . ($hasWarnings ? ' (with warnings)' : ''),
+            'warnings' => $validationResults['warnings'] ?? [],
+            'document' => $document,
+            'validation' => [
+                'is_clear' => $validationResults['is_clear'],
+                'has_face' => $validationResults['has_face'],
+                'is_kenyan_id' => $validationResults['is_kenyan_id'],
+                'is_readable' => $validationResults['is_readable'],
+            ],
+        ], 201);
     }
 
     /**
