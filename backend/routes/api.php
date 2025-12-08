@@ -67,7 +67,12 @@ Route::prefix('v1')->group(function () {
         
         // Public profile management
         Route::get('/profile/{token}/status', [ProfileController::class, 'checkProfileStatus']);
+        Route::get('/profile/{token}/check-duplicate', [ProfileController::class, 'checkDuplicate']);
         Route::post('/profile/{token}/update', [ProfileController::class, 'updateProfile']);
+        
+        // Public KYC document uploads
+        Route::post('/profile/{token}/kyc/upload', [ProfileController::class, 'uploadKycDocument']);
+        Route::get('/profile/{token}/kyc/status', [ProfileController::class, 'getKycStatus']);
     });
 
     Route::prefix('webhooks')->group(function () {
@@ -188,6 +193,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/members/{member}/investment-report/export', [MemberController::class, 'exportInvestmentReport'])->where('member', '[0-9]+');
         Route::get('/members/statements/export', [MemberController::class, 'exportBulkStatements']);
         Route::post('/members/{member}/activate', [KycController::class, 'activateMember'])->where('member', '[0-9]+');
+        Route::get('/members/check-duplicate', [MemberController::class, 'checkDuplicate']);
         
         // Members API Resource - must come after specific routes
         Route::apiResource('members', MemberController::class);

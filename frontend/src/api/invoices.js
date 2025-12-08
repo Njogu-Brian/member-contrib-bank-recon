@@ -70,7 +70,20 @@ export const getWeeklySummaryReport = async (params = {}) => {
 }
 
 export const getMembersWithInvoices = async (params = {}) => {
-  const response = await api.get('/admin/invoices/members-summary', { params })
+  // Clean up params - remove empty strings and fix any typos
+  const cleanParams = Object.entries(params).reduce((acc, [key, value]) => {
+    if (value !== '' && value !== null && value !== undefined) {
+      // Fix common typos
+      if (key === 'page_t') {
+        acc['page'] = value
+      } else {
+        acc[key] = value
+      }
+    }
+    return acc
+  }, {})
+  
+  const response = await api.get('/admin/invoices/members-summary', { params: cleanParams })
   return response.data
 }
 

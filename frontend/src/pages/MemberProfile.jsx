@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getMember, updateMember, getMemberStatement, exportMemberStatement } from '../api/members'
+import { getMember, updateMember, getMemberStatement, exportMemberStatement, checkDuplicate } from '../api/members'
+import useDebounce from '../hooks/useDebounce'
 import { getMemberAuditResults } from '../api/audit'
 import MemberSearchModal from '../components/MemberSearchModal'
 import { transferTransaction, splitTransaction, bulkAssign } from '../api/transactions'
@@ -41,6 +42,8 @@ export default function MemberProfile() {
   const [activeTab, setActiveTab] = useState('statement')
   const [transactionFilter, setTransactionFilter] = useState('all') // 'all', 'invoices', 'contributions'
   const [formData, setFormData] = useState({})
+  const [fieldErrors, setFieldErrors] = useState({})
+  const [checkingDuplicates, setCheckingDuplicates] = useState({})
   const [showAssignModal, setShowAssignModal] = useState(false)
   const [assigningTransaction, setAssigningTransaction] = useState(null)
   const [selectedTransaction, setSelectedTransaction] = useState(null)
@@ -172,7 +175,7 @@ export default function MemberProfile() {
       setFormData({
         name: member.name || '',
         phone: member.phone || '',
-        secondary_phone: member.secondary_phone || '',
+        whatsapp_number: member.whatsapp_number || '',
         email: member.email || '',
         id_number: member.id_number || '',
         church: member.church || '',
@@ -184,12 +187,203 @@ export default function MemberProfile() {
         is_active: member.is_active ?? true,
       })
       setShowEditModal(true)
+      setFieldErrors({}) // Clear errors when opening modal
     }
+  }
+
+  // Debounce timer ref
+  const debounceTimerRef = useRef({})
+
+  // Duplicate checking function
+  const checkDuplicateValue = useCallback(async (field, value) => {
+    if (!value || value.trim() === '') {
+      setFieldErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors[field]
+        return newErrors
+      })
+      setCheckingDuplicates(prev => {
+        const newChecking = { ...prev }
+        delete newChecking[field]
+        return newChecking
+      })
+      return
+    }
+
+    // Only check phone, whatsapp_number, and id_number
+    if (!['phone', 'whatsapp_number', 'id_number'].includes(field)) {
+      return
+    }
+
+    setCheckingDuplicates(prev => ({ ...prev, [field]: true }))
+
+    try {
+      const result = await checkDuplicate(field, value, id || null)
+      if (result.is_duplicate) {
+        setFieldErrors(prev => ({
+          ...prev,
+          [field]: result.message
+        }))
+      } else {
+        setFieldErrors(prev => {
+          const newErrors = { ...prev }
+          delete newErrors[field]
+          return newErrors
+        })
+      }
+    } catch (error) {
+      console.error('Error checking duplicate:', error)
+    } finally {
+      setCheckingDuplicates(prev => {
+        const newChecking = { ...prev }
+        delete newChecking[field]
+        return newChecking
+      })
+    }
+  }, [id])
+
+  // Debounced duplicate checking
+  const debouncedCheckDuplicate = useCallback((field, value) => {
+    // Clear existing timer for this field
+    if (debounceTimerRef.current[field]) {
+      clearTimeout(debounceTimerRef.current[field])
+    }
+
+    // Set new timer
+    debounceTimerRef.current[field] = setTimeout(() => {
+      checkDuplicateValue(field, value)
+      delete debounceTimerRef.current[field]
+    }, 500)
+  }, [checkDuplicateValue])
+
+  // Handle field changes with duplicate checking
+  const handleFieldChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+    
+    // Clear error for this field immediately
+    setFieldErrors(prev => {
+      const newErrors = { ...prev }
+      delete newErrors[field]
+      return newErrors
+    })
+
+    // Check for duplicates on phone, whatsapp_number, and id_number
+    if (['phone', 'whatsapp_number', 'id_number'].includes(field)) {
+      debouncedCheckDuplicate(field, value)
+    }
+  }
+
+  // Helper function to format phone numbers to Kenya format
+  const formatPhoneNumber = (phone) => {
+    if (!phone || phone.trim() === '') return null
+    // Remove any existing + or spaces
+    let cleaned = phone.toString().replace(/[\s+]/g, '')
+    
+    // If it starts with 254, add +
+    if (cleaned.startsWith('254')) {
+      const number = cleaned.substring(3) // Get digits after 254
+      // Ensure it starts with 7 or 1 and has exactly 9 digits total (254 + 9 = 12)
+      if ((number.startsWith('7') || number.startsWith('1')) && number.length === 9) {
+        return '+' + cleaned
+      }
+      // If it's 12 digits total (254 + 9), it might be valid
+      if (cleaned.length === 12 && (cleaned[3] === '7' || cleaned[3] === '1')) {
+        return '+' + cleaned
+      }
+    }
+    // If it starts with 0, replace with +254
+    if (cleaned.startsWith('0')) {
+      const number = cleaned.substring(1)
+      if ((number.startsWith('7') || number.startsWith('1')) && number.length === 9) {
+        return '+254' + number
+      }
+    }
+    // If it already has +, validate format
+    if (cleaned.startsWith('+')) {
+      cleaned = cleaned.substring(1) // Remove + for processing
+    }
+    // If it starts with 254, validate
+    if (cleaned.startsWith('254')) {
+      const number = cleaned.substring(3)
+      if ((number.startsWith('7') || number.startsWith('1')) && number.length === 9) {
+        return '+' + cleaned
+      }
+    }
+    // If it's a 9-digit number starting with 7 or 1, add +254
+    if ((cleaned.startsWith('7') || cleaned.startsWith('1')) && cleaned.length === 9) {
+      return '+254' + cleaned
+    }
+    // Return null if format is invalid
+    return null
+  }
+
+  // Check if form is valid and can be submitted
+  const isFormValid = () => {
+    // Check for duplicate errors
+    if (Object.keys(fieldErrors).length > 0) {
+      return false
+    }
+
+    // Check if required fields are filled
+    if (!formData.name || !formData.name.trim()) {
+      return false
+    }
+
+    // Check phone format if provided
+    if (formData.phone && !/^\+254[17]\d{8}$/.test(formData.phone)) {
+      return false
+    }
+
+    // Check email format if provided
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      return false
+    }
+
+    // Check ID number format if provided
+    if (formData.id_number && (!/^\d+$/.test(formData.id_number) || formData.id_number.length < 5)) {
+      return false
+    }
+
+    return true
   }
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    updateMutation.mutate(formData)
+    
+    // Check if there are any duplicate errors
+    if (Object.keys(fieldErrors).length > 0) {
+      alert('Please fix the duplicate field errors before submitting.')
+      return
+    }
+    
+    // Format phone numbers before submission
+    const formattedData = {
+      ...formData,
+      phone: formatPhoneNumber(formData.phone),
+      whatsapp_number: formData.whatsapp_number ? formatPhoneNumber(formData.whatsapp_number) : null,
+      next_of_kin_phone: formatPhoneNumber(formData.next_of_kin_phone),
+    }
+    
+    // Validate phone number format before submission
+    if (formattedData.phone && !/^\+254[17]\d{8}$/.test(formattedData.phone)) {
+      alert('Phone number must be in format +254712345678 (Kenya format)')
+      return
+    }
+    
+    if (formattedData.whatsapp_number && !/^\+254[17]\d{8}$/.test(formattedData.whatsapp_number)) {
+      alert('WhatsApp number must be in format +254712345678 (Kenya format)')
+      return
+    }
+    
+    if (formattedData.next_of_kin_phone && !/^\+254[17]\d{8}$/.test(formattedData.next_of_kin_phone)) {
+      alert('Next of kin phone must be in format +254712345678 (Kenya format)')
+      return
+    }
+    
+    // Log for debugging
+    console.log('Formatted data before submission:', formattedData)
+    
+    updateMutation.mutate(formattedData)
   }
 
   if (isLoading) {
@@ -429,7 +623,7 @@ export default function MemberProfile() {
           </div>
           <div>
             <label className="text-sm font-medium text-gray-500">WhatsApp Number</label>
-            <p className="text-gray-900">{member.secondary_phone || <span className="text-gray-400">Not set</span>}</p>
+            <p className="text-gray-900">{member.whatsapp_number || <span className="text-gray-400">Not set</span>}</p>
           </div>
           <div>
             <label className="text-sm font-medium text-gray-500">Email</label>
@@ -1347,22 +1541,46 @@ export default function MemberProfile() {
                     <input
                       type="text"
                       value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      onChange={(e) => handleFieldChange('phone', e.target.value)}
+                      className={`mt-1 block w-full rounded-md shadow-sm focus:ring-indigo-500 sm:text-sm ${
+                        fieldErrors.phone 
+                          ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                          : 'border-gray-300 focus:border-indigo-500'
+                      }`}
                       placeholder="+254712345678"
                     />
-                    <p className="mt-1 text-xs text-gray-500">Format: +254712345678 (with country code)</p>
+                    {checkingDuplicates.phone && (
+                      <p className="mt-1 text-xs text-blue-500">Checking availability...</p>
+                    )}
+                    {fieldErrors.phone && !checkingDuplicates.phone && (
+                      <p className="mt-1 text-xs text-red-600">{fieldErrors.phone}</p>
+                    )}
+                    {!fieldErrors.phone && !checkingDuplicates.phone && (
+                      <p className="mt-1 text-xs text-gray-500">Format: +254712345678 (with country code)</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">WhatsApp Number</label>
                     <input
                       type="text"
-                      value={formData.secondary_phone || ''}
-                      onChange={(e) => setFormData({ ...formData, secondary_phone: e.target.value })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      value={formData.whatsapp_number || ''}
+                      onChange={(e) => handleFieldChange('whatsapp_number', e.target.value)}
+                      className={`mt-1 block w-full rounded-md shadow-sm focus:ring-indigo-500 sm:text-sm ${
+                        fieldErrors.whatsapp_number 
+                          ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                          : 'border-gray-300 focus:border-indigo-500'
+                      }`}
                       placeholder="+254723456789 (optional)"
                     />
-                    <p className="mt-1 text-xs text-gray-500">Optional, with country code</p>
+                    {checkingDuplicates.whatsapp_number && (
+                      <p className="mt-1 text-xs text-blue-500">Checking availability...</p>
+                    )}
+                    {fieldErrors.whatsapp_number && !checkingDuplicates.whatsapp_number && (
+                      <p className="mt-1 text-xs text-red-600">{fieldErrors.whatsapp_number}</p>
+                    )}
+                    {!fieldErrors.whatsapp_number && !checkingDuplicates.whatsapp_number && (
+                      <p className="mt-1 text-xs text-gray-500">Optional, with country code</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Email *</label>
@@ -1380,11 +1598,23 @@ export default function MemberProfile() {
                     <input
                       type="text"
                       value={formData.id_number || ''}
-                      onChange={(e) => setFormData({ ...formData, id_number: e.target.value })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                      onChange={(e) => handleFieldChange('id_number', e.target.value)}
+                      className={`mt-1 block w-full rounded-md shadow-sm focus:ring-indigo-500 sm:text-sm ${
+                        fieldErrors.id_number 
+                          ? 'border-red-500 focus:border-red-500 focus:ring-red-500' 
+                          : 'border-gray-300 focus:border-indigo-500'
+                      }`}
                       placeholder="12345678"
                     />
-                    <p className="mt-1 text-xs text-gray-500">Digits only, minimum 5 characters</p>
+                    {checkingDuplicates.id_number && (
+                      <p className="mt-1 text-xs text-blue-500">Checking availability...</p>
+                    )}
+                    {fieldErrors.id_number && !checkingDuplicates.id_number && (
+                      <p className="mt-1 text-xs text-red-600">{fieldErrors.id_number}</p>
+                    )}
+                    {!fieldErrors.id_number && !checkingDuplicates.id_number && (
+                      <p className="mt-1 text-xs text-gray-500">Digits only, minimum 5 characters</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Church *</label>
@@ -1495,8 +1725,8 @@ export default function MemberProfile() {
                 <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
                   <button
                     type="submit"
-                    disabled={updateMutation.isPending}
-                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:col-start-2 sm:text-sm disabled:opacity-50"
+                    disabled={updateMutation.isPending || !isFormValid()}
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:col-start-2 sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {updateMutation.isPending ? 'Saving...' : 'Save'}
                   </button>

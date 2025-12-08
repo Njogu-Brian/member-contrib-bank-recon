@@ -7,6 +7,7 @@ use App\Models\Member;
 use App\Models\Payment;
 use App\Services\InvoicePaymentMatcher;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class InvoiceController extends Controller
 {
@@ -293,12 +294,24 @@ class InvoiceController extends Controller
      */
     public function bulkMatch(InvoicePaymentMatcher $matcher)
     {
-        $result = $matcher->bulkMatchPayments();
+        try {
+            $result = $matcher->bulkMatchPayments();
 
-        return response()->json([
-            'message' => 'Bulk matching completed',
-            'result' => $result,
-        ]);
+            return response()->json([
+                'message' => 'Bulk matching completed',
+                'result' => $result,
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error in bulk match: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+            return response()->json([
+                'message' => 'Error performing bulk match',
+                'error' => config('app.debug') ? $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() : 'An error occurred',
+            ], 500);
+        }
     }
 
     /**
@@ -306,51 +319,85 @@ class InvoiceController extends Controller
      */
     public function membersWithInvoices(Request $request)
     {
-        $query = Member::where('is_active', true)
-            ->withCount([
-                'invoices as total_invoices_count',
-                'invoices as paid_invoices_count' => function ($q) {
-                    $q->where('status', 'paid');
-                },
-                'invoices as pending_invoices_count' => function ($q) {
-                    $q->whereIn('status', ['pending', 'overdue']);
-                },
-            ])
-            ->withSum([
-                'invoices as total_invoices_amount',
-                'invoices as paid_invoices_amount' => function ($q) {
-                    $q->where('status', 'paid');
-                },
-                'invoices as pending_invoices_amount' => function ($q) {
-                    $q->whereIn('status', ['pending', 'overdue']);
-                },
-            ], 'amount');
+        try {
+            $query = Member::where('is_active', true)
+                ->withCount([
+                    'invoices as total_invoices_count',
+                    'invoices as paid_invoices_count' => function ($q) {
+                        $q->where('status', 'paid');
+                    },
+                    'invoices as pending_invoices_count' => function ($q) {
+                        $q->whereIn('status', ['pending', 'overdue']);
+                    },
+                ])
+                ->withSum([
+                    'invoices as total_invoices_amount',
+                    'invoices as paid_invoices_amount' => function ($q) {
+                        $q->where('status', 'paid');
+                    },
+                    'invoices as pending_invoices_amount' => function ($q) {
+                        $q->whereIn('status', ['pending', 'overdue']);
+                    },
+                ], 'amount');
 
-        // Search filter
-        if ($request->has('search') && $request->search !== '') {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('member_code', 'like', "%{$search}%");
-            });
+            // Search filter
+            if ($request->has('search') && $request->search !== '') {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('phone', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%")
+                      ->orWhere('member_code', 'like', "%{$search}%");
+                });
+            }
+
+            // Sort - for aggregated columns, use orderByRaw with subquery
+            $sortBy = $request->get('sort_by', 'total_invoices_amount');
+            $sortOrder = $request->get('sort_order', 'desc');
+            
+            $allowedSortColumns = ['name', 'total_invoices_amount', 'total_invoices_count', 'pending_invoices_amount'];
+            if (!in_array($sortBy, $allowedSortColumns)) {
+                $sortBy = 'total_invoices_amount';
+            }
+            
+            $sortOrder = in_array($sortOrder, ['asc', 'desc']) ? $sortOrder : 'desc';
+
+            // Apply sorting
+            if ($sortBy === 'name') {
+                $query->orderBy('name', $sortOrder);
+            } elseif ($sortBy === 'total_invoices_amount') {
+                $query->orderByRaw("(SELECT COALESCE(SUM(amount), 0) FROM invoices WHERE invoices.member_id = members.id) {$sortOrder}");
+            } elseif ($sortBy === 'total_invoices_count') {
+                $query->orderByRaw("(SELECT COUNT(*) FROM invoices WHERE invoices.member_id = members.id) {$sortOrder}");
+            } elseif ($sortBy === 'pending_invoices_amount') {
+                $query->orderByRaw("(SELECT COALESCE(SUM(amount), 0) FROM invoices WHERE invoices.member_id = members.id AND invoices.status IN ('pending', 'overdue')) {$sortOrder}");
+            }
+
+            $paginated = $query->paginate($request->get('per_page', 25));
+
+            // Return in standard Laravel pagination format
+            return response()->json([
+                'data' => $paginated->items(),
+                'meta' => [
+                    'current_page' => $paginated->currentPage(),
+                    'last_page' => $paginated->lastPage(),
+                    'per_page' => $paginated->perPage(),
+                    'total' => $paginated->total(),
+                    'from' => $paginated->firstItem(),
+                    'to' => $paginated->lastItem(),
+                ],
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error in membersWithInvoices: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'request' => $request->all(),
+            ]);
+            return response()->json([
+                'message' => 'Error fetching members with invoices',
+                'error' => config('app.debug') ? $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() : 'An error occurred',
+            ], 500);
         }
-
-        // Sort
-        $sortBy = $request->get('sort_by', 'total_invoices_amount');
-        $sortOrder = $request->get('sort_order', 'desc');
-        
-        $allowedSortColumns = ['name', 'total_invoices_amount', 'total_invoices_count', 'pending_invoices_amount'];
-        if (!in_array($sortBy, $allowedSortColumns)) {
-            $sortBy = 'total_invoices_amount';
-        }
-        
-        $sortOrder = in_array($sortOrder, ['asc', 'desc']) ? $sortOrder : 'desc';
-
-        return response()->json(
-            $query->orderBy($sortBy, $sortOrder)
-                ->paginate($request->get('per_page', 25))
-        );
     }
 }

@@ -1,25 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { HiXMark } from 'react-icons/hi2'
 
-// Common country codes (with Kenya first as default)
-const COUNTRY_CODES = [
-  { code: '+254', country: 'Kenya', flag: '🇰🇪', length: 9 },
-  { code: '+1', country: 'USA/Canada', flag: '🇺🇸', length: 10 },
-  { code: '+44', country: 'UK', flag: '🇬🇧', length: 10 },
-  { code: '+256', country: 'Uganda', flag: '🇺🇬', length: 9 },
-  { code: '+255', country: 'Tanzania', flag: '🇹🇿', length: 9 },
-  { code: '+250', country: 'Rwanda', flag: '🇷🇼', length: 9 },
-  { code: '+27', country: 'South Africa', flag: '🇿🇦', length: 9 },
-  { code: '+234', country: 'Nigeria', flag: '🇳🇬', length: 10 },
-  { code: '+91', country: 'India', flag: '🇮🇳', length: 10 },
-  { code: '+86', country: 'China', flag: '🇨🇳', length: 11 },
-]
+// Kenya is the only allowed country code
+const KENYA_CODE = '+254'
 
 export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, initialData = {} }) {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
-    secondary_phone: '',
+    whatsapp_number: '',
     email: '',
     id_number: '',
     church: '',
@@ -35,6 +24,84 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
   const [nextOfKinNumber, setNextOfKinNumber] = useState('')
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [checkingDuplicates, setCheckingDuplicates] = useState({})
+
+  // Debounce timer ref
+  const debounceTimerRef = useRef({})
+
+  // Duplicate checking function for public profile
+  const checkDuplicateValue = useCallback(async (field, value) => {
+    if (!value || value.trim() === '') {
+      setErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors[field]
+        return newErrors
+      })
+      setCheckingDuplicates(prev => {
+        const newChecking = { ...prev }
+        delete newChecking[field]
+        return newChecking
+      })
+      return
+    }
+
+    // Only check phone, whatsapp_number, and id_number
+    if (!['phone', 'whatsapp_number', 'id_number'].includes(field)) {
+      return
+    }
+
+    setCheckingDuplicates(prev => ({ ...prev, [field]: true }))
+
+    try {
+      // Use public endpoint for duplicate checking
+      const response = await fetch(`/api/v1/public/profile/${token}/check-duplicate?field=${field}&value=${encodeURIComponent(value)}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        if (result.is_duplicate) {
+          setErrors(prev => ({
+            ...prev,
+            [field]: result.message
+          }))
+        } else {
+          setErrors(prev => {
+            const newErrors = { ...prev }
+            delete newErrors[field]
+            return newErrors
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Error checking duplicate:', error)
+      // Don't show error to user, just silently fail
+    } finally {
+      setCheckingDuplicates(prev => {
+        const newChecking = { ...prev }
+        delete newChecking[field]
+        return newChecking
+      })
+    }
+  }, [token])
+
+  // Debounced duplicate checking
+  const debouncedCheckDuplicate = useCallback((field, value) => {
+    // Clear existing timer for this field
+    if (debounceTimerRef.current[field]) {
+      clearTimeout(debounceTimerRef.current[field])
+    }
+
+    // Set new timer
+    debounceTimerRef.current[field] = setTimeout(() => {
+      checkDuplicateValue(field, value)
+      delete debounceTimerRef.current[field]
+    }, 500)
+  }, [checkDuplicateValue])
 
   useEffect(() => {
     if (initialData) {
@@ -44,7 +111,15 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
         
         // Check if already has country code
         if (fullPhone.startsWith('+')) {
-          const match = COUNTRY_CODES.find(c => fullPhone.startsWith(c.code))
+          // For Kenya, check if it starts with +254
+          if (fullPhone.startsWith('+254')) {
+            return {
+              code: '+254',
+              number: fullPhone.substring(4)
+            }
+          }
+          // Fallback to Kenya
+          const match = { code: '+254', length: 9 }
           if (match) {
             return {
               code: match.code,
@@ -65,7 +140,7 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
       }
       
       const parsedPhone = parsePhone(initialData.phone)
-      const parsedWhatsapp = parsePhone(initialData.secondary_phone)
+      const parsedWhatsapp = parsePhone(initialData.whatsapp_number)
       const parsedNextOfKin = parsePhone(initialData.next_of_kin_phone)
       
       setPhoneCountryCode(parsedPhone.code)
@@ -78,7 +153,7 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
       setFormData({
         name: initialData.name || '',
         phone: parsedPhone.code + parsedPhone.number,
-        secondary_phone: parsedWhatsapp.number ? parsedWhatsapp.code + parsedWhatsapp.number : '',
+        whatsapp_number: parsedWhatsapp.number ? parsedWhatsapp.code + parsedWhatsapp.number : '',
         email: initialData.email || '',
         id_number: initialData.id_number || '',
         church: initialData.church || '',
@@ -92,39 +167,55 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
-    // Clear error for this field
-    if (errors[name]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev }
-        delete newErrors[name]
-        return newErrors
-      })
+    
+    // Clear error for this field immediately
+    setErrors(prev => {
+      const newErrors = { ...prev }
+      delete newErrors[name]
+      return newErrors
+    })
+
+    // Check for duplicates on id_number
+    if (name === 'id_number' && value && value.length >= 5) {
+      debouncedCheckDuplicate('id_number', value)
     }
   }
 
   const handlePhoneNumberChange = (e) => {
     const value = e.target.value.replace(/\D/g, '') // Only digits
     setPhoneNumber(value)
-    setFormData((prev) => ({ ...prev, phone: phoneCountryCode + value }))
-    if (errors.phone) {
-      setErrors((prev) => {
-        const newErrors = { ...prev }
-        delete newErrors.phone
-        return newErrors
-      })
+    const fullPhone = phoneCountryCode + value
+    setFormData((prev) => ({ ...prev, phone: fullPhone }))
+    
+    // Clear error immediately
+    setErrors(prev => {
+      const newErrors = { ...prev }
+      delete newErrors.phone
+      return newErrors
+    })
+
+    // Check for duplicates
+    if (fullPhone && fullPhone.length >= 10) {
+      debouncedCheckDuplicate('phone', fullPhone)
     }
   }
 
   const handleWhatsappNumberChange = (e) => {
     const value = e.target.value.replace(/\D/g, '') // Only digits
     setWhatsappNumber(value)
-    setFormData((prev) => ({ ...prev, secondary_phone: value ? whatsappCountryCode + value : '' }))
-    if (errors.secondary_phone) {
-      setErrors((prev) => {
-        const newErrors = { ...prev }
-        delete newErrors.secondary_phone
-        return newErrors
-      })
+    const fullWhatsapp = value ? whatsappCountryCode + value : ''
+    setFormData((prev) => ({ ...prev, whatsapp_number: fullWhatsapp }))
+    
+    // Clear error immediately
+    setErrors(prev => {
+      const newErrors = { ...prev }
+      delete newErrors.whatsapp_number
+      return newErrors
+    })
+
+    // Check for duplicates if value exists
+    if (fullWhatsapp && fullWhatsapp.length >= 10) {
+      debouncedCheckDuplicate('whatsapp_number', fullWhatsapp)
     }
   }
 
@@ -137,7 +228,7 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
   const handleWhatsappCountryCodeChange = (e) => {
     const code = e.target.value
     setWhatsappCountryCode(code)
-    setFormData((prev) => ({ ...prev, secondary_phone: whatsappNumber ? code + whatsappNumber : '' }))
+    setFormData((prev) => ({ ...prev, whatsapp_number: whatsappNumber ? code + whatsappNumber : '' }))
   }
 
   const handleNextOfKinNumberChange = (e) => {
@@ -168,17 +259,17 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
     
     if (!formData.phone.trim()) {
       newErrors.phone = 'Phone number is required'
-    } else if (!/^\+\d{1,4}\d{6,14}$/.test(formData.phone)) {
-      newErrors.phone = 'Please enter a valid international phone number'
+    } else if (!/^\+254[17]\d{8}$/.test(formData.phone)) {
+      newErrors.phone = 'Phone number must be a valid Kenyan number starting with +2547 or +2541 followed by 8 digits'
     } else if (!phoneNumber.trim()) {
       newErrors.phone = 'Please enter the phone number after selecting country code'
     }
     
-    if (formData.secondary_phone) {
-      if (!/^\+\d{1,4}\d{6,14}$/.test(formData.secondary_phone)) {
-        newErrors.secondary_phone = 'Please enter a valid international phone number'
+    if (formData.whatsapp_number) {
+      if (!/^\+254[17]\d{8}$/.test(formData.whatsapp_number)) {
+        newErrors.whatsapp_number = 'WhatsApp number must be a valid Kenyan number starting with +2547 or +2541 followed by 8 digits'
       } else if (!whatsappNumber.trim()) {
-        newErrors.secondary_phone = 'Please enter the number after selecting country code'
+        newErrors.whatsapp_number = 'Please enter the number after selecting country code'
       }
     }
     
@@ -207,8 +298,8 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
     
     if (!formData.next_of_kin_phone.trim()) {
       newErrors.next_of_kin_phone = 'Next of kin phone number is required'
-    } else if (!/^\+\d{1,4}\d{6,14}$/.test(formData.next_of_kin_phone)) {
-      newErrors.next_of_kin_phone = 'Please enter a valid international phone number'
+    } else if (!/^\+254[17]\d{8}$/.test(formData.next_of_kin_phone)) {
+      newErrors.next_of_kin_phone = 'Next of kin phone number must be a valid Kenyan number starting with +2547 or +2541 followed by 8 digits'
     } else if (!nextOfKinNumber.trim()) {
       newErrors.next_of_kin_phone = 'Please enter the number after selecting country code'
     }
@@ -221,10 +312,72 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
     return Object.keys(newErrors).length === 0
   }
 
+  // Check if form is valid and can be submitted
+  const isFormValid = () => {
+    // Check for duplicate errors
+    const hasDuplicateErrors = Object.keys(errors).some(key => 
+      ['phone', 'whatsapp_number', 'id_number'].includes(key) && errors[key]
+    )
+    
+    if (hasDuplicateErrors) {
+      return false
+    }
+
+    // Check if all required fields are filled
+    const requiredFields = [
+      'name',
+      'phone',
+      'email',
+      'id_number',
+      'church',
+      'next_of_kin_name',
+      'next_of_kin_phone',
+      'next_of_kin_relationship'
+    ]
+
+    for (const field of requiredFields) {
+      if (!formData[field] || !formData[field].toString().trim()) {
+        return false
+      }
+    }
+
+    // Check phone format
+    if (!/^\+254[17]\d{8}$/.test(formData.phone) || !phoneNumber.trim()) {
+      return false
+    }
+
+    // Check email format
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      return false
+    }
+
+    // Check ID number format
+    if (!/^\d+$/.test(formData.id_number) || formData.id_number.length < 5) {
+      return false
+    }
+
+    // Check next of kin phone format
+    if (!/^\+254[17]\d{8}$/.test(formData.next_of_kin_phone) || !nextOfKinNumber.trim()) {
+      return false
+    }
+
+    return true
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
 
     if (!validate()) {
+      return
+    }
+
+    // Double check for duplicate errors before submitting
+    const hasDuplicateErrors = Object.keys(errors).some(key => 
+      ['phone', 'whatsapp_number', 'id_number'].includes(key) && errors[key]
+    )
+    
+    if (hasDuplicateErrors) {
+      alert('Please fix the duplicate field errors before submitting.')
       return
     }
 
@@ -243,34 +396,59 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
 
       if (!response.ok) {
         if (data.errors) {
-          setErrors(data.errors)
+          // Handle duplicate errors specially
+          if (data.errors.duplicate && Array.isArray(data.errors.duplicate)) {
+            // Show duplicate errors as alert
+            alert(data.errors.duplicate.join('\n'))
+            setErrors({})
+          } else {
+            setErrors(data.errors)
+          }
         } else {
           alert(data.message || 'Failed to update profile')
         }
+        setIsSubmitting(false)
+        return
       } else {
         // Show success message
         const message = data.message || 'Profile updated successfully.'
         
-        // Close modal first
-        onClose()
-        
-        // Show alert after a brief delay to allow modal to close
-        setTimeout(() => {
-          alert(message)
-        }, 100)
-        
-        // For pending changes, we still call onUpdate but with a flag to indicate pending
-        if (onUpdate) {
-          onUpdate({ ...formData, pending: true })
+        // If auto-approved (first-time update), close modal and refresh
+        if (data.auto_approved) {
+          onClose()
+          setTimeout(() => {
+            alert(message)
+            if (onUpdate) {
+              onUpdate({ ...formData, auto_approved: true })
+            }
+          }, 100)
+          setIsSubmitting(false)
+          return
         }
-        setIsSubmitting(false)
-        return
-      }
+        
+        // For pending changes (edit from statement view)
+        if (data.pending) {
+          // Close modal first
+          onClose()
+          
+          // Show alert after a brief delay to allow modal to close
+          setTimeout(() => {
+            alert(message)
+          }, 100)
+          
+          // For pending changes, we still call onUpdate but with a flag to indicate pending
+          if (onUpdate) {
+            onUpdate({ ...formData, pending: true })
+          }
+          setIsSubmitting(false)
+          return
+        }
 
-      // Success! (This case is for immediate approval, which shouldn't happen)
-      onClose()
-      if (onUpdate) {
-        onUpdate(data)
+        // Success! (fallback case)
+        onClose()
+        if (onUpdate) {
+          onUpdate(data)
+        }
       }
     } catch (error) {
       console.error('Error updating profile:', error)
@@ -341,11 +519,7 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
                   className="px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-sm font-medium"
                   style={{ minWidth: '140px' }}
                 >
-                  {COUNTRY_CODES.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {c.flag} {c.code}
-                    </option>
-                  ))}
+                  <option value="+254">🇰🇪 +254</option>
                 </select>
                 <input
                   type="tel"
@@ -354,19 +528,26 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
                   value={phoneNumber}
                   onChange={handlePhoneNumberChange}
                   className={`flex-1 px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
-                    errors.phone ? 'border-red-500' : 'border-gray-300'
+                    errors.phone ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
                   }`}
                   placeholder="712345678"
                 />
               </div>
-              {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone}</p>}
-              <p className="mt-1 text-xs text-gray-500">
-                Full number: <strong>{phoneCountryCode}{phoneNumber || '...'}</strong>
-              </p>
+              {checkingDuplicates.phone && (
+                <p className="mt-1 text-xs text-blue-500">Checking availability...</p>
+              )}
+              {errors.phone && !checkingDuplicates.phone && (
+                <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+              )}
+              {!errors.phone && !checkingDuplicates.phone && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Full number: <strong>{phoneCountryCode}{phoneNumber || '...'}</strong>
+                </p>
+              )}
             </div>
 
             <div>
-              <label htmlFor="secondary_phone" className="block text-sm font-semibold text-gray-700 mb-2">
+              <label htmlFor="whatsapp_number" className="block text-sm font-semibold text-gray-700 mb-2">
                 WhatsApp Number <span className="text-gray-400 text-xs">(Optional)</span>
               </label>
               <div className="flex gap-2">
@@ -376,32 +557,35 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
                   className="px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-sm font-medium"
                   style={{ minWidth: '140px' }}
                 >
-                  {COUNTRY_CODES.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {c.flag} {c.code}
-                    </option>
-                  ))}
+                  <option value="+254">🇰🇪 +254</option>
                 </select>
                 <input
                   type="tel"
-                  id="secondary_phone"
+                  id="whatsapp_number"
                   name="whatsapp_number"
                   value={whatsappNumber}
                   onChange={handleWhatsappNumberChange}
                   className={`flex-1 px-4 py-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
-                    errors.secondary_phone ? 'border-red-500' : 'border-gray-300'
+                    errors.whatsapp_number ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
                   }`}
                   placeholder="723456789"
                 />
               </div>
-              {errors.secondary_phone && <p className="mt-1 text-sm text-red-600">{errors.secondary_phone}</p>}
-              <p className="mt-1 text-xs text-gray-500">
-                {whatsappNumber ? (
-                  <>Full number: <strong>{whatsappCountryCode}{whatsappNumber}</strong></>
-                ) : (
-                  'Optional field'
-                )}
-              </p>
+              {checkingDuplicates.whatsapp_number && (
+                <p className="mt-1 text-xs text-blue-500">Checking availability...</p>
+              )}
+              {errors.whatsapp_number && !checkingDuplicates.whatsapp_number && (
+                <p className="mt-1 text-sm text-red-600">{errors.whatsapp_number}</p>
+              )}
+              {!errors.whatsapp_number && !checkingDuplicates.whatsapp_number && (
+                <p className="mt-1 text-xs text-gray-500">
+                  {whatsappNumber ? (
+                    <>Full number: <strong>{whatsappCountryCode}{whatsappNumber}</strong></>
+                  ) : (
+                    'Optional field'
+                  )}
+                </p>
+              )}
             </div>
           </div>
 
@@ -441,8 +625,15 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
               placeholder="12345678"
               maxLength="20"
             />
-            {errors.id_number && <p className="mt-1 text-sm text-red-600">{errors.id_number}</p>}
-            <p className="mt-1 text-xs text-gray-500">Digits only, minimum 5 digits</p>
+            {checkingDuplicates.id_number && (
+              <p className="mt-1 text-xs text-blue-500">Checking availability...</p>
+            )}
+            {errors.id_number && !checkingDuplicates.id_number && (
+              <p className="mt-1 text-sm text-red-600">{errors.id_number}</p>
+            )}
+            {!errors.id_number && !checkingDuplicates.id_number && (
+              <p className="mt-1 text-xs text-gray-500">Digits only, minimum 5 digits</p>
+            )}
           </div>
 
           {/* Church */}
@@ -501,11 +692,7 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
                     className="px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white text-sm font-medium"
                     style={{ minWidth: '140px' }}
                   >
-                    {COUNTRY_CODES.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.flag} {c.code}
-                      </option>
-                    ))}
+                    <option value="+254">🇰🇪 +254</option>
                   </select>
                   <input
                     type="tel"
@@ -572,7 +759,7 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !isFormValid()}
               className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-lg hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
             >
               {isSubmitting ? 'Saving...' : 'Save & Continue'}

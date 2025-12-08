@@ -16,6 +16,7 @@ export const createMember = async (data) => {
 }
 
 export const updateMember = async (id, data) => {
+  console.log('Sending update data:', data) // Debug log
   const response = await api.put(`/admin/members/${id}`, data)
   return response.data
 }
@@ -67,6 +68,15 @@ export const resetMemberProfileLink = async (memberId) => {
 
 export const resetAllProfileLinks = async () => {
   const response = await api.post('/admin/members/reset-all-profile-links')
+  return response.data
+}
+
+export const checkDuplicate = async (field, value, memberId = null) => {
+  const params = { field, value }
+  if (memberId) {
+    params.member_id = memberId
+  }
+  const response = await api.get('/admin/members/check-duplicate', { params })
   return response.data
 }
 

@@ -179,25 +179,24 @@ class MemberController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'phone' => ['nullable', 'string', 'max:20', 'regex:/^(\+?254[17]|0[17])\d{8,9}$/', 'unique:members,phone'],
-            'secondary_phone' => ['nullable', 'string', 'max:20', 'regex:/^(\+?254[17]|0[17])\d{8,9}$/', 'unique:members,secondary_phone'],
+            'phone' => ['nullable', 'string', 'max:20', 'regex:/^\+254[17]\d{8}$/', 'unique:members,phone'],
+            'whatsapp_number' => ['nullable', 'string', 'max:20', 'regex:/^\+254[17]\d{8}$/', 'unique:members,whatsapp_number'],
             'email' => 'nullable|email|max:255',
             'id_number' => 'nullable|string|max:50|unique:members,id_number',
             'gender' => 'nullable|string|in:male,female,other',
             'next_of_kin_name' => 'nullable|string|max:255',
-            'next_of_kin_phone' => ['nullable', 'string', 'max:255', 'regex:/^(\+?254[17]|0[17])\d{8,9}$/'],
+            'next_of_kin_phone' => ['nullable', 'string', 'max:255', 'regex:/^\+254[17]\d{8}$/'],
             'next_of_kin_relationship' => 'nullable|string|max:255',
-            'member_code' => 'nullable|string|max:50|unique:members',
             'member_number' => 'nullable|string|max:50',
             'notes' => 'nullable|string',
             'is_active' => 'boolean',
         ], [
-            'phone.regex' => 'Phone number must be a valid Kenyan number starting with 2547, 2541, 07, or 01',
+            'phone.regex' => 'Phone number must be a valid Kenyan number starting with +2547 or +2541 followed by 8 digits (e.g., +254712345678)',
             'phone.unique' => 'This phone number is already registered to another member.',
-            'secondary_phone.regex' => 'Secondary phone must be a valid Kenyan number starting with 2547, 2541, 07, or 01',
-            'secondary_phone.unique' => 'This WhatsApp number is already registered to another member.',
+            'whatsapp_number.regex' => 'WhatsApp number must be a valid Kenyan number starting with +2547 or +2541 followed by 8 digits',
+            'whatsapp_number.unique' => 'This WhatsApp number is already registered to another member.',
             'id_number.unique' => 'This ID number is already registered to another member.',
-            'next_of_kin_phone.regex' => 'Next of kin phone must be a valid Kenyan number starting with 2547, 2541, 07, or 01',
+            'next_of_kin_phone.regex' => 'Next of kin phone must be a valid Kenyan number starting with +2547 or +2541 followed by 8 digits',
         ]);
 
         $member = Member::create($validated);
@@ -793,28 +792,30 @@ class MemberController extends Controller
     {
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
-            'phone' => ['nullable', 'string', 'max:20', 'regex:/^(\+?254[17]|0[17])\d{8,9}$/', 'unique:members,phone,' . $member->id],
-            'secondary_phone' => ['nullable', 'string', 'max:20', 'regex:/^(\+?254[17]|0[17])\d{8,9}$/', 'unique:members,secondary_phone,' . $member->id],
+            'phone' => ['nullable', 'string', 'max:20', 'regex:/^\+254[17]\d{8}$/', 'unique:members,phone,' . $member->id],
+            'whatsapp_number' => ['nullable', 'string', 'max:20', 'regex:/^\+254[17]\d{8}$/', 'unique:members,whatsapp_number,' . $member->id],
             'email' => 'nullable|email|max:255',
             'id_number' => 'nullable|string|max:50|unique:members,id_number,' . $member->id,
             'gender' => 'nullable|string|in:male,female,other',
             'next_of_kin_name' => 'nullable|string|max:255',
-            'next_of_kin_phone' => ['nullable', 'string', 'max:255', 'regex:/^(\+?254[17]|0[17])\d{8,9}$/'],
+            'next_of_kin_phone' => ['nullable', 'string', 'max:255', 'regex:/^\+254[17]\d{8}$/'],
             'next_of_kin_relationship' => 'nullable|string|max:255',
-            'member_code' => 'nullable|string|max:50|unique:members,member_code,' . $member->id,
             'member_number' => 'nullable|string|max:50',
             'notes' => 'nullable|string',
             'is_active' => 'boolean',
             'date_of_registration' => 'nullable|date',
         ], [
-            'phone.regex' => 'Phone number must be a valid Kenyan number starting with 2547, 2541, 07, or 01',
+            'phone.regex' => 'Phone number must be a valid Kenyan number starting with +2547 or +2541 followed by 8 digits (e.g., +254712345678)',
             'phone.unique' => 'This phone number is already registered to another member.',
-            'secondary_phone.regex' => 'Secondary phone must be a valid Kenyan number starting with 2547, 2541, 07, or 01',
-            'secondary_phone.unique' => 'This WhatsApp number is already registered to another member.',
+            'whatsapp_number.regex' => 'WhatsApp number must be a valid Kenyan number starting with +2547 or +2541 followed by 8 digits',
+            'whatsapp_number.unique' => 'This WhatsApp number is already registered to another member.',
             'id_number.unique' => 'This ID number is already registered to another member.',
-            'next_of_kin_phone.regex' => 'Next of kin phone must be a valid Kenyan number starting with 2547, 2541, 07, or 01',
+            'next_of_kin_phone.regex' => 'Next of kin phone must be a valid Kenyan number starting with +2547 or +2541 followed by 8 digits',
         ]);
 
+        // Remove member_code from validated data if present (we don't want to update it)
+        unset($validated['member_code']);
+        
         $member->update($validated);
 
         return response()->json($member);
@@ -913,7 +914,6 @@ class MemberController extends Controller
                 'name' => 'required|string',
                 'phone' => 'nullable|string',
                 'email' => 'nullable|email',
-                'member_code' => 'nullable|string|unique:members',
                 'member_number' => 'nullable|string',
             ]);
 
@@ -1001,6 +1001,65 @@ class MemberController extends Controller
         (new Xlsx($spreadsheet))->save($tempFile);
 
         return response()->download($tempFile, $filename)->deleteFileAfterSend(true);
+    }
+
+    /**
+     * Check if a field value is duplicate
+     */
+    public function checkDuplicate(Request $request)
+    {
+        $request->validate([
+            'field' => 'required|string|in:phone,whatsapp_number,id_number',
+            'value' => 'required|string',
+            'member_id' => 'nullable|integer|exists:members,id', // Exclude this member when checking
+        ]);
+
+        $field = $request->field;
+        $value = $request->value;
+        $memberId = $request->member_id;
+
+        // Format phone numbers to match database format
+        if (in_array($field, ['phone', 'whatsapp_number']) && $value) {
+            // Remove spaces and ensure + prefix
+            $cleaned = str_replace([' ', '-', '(', ')'], '', $value);
+            if (substr($cleaned, 0, 1) !== '+') {
+                if (substr($cleaned, 0, 3) === '254') {
+                    $value = '+' . $cleaned;
+                } elseif (substr($cleaned, 0, 1) === '0') {
+                    $value = '+254' . substr($cleaned, 1);
+                } else {
+                    $value = '+254' . $cleaned;
+                }
+            } else {
+                $value = $cleaned;
+            }
+        }
+
+        $query = Member::where($field, $value);
+        
+        // Exclude current member if editing
+        if ($memberId) {
+            $query->where('id', '!=', $memberId);
+        }
+
+        $exists = $query->exists();
+
+        if ($exists) {
+            $member = $query->first();
+            return response()->json([
+                'is_duplicate' => true,
+                'message' => "This {$field} is already registered to member: {$member->name} (ID: {$member->id})",
+                'existing_member' => [
+                    'id' => $member->id,
+                    'name' => $member->name,
+                ],
+            ]);
+        }
+
+        return response()->json([
+            'is_duplicate' => false,
+            'message' => 'Available',
+        ]);
     }
 }
 

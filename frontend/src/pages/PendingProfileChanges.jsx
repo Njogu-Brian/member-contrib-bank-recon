@@ -9,7 +9,7 @@ import api from '../api/axios'
 const fieldLabels = {
   name: 'Name',
   phone: 'Phone',
-  secondary_phone: 'Secondary Phone',
+  whatsapp_number: 'WhatsApp Number',
   email: 'Email',
   id_number: 'ID Number',
   church: 'Church',

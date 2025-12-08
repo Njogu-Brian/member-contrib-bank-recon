@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../api/axios'
 import StatementHeader from '../components/StatementHeader'
 import ProfileUpdateModal from '../components/ProfileUpdateModal'
@@ -23,6 +23,7 @@ const formatDate = (date) => {
 
 export default function PublicStatement() {
   const { token } = useParams()
+  const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const [page, setPage] = useState(parseInt(searchParams.get('page') || '1', 10))
   const [perPage, setPerPage] = useState(parseInt(searchParams.get('per_page') || '25', 10))
@@ -79,15 +80,26 @@ export default function PublicStatement() {
           // Special handling for profile incomplete error
           if (response.status === 403 && errorData.requires_profile_update) {
             // Fetch profile data to pre-populate modal
-            const profileResponse = await fetch(
-              `${window.location.origin}/api/v1/public/profile/${token}/status`
-            )
-            if (profileResponse.ok) {
-              const profileInfo = await profileResponse.json()
-              setProfileData(profileInfo.member)
+            let memberData = null
+            try {
+              const profileResponse = await fetch(
+                `${window.location.origin}/api/v1/public/profile/${token}/status`
+              )
+              if (profileResponse.ok) {
+                const profileInfo = await profileResponse.json()
+                memberData = profileInfo.member
+              }
+            } catch (e) {
+              console.error('Error fetching profile status:', e)
             }
-            setProfileIncompleteError(errorData)
-            setShowProfileModal(true)
+            
+            // Return a special response object that indicates profile incomplete
+            // This prevents React Query from treating it as an error
+            return {
+              profileIncomplete: true,
+              error: errorData,
+              member: memberData,
+            }
           }
           
           const error = new Error(errorData.message || `HTTP error! status: ${response.status}`)
@@ -113,16 +125,33 @@ export default function PublicStatement() {
     // Profile updated successfully
     setShowProfileModal(false)
     
-    // If changes are pending approval, don't refetch yet - show message instead
-    if (updatedData?.pending) {
-      // Don't clear profileIncompleteError since profile is still incomplete
-      // The user needs to wait for admin approval
-      return
+    // Clear the profile incomplete error - the profile should now be complete
+    // (including pending changes, which is checked by isProfileCompleteWithPending)
+    setProfileIncompleteError(null)
+    
+    // Clear the profile incomplete data flag
+    if (data?.profileIncomplete) {
+      // Force refetch by invalidating the query
+      queryClient.invalidateQueries(['public-statement', token])
     }
     
-    // If profile is now complete (shouldn't happen with pending system, but just in case)
-    setProfileIncompleteError(null)
+    // Always refetch the statement data after profile update
+    // The backend's isProfileCompleteWithPending() will check if profile is complete
+    // including pending changes, so the member can view their statement
     await refetch()
+  }
+
+  // Handle profile incomplete response
+  if (data?.profileIncomplete) {
+    if (!profileIncompleteError) {
+      setProfileIncompleteError(data.error)
+    }
+    if (data.member && !profileData) {
+      setProfileData(data.member)
+    }
+    if (!showProfileModal) {
+      setShowProfileModal(true)
+    }
   }
 
   if (isLoading) {
@@ -136,7 +165,7 @@ export default function PublicStatement() {
     )
   }
 
-  if (error && !profileIncompleteError) {
+  if (error && !profileIncompleteError && !data?.profileIncomplete) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-6 text-center">

@@ -21,10 +21,21 @@ class KycDocument extends Model
         'approved_by',
         'approved_at',
         'rejection_reason',
+        'is_clear',
+        'has_face',
+        'is_kenyan_id',
+        'is_readable',
+        'validation_results',
+        'validation_errors',
     ];
 
     protected $casts = [
         'approved_at' => 'datetime',
+        'is_clear' => 'boolean',
+        'has_face' => 'boolean',
+        'is_kenyan_id' => 'boolean',
+        'is_readable' => 'boolean',
+        'validation_results' => 'array',
     ];
 
     public function user()

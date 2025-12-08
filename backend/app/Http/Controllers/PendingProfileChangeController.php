@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PendingProfileChange;
 use App\Models\Member;
+use App\Models\KycDocument;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -125,7 +126,7 @@ class PendingProfileChangeController extends Controller
             $newValue = $change->new_value;
 
             // Validate uniqueness for unique fields before approving
-            $uniqueFields = ['id_number', 'phone', 'secondary_phone'];
+            $uniqueFields = ['id_number', 'phone', 'whatsapp_number'];
             if (in_array($fieldName, $uniqueFields) && !empty($newValue)) {
                 $existingMember = Member::where($fieldName, $newValue)
                     ->where('id', '!=', $member->id)
@@ -161,6 +162,9 @@ class PendingProfileChangeController extends Controller
             if ($member->isProfileComplete() && !$member->profile_completed_at) {
                 $member->markProfileComplete();
             }
+
+            // Check KYC status - if all required documents are approved, update KYC status
+            $this->updateKycStatusIfComplete($member);
 
             // Clear cached profile status for this member's token
             Cache::forget('profile-status:' . $member->public_share_token);
@@ -239,7 +243,7 @@ class PendingProfileChangeController extends Controller
             DB::beginTransaction();
 
             // Validate uniqueness for all changes before applying them
-            $uniqueFields = ['id_number', 'phone', 'secondary_phone'];
+            $uniqueFields = ['id_number', 'phone', 'whatsapp_number'];
             $conflicts = [];
             
             foreach ($pendingChanges as $change) {
@@ -255,7 +259,7 @@ class PendingProfileChangeController extends Controller
                         $fieldLabels = [
                             'id_number' => 'ID number',
                             'phone' => 'phone number',
-                            'secondary_phone' => 'WhatsApp number',
+                            'whatsapp_number' => 'WhatsApp number',
                         ];
                         $fieldLabel = $fieldLabels[$fieldName] ?? $fieldName;
                         $conflicts[] = "{$fieldLabel} is already registered to {$existingMember->name}";
@@ -297,6 +301,9 @@ class PendingProfileChangeController extends Controller
             if ($member->isProfileComplete() && !$member->profile_completed_at) {
                 $member->markProfileComplete();
             }
+
+            // Check KYC status - if all required documents are approved, update KYC status
+            $this->updateKycStatusIfComplete($member);
 
             // Clear cached profile status for this member's token
             Cache::forget('profile-status:' . $member->public_share_token);
@@ -351,7 +358,7 @@ class PendingProfileChangeController extends Controller
                 }
 
                 // Validate uniqueness for this member's changes
-                $uniqueFields = ['id_number', 'phone', 'secondary_phone'];
+                $uniqueFields = ['id_number', 'phone', 'whatsapp_number'];
                 $memberConflicts = [];
                 
                 foreach ($changes as $change) {
@@ -367,7 +374,7 @@ class PendingProfileChangeController extends Controller
                             $fieldLabels = [
                                 'id_number' => 'ID number',
                                 'phone' => 'phone number',
-                                'secondary_phone' => 'WhatsApp number',
+                                'whatsapp_number' => 'WhatsApp number',
                             ];
                             $fieldLabel = $fieldLabels[$fieldName] ?? $fieldName;
                             $memberConflicts[] = "{$member->name}: {$fieldLabel} already registered to {$existingMember->name}";
@@ -402,6 +409,9 @@ class PendingProfileChangeController extends Controller
                 if ($member->isProfileComplete() && !$member->profile_completed_at) {
                     $member->markProfileComplete();
                 }
+
+                // Check KYC status - if all required documents are approved, update KYC status
+                $this->updateKycStatusIfComplete($member);
 
                 // Clear cached profile status for this member's token
                 Cache::forget('profile-status:' . $member->public_share_token);
@@ -576,6 +586,29 @@ class PendingProfileChangeController extends Controller
                 'message' => 'Error fetching pending profile changes statement',
                 'error' => config('app.debug') ? $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() : 'An error occurred',
             ], 500);
+        }
+    }
+
+    /**
+     * Update KYC status if all required documents are approved
+     */
+    private function updateKycStatusIfComplete(Member $member): void
+    {
+        $requiredDocuments = ['front_id', 'back_id', 'selfie'];
+        $approvedDocuments = KycDocument::where('member_id', $member->id)
+            ->whereIn('document_type', $requiredDocuments)
+            ->where('status', 'approved')
+            ->pluck('document_type')
+            ->toArray();
+
+        $allApproved = count(array_intersect($requiredDocuments, $approvedDocuments)) === count($requiredDocuments);
+
+        if ($allApproved && $member->isProfileComplete()) {
+            $member->update([
+                'kyc_status' => 'approved',
+                'kyc_approved_at' => now(),
+                'kyc_approved_by' => auth()->id(),
+            ]);
         }
     }
 }

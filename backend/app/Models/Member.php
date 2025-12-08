@@ -16,7 +16,7 @@ class Member extends Model
     protected $fillable = [
         'name',
         'phone',
-        'secondary_phone',
+        'whatsapp_number',
         'email',
         'id_number',
         'church',
@@ -326,31 +326,57 @@ class Member extends Model
         }
 
         // Check if all required fields are filled
-        return !empty($values['name']) &&
-               !empty($values['phone']) &&
-               !empty($values['email']) &&
-               !empty($values['id_number']) &&
-               !empty($values['church']) &&
-               !empty($values['next_of_kin_name']) &&
-               !empty($values['next_of_kin_phone']) &&
-               !empty($values['next_of_kin_relationship']);
+        // Use trim() to handle whitespace-only values and check for null/empty
+        return !empty(trim($values['name'] ?? '')) &&
+               !empty(trim($values['phone'] ?? '')) &&
+               !empty(trim($values['email'] ?? '')) &&
+               !empty(trim($values['id_number'] ?? '')) &&
+               !empty(trim($values['church'] ?? '')) &&
+               !empty(trim($values['next_of_kin_name'] ?? '')) &&
+               !empty(trim($values['next_of_kin_phone'] ?? '')) &&
+               !empty(trim($values['next_of_kin_relationship'] ?? ''));
     }
 
     /**
-     * Get list of missing profile fields
+     * Get list of missing profile fields (including pending changes)
      */
     public function getMissingProfileFields(): array
     {
+        // Get current values
+        $values = [
+            'name' => $this->name,
+            'phone' => $this->phone,
+            'email' => $this->email,
+            'id_number' => $this->id_number,
+            'church' => $this->church,
+            'next_of_kin_name' => $this->next_of_kin_name,
+            'next_of_kin_phone' => $this->next_of_kin_phone,
+            'next_of_kin_relationship' => $this->next_of_kin_relationship,
+        ];
+
+        // Override with pending values if they exist
+        $pendingChanges = \App\Models\PendingProfileChange::where('member_id', $this->id)
+            ->where('status', 'pending')
+            ->get()
+            ->keyBy('field_name');
+
+        foreach ($pendingChanges as $fieldName => $change) {
+            if (isset($values[$fieldName])) {
+                $values[$fieldName] = $change->new_value;
+            }
+        }
+
+        // Check which fields are missing
+        // Use trim() to handle whitespace-only values
         $missing = [];
-        
-        if (empty($this->name)) $missing[] = 'name';
-        if (empty($this->phone)) $missing[] = 'phone';
-        if (empty($this->email)) $missing[] = 'email';
-        if (empty($this->id_number)) $missing[] = 'id_number';
-        if (empty($this->church)) $missing[] = 'church';
-        if (empty($this->next_of_kin_name)) $missing[] = 'next_of_kin_name';
-        if (empty($this->next_of_kin_phone)) $missing[] = 'next_of_kin_phone';
-        if (empty($this->next_of_kin_relationship)) $missing[] = 'next_of_kin_relationship';
+        if (empty(trim($values['name'] ?? ''))) $missing[] = 'name';
+        if (empty(trim($values['phone'] ?? ''))) $missing[] = 'phone';
+        if (empty(trim($values['email'] ?? ''))) $missing[] = 'email';
+        if (empty(trim($values['id_number'] ?? ''))) $missing[] = 'id_number';
+        if (empty(trim($values['church'] ?? ''))) $missing[] = 'church';
+        if (empty(trim($values['next_of_kin_name'] ?? ''))) $missing[] = 'next_of_kin_name';
+        if (empty(trim($values['next_of_kin_phone'] ?? ''))) $missing[] = 'next_of_kin_phone';
+        if (empty(trim($values['next_of_kin_relationship'] ?? ''))) $missing[] = 'next_of_kin_relationship';
         
         return $missing;
     }

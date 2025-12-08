@@ -189,7 +189,7 @@ class AuthController extends Controller
                 'name' => $member->name,
                 'email' => $member->email,
                 'phone' => $member->phone,
-                'secondary_phone' => $member->secondary_phone,
+                'whatsapp_number' => $member->whatsapp_number,
                 'profile_photo_path' => $member->profile_photo_path,
                 'member_code' => $member->member_code,
                 'member_number' => $member->member_number,
@@ -223,7 +223,7 @@ class AuthController extends Controller
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
             'phone' => ['sometimes', 'string', 'max:255'],
-            'secondary_phone' => ['nullable', 'string', 'max:255'],
+            'whatsapp_number' => ['nullable', 'string', 'max:255'],
             'address' => ['nullable', 'string'],
             'date_of_birth' => ['nullable', 'date'],
             'national_id' => ['nullable', 'string', 'max:255'],
@@ -252,8 +252,8 @@ class AuthController extends Controller
             if (isset($data['phone'])) {
                 $user->member->phone = $data['phone'];
             }
-            if (isset($data['secondary_phone'])) {
-                $user->member->secondary_phone = $data['secondary_phone'];
+            if (isset($data['whatsapp_number'])) {
+                $user->member->whatsapp_number = $data['whatsapp_number'];
             }
             if (isset($data['gender'])) {
                 $user->member->gender = $data['gender'];
