@@ -356,7 +356,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/statements/send-monthly', [\App\Http\Controllers\NotificationController::class, 'sendMonthlyStatements']);
         Route::post('/contributions/send-reminders', [\App\Http\Controllers\NotificationController::class, 'sendContributionReminders']);
 
-        // Audits
+        // Audits (Contribution Audits)
         Route::get('/audits', [AuditController::class, 'index']);
         Route::get('/audits/{auditRun}', [AuditController::class, 'show']);
         Route::post('/audits/contributions', [AuditController::class, 'upload']);
@@ -366,6 +366,11 @@ Route::prefix('v1')->group(function () {
         Route::get('/audits/member/pending-profile-changes', [AuditController::class, 'pendingProfileChangesAudit']);
         Route::get('/audits/member/{member}', [AuditController::class, 'memberResults']);
         Route::post('/audits/statements', [AuditController::class, 'auditStatements']);
+
+        // Audit Logs (System Audit Trail)
+        Route::get('/audit-logs', [\App\Http\Controllers\Admin\AuditLogController::class, 'index']);
+        Route::get('/audit-logs/{auditLog}', [\App\Http\Controllers\Admin\AuditLogController::class, 'show']);
+        Route::get('/audit-logs/statistics', [\App\Http\Controllers\Admin\AuditLogController::class, 'statistics']);
 
         // Admin Management (under /v1/admin/admin/*)
         Route::prefix('admin')->group(function () {
