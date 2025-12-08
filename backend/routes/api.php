@@ -73,6 +73,8 @@ Route::prefix('v1')->group(function () {
 
     Route::prefix('webhooks')->group(function () {
         Route::post('/payments/mpesa/callback', [PaymentController::class, 'mpesaCallback']);
+        Route::get('/whatsapp/verify', [\App\Http\Controllers\API\WhatsAppWebhookController::class, 'verify']);
+        Route::post('/whatsapp/callback', [\App\Http\Controllers\API\WhatsAppWebhookController::class, 'callback']);
     });
 
     Route::prefix('mobile')->group(function () {

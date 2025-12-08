@@ -37,5 +37,14 @@ return [
         'senderid' => env('SMS_SENDERID', 'EVIMERIA'),
         'base_url' => env('SMS_BASE_URL', 'https://smsportal.hostpinnacle.co.ke/SMSApi/send'),
     ],
+
+    'whatsapp' => [
+        'enabled' => env('WHATSAPP_ENABLED', false),
+        'api_url' => env('WHATSAPP_API_URL', ''),
+        'api_key' => env('WHATSAPP_API_KEY', ''),
+        'phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID', ''),
+        'webhook_verify_token' => env('WHATSAPP_WEBHOOK_VERIFY_TOKEN', ''),
+        'business_account_id' => env('WHATSAPP_BUSINESS_ACCOUNT_ID', ''),
+    ],
 ];
 

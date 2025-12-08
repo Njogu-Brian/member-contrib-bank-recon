@@ -16,10 +16,11 @@ class WhatsAppService
 
     public function __construct()
     {
-        $this->enabled = env('WHATSAPP_ENABLED', false);
-        $this->apiUrl = env('WHATSAPP_API_URL', '');
-        $this->apiKey = env('WHATSAPP_API_KEY', '');
-        $this->phoneNumberId = env('WHATSAPP_PHONE_NUMBER_ID', '');
+        // Load from config/services.php or .env
+        $this->enabled = config('services.whatsapp.enabled', env('WHATSAPP_ENABLED', false));
+        $this->apiUrl = config('services.whatsapp.api_url', env('WHATSAPP_API_URL', ''));
+        $this->apiKey = config('services.whatsapp.api_key', env('WHATSAPP_API_KEY', ''));
+        $this->phoneNumberId = config('services.whatsapp.phone_number_id', env('WHATSAPP_PHONE_NUMBER_ID', ''));
     }
 
     /**
@@ -55,28 +56,41 @@ class WhatsAppService
         ]);
 
         try {
-            // Send via WhatsApp API (placeholder - adjust based on your provider)
+            // Send via WhatsApp Business API
+            // Format: https://graph.facebook.com/v18.0/{phone-number-id}/messages
+            $apiEndpoint = "{$this->apiUrl}/v18.0/{$this->phoneNumberId}/messages";
+            
+            $payload = [
+                'messaging_product' => 'whatsapp',
+                'to' => $phone,
+                'type' => 'text',
+                'text' => [
+                    'body' => $message,
+                ],
+            ];
+
             $response = Http::timeout(30)
                 ->withHeaders([
                     'Authorization' => 'Bearer ' . $this->apiKey,
                     'Content-Type' => 'application/json',
                 ])
-                ->post("{$this->apiUrl}/messages", [
-                    'phone_number_id' => $this->phoneNumberId,
-                    'to' => $phone,
-                    'message' => $message,
-                ]);
+                ->post($apiEndpoint, $payload);
 
             if ($response->successful()) {
+                $responseData = $response->json();
+                $messageId = $responseData['messages'][0]['id'] ?? null;
+                
                 $log->update([
+                    'message_id' => $messageId,
                     'status' => 'sent',
                     'sent_at' => now(),
-                    'response' => $response->json(),
+                    'response' => $responseData,
                 ]);
 
                 return [
                     'success' => true,
                     'status' => 'sent',
+                    'message_id' => $messageId,
                     'log_id' => $log->id,
                 ];
             } else {
