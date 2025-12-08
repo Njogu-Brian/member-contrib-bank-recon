@@ -199,6 +199,21 @@ class MemberController extends Controller
             'next_of_kin_phone.regex' => 'Next of kin phone must be a valid Kenyan number starting with +2547 or +2541 followed by 8 digits',
         ]);
 
+        // Additional duplicate check for ID number (defense in depth)
+        if (!empty($validated['id_number'])) {
+            $existingMember = Member::where('id_number', $validated['id_number'])->first();
+            if ($existingMember) {
+                return response()->json([
+                    'message' => 'This ID number is already registered to another member.',
+                    'error' => 'duplicate_id_number',
+                    'existing_member' => [
+                        'id' => $existingMember->id,
+                        'name' => $existingMember->name,
+                    ],
+                ], 422);
+            }
+        }
+
         $member = Member::create($validated);
 
         return response()->json($member, 201);

@@ -237,5 +237,33 @@ class AccountingService
             ->orderBy('code')
             ->get();
     }
+
+    /**
+     * Get or create accounting period for a date
+     */
+    public function getOrCreatePeriod($date): AccountingPeriod
+    {
+        $date = is_string($date) ? \Carbon\Carbon::parse($date) : $date;
+        
+        $period = AccountingPeriod::where('start_date', '<=', $date)
+            ->where('end_date', '>=', $date)
+            ->where('is_closed', false)
+            ->first();
+
+        if (!$period) {
+            // Create monthly period
+            $startDate = $date->copy()->startOfMonth();
+            $endDate = $date->copy()->endOfMonth();
+            
+            $period = AccountingPeriod::create([
+                'period_name' => $date->format('F Y'),
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+                'is_closed' => false,
+            ]);
+        }
+
+        return $period;
+    }
 }
 

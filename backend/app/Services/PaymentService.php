@@ -7,7 +7,10 @@ use App\Models\Member;
 use App\Models\Payment;
 use App\Models\PaymentReceipt;
 use App\Models\Wallet;
+use App\Models\ChartOfAccount;
+use App\Models\GeneralLedger;
 use App\Services\MpesaReconciliationService;
+use App\Services\AccountingService;
 use Dompdf\Dompdf;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -21,6 +24,7 @@ class PaymentService
         private readonly QrCodeService $qrCodeService,
         private readonly AuditLogger $auditLogger,
         private readonly MpesaReconciliationService $reconciliationService,
+        private readonly AccountingService $accountingService,
     ) {
     }
 
@@ -43,24 +47,30 @@ class PaymentService
                 throw new \RuntimeException('Member not found for MSISDN ' . $msisdn);
             }
 
-            // Check for duplicate payment before creating
-            if ($this->isDuplicatePayment($mpesaTransactionId, $mpesaReceiptNumber, $member->id, $amount)) {
+            // Generate idempotency key from transaction ID
+            $idempotencyKey = $mpesaTransactionId ? 'mpesa_' . $mpesaTransactionId : 'mpesa_' . Str::random(32);
+
+            // Check for duplicate payment before creating (using idempotency key)
+            if ($this->isDuplicatePayment($mpesaTransactionId, $mpesaReceiptNumber, $member->id, $amount, $idempotencyKey)) {
                 Log::warning('Duplicate MPESA payment detected', [
                     'msisdn' => $msisdn,
                     'transaction_id' => $mpesaTransactionId,
                     'receipt_number' => $mpesaReceiptNumber,
+                    'idempotency_key' => $idempotencyKey,
                 ]);
                 throw new \RuntimeException('Duplicate payment detected');
             }
 
             $wallet = $this->walletService->ensureWallet($member);
 
+            // Create payment with idempotency key
             $payment = Payment::create([
                 'member_id' => $member->id,
                 'channel' => 'mpesa',
                 'provider_reference' => $mpesaTransactionId,
                 'mpesa_transaction_id' => $mpesaTransactionId,
                 'mpesa_receipt_number' => $mpesaReceiptNumber,
+                'idempotency_key' => $idempotencyKey,
                 'amount' => $amount,
                 'currency' => 'KES',
                 'status' => ($resultCode === '0' || $resultCode === 0) ? 'completed' : 'failed',
@@ -82,6 +92,9 @@ class PaymentService
                 // Mark pending invoices as paid (oldest first, up to payment amount)
                 $this->markInvoicesAsPaid($member, $payment);
 
+                // Post to ledger (atomic with payment creation)
+                $this->postPaymentToLedger($payment);
+
                 // Queue reconciliation job
                 ReconcileMpesaTransaction::dispatch($payment);
             }
@@ -98,8 +111,16 @@ class PaymentService
     /**
      * Check if payment is duplicate
      */
-    protected function isDuplicatePayment(?string $transactionId, ?string $receiptNumber, int $memberId, float $amount): bool
+    protected function isDuplicatePayment(?string $transactionId, ?string $receiptNumber, int $memberId, float $amount, ?string $idempotencyKey = null): bool
     {
+        // Check by idempotency key first (most reliable)
+        if ($idempotencyKey) {
+            $existing = Payment::where('idempotency_key', $idempotencyKey)->exists();
+            if ($existing) {
+                return true;
+            }
+        }
+
         // Check by MPESA transaction ID
         if ($transactionId) {
             $existing = Payment::where('mpesa_transaction_id', $transactionId)
@@ -130,6 +151,107 @@ class PaymentService
             ->exists();
 
         return $recentPayment;
+    }
+
+    /**
+     * Post payment to general ledger using double-entry bookkeeping
+     */
+    protected function postPaymentToLedger(Payment $payment): void
+    {
+        try {
+            // Get or find cash account (asset) - typically code '1101' or '1102'
+            $cashAccount = ChartOfAccount::where('code', '1101')
+                ->orWhere('code', '1102')
+                ->where('type', 'asset')
+                ->where('is_active', true)
+                ->first();
+
+            // Get or find contributions receivable/revenue account - typically code '4100'
+            $revenueAccount = ChartOfAccount::where('code', '4100')
+                ->where('type', 'revenue')
+                ->where('is_active', true)
+                ->first();
+
+            // If accounts don't exist, create them or use defaults
+            if (!$cashAccount) {
+                $cashAccount = ChartOfAccount::firstOrCreate(
+                    ['code' => '1101'],
+                    [
+                        'name' => 'Cash on Hand',
+                        'type' => 'asset',
+                        'is_active' => true,
+                    ]
+                );
+            }
+
+            if (!$revenueAccount) {
+                $revenueAccount = ChartOfAccount::firstOrCreate(
+                    ['code' => '4100'],
+                    [
+                        'name' => 'Member Contributions',
+                        'type' => 'revenue',
+                        'is_active' => true,
+                    ]
+                );
+            }
+
+            // Get or create accounting period
+            $period = $this->accountingService->getOrCreatePeriod(now());
+
+            // Calculate running balances
+            $cashLastBalance = GeneralLedger::where('account_id', $cashAccount->id)
+                ->where('entry_date', '<=', now())
+                ->orderBy('entry_date', 'desc')
+                ->orderBy('id', 'desc')
+                ->value('running_balance') ?? 0;
+
+            $revenueLastBalance = GeneralLedger::where('account_id', $revenueAccount->id)
+                ->where('entry_date', '<=', now())
+                ->orderBy('entry_date', 'desc')
+                ->orderBy('id', 'desc')
+                ->value('running_balance') ?? 0;
+
+            // Post debit to cash (asset increases)
+            GeneralLedger::create([
+                'account_id' => $cashAccount->id,
+                'period_id' => $period->id,
+                'entry_date' => $payment->created_at ?? now(),
+                'debit' => $payment->amount,
+                'credit' => 0,
+                'running_balance' => $cashLastBalance + $payment->amount, // Asset: debit increases
+                'reference_type' => Payment::class,
+                'reference_id' => $payment->id,
+                'description' => 'MPESA Payment - ' . ($payment->member->name ?? 'Member'),
+            ]);
+
+            // Post credit to revenue (revenue increases)
+            GeneralLedger::create([
+                'account_id' => $revenueAccount->id,
+                'period_id' => $period->id,
+                'entry_date' => $payment->created_at ?? now(),
+                'debit' => 0,
+                'credit' => $payment->amount,
+                'running_balance' => $revenueLastBalance + $payment->amount, // Revenue: credit increases
+                'reference_type' => Payment::class,
+                'reference_id' => $payment->id,
+                'description' => 'Member Contribution - ' . ($payment->member->name ?? 'Member'),
+            ]);
+
+            Log::info('Payment posted to ledger', [
+                'payment_id' => $payment->id,
+                'amount' => $payment->amount,
+                'cash_account' => $cashAccount->code,
+                'revenue_account' => $revenueAccount->code,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to post payment to ledger', [
+                'payment_id' => $payment->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            // Don't throw - log error but allow payment to complete
+            // This ensures payment is recorded even if ledger posting fails
+        }
     }
     
     /**

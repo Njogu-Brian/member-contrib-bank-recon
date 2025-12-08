@@ -16,6 +16,7 @@ class Payment extends Model
         'provider_reference',
         'mpesa_transaction_id',
         'mpesa_receipt_number',
+        'idempotency_key',
         'amount',
         'currency',
         'status',
