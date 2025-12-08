@@ -3,10 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\Expense;
+use App\Services\ExpenseApprovalService;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 
 class ExpenseController extends Controller
 {
+    public function __construct(
+        private readonly ExpenseApprovalService $approvalService,
+        private readonly AuditLogger $auditLogger
+    ) {
+    }
+
     public function index(Request $request)
     {
         $query = Expense::with(['transaction', 'members']);
@@ -116,6 +124,17 @@ class ExpenseController extends Controller
             return response()->json(['message' => 'You cannot approve your own expense request'], 422);
         }
         
+        // Check approval hierarchy
+        $user = auth()->user();
+        $approvalCheck = $this->approvalService->canApprove($expense, $user);
+        
+        if (!$approvalCheck['can_approve']) {
+            return response()->json([
+                'message' => $approvalCheck['reason'] ?? 'You do not have permission to approve this expense',
+                'required_role' => $approvalCheck['required_role'],
+            ], 403);
+        }
+        
         $expense->update([
             'approval_status' => 'approved',
             'approved_by' => auth()->id(),
@@ -123,6 +142,11 @@ class ExpenseController extends Controller
             'rejection_reason' => null,
             'rejected_by' => null,
             'rejected_at' => null,
+        ]);
+        
+        $this->auditLogger->log(auth()->id(), 'expense.approved', $expense, [
+            'expense_id' => $expense->id,
+            'amount' => $expense->amount,
         ]);
         
         $expense->load(['requestedBy', 'approvedBy']);
@@ -147,11 +171,27 @@ class ExpenseController extends Controller
             return response()->json(['message' => 'Expense is already rejected'], 422);
         }
         
+        // Check if user can reject (same hierarchy as approval)
+        $user = auth()->user();
+        $approvalCheck = $this->approvalService->canApprove($expense, $user);
+        
+        if (!$approvalCheck['can_approve']) {
+            return response()->json([
+                'message' => 'You do not have permission to reject this expense',
+                'required_role' => $approvalCheck['required_role'],
+            ], 403);
+        }
+        
         $expense->update([
             'approval_status' => 'rejected',
             'rejected_by' => auth()->id(),
             'rejected_at' => now(),
             'rejection_reason' => $validated['reason'],
+        ]);
+        
+        $this->auditLogger->log(auth()->id(), 'expense.rejected', $expense, [
+            'expense_id' => $expense->id,
+            'reason' => $validated['reason'],
         ]);
         
         $expense->load(['requestedBy', 'rejectedBy']);
@@ -160,6 +200,14 @@ class ExpenseController extends Controller
             'message' => 'Expense rejected successfully',
             'expense' => $expense,
         ]);
+    }
+
+    /**
+     * Get approval hierarchy information
+     */
+    public function approvalHierarchy(Request $request)
+    {
+        return response()->json($this->approvalService->getApprovalHierarchy());
     }
 }
 
