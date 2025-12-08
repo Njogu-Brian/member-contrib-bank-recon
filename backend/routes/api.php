@@ -198,6 +198,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/kyc/pending', [KycController::class, 'pending']);
         Route::post('/kyc/{document}/approve', [KycController::class, 'approve']);
         Route::post('/kyc/{document}/reject', [KycController::class, 'reject']);
+        Route::post('/kyc/members/{member}/upload', [KycController::class, 'uploadDocument'])->where('member', '[0-9]+');
 
         // Wallets & Contributions
         Route::get('/wallets', [WalletController::class, 'index']);

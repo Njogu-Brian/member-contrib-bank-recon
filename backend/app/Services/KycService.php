@@ -202,5 +202,21 @@ class KycService
     {
         return $member->kyc_status === 'approved' && !$member->is_active;
     }
+
+    /**
+     * Log document upload
+     */
+    public function logDocumentUpload(KycDocument $document, ?int $userId = null): void
+    {
+        $this->auditLogger->log(
+            $userId ?? auth()->id(),
+            'kyc.document.uploaded',
+            $document,
+            [
+                'document_type' => $document->document_type,
+                'member_id' => $document->member_id,
+            ]
+        );
+    }
 }
 
