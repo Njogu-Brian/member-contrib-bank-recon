@@ -38,9 +38,48 @@ class InvestmentService
     public function create(array $data): Investment
     {
         return DB::transaction(function () use ($data) {
+            // Ensure status has a default value
+            if (!isset($data['status'])) {
+                $data['status'] = 'active';
+            }
+
+            // Validate principal_amount is positive
+            if (isset($data['principal_amount']) && $data['principal_amount'] <= 0) {
+                throw new \InvalidArgumentException('Principal amount must be greater than 0');
+            }
+
+            // Validate expected_roi_rate is within valid range
+            if (isset($data['expected_roi_rate']) && ($data['expected_roi_rate'] < 0 || $data['expected_roi_rate'] > 100)) {
+                throw new \InvalidArgumentException('Expected ROI rate must be between 0 and 100');
+            }
+
             $investment = Investment::create($data);
-            $this->generateRoiSnapshot($investment);
-            $this->schedulePayouts($investment);
+            
+            // Only generate ROI snapshot if we have valid dates
+            if ($investment->start_date) {
+                try {
+                    $this->generateRoiSnapshot($investment);
+                } catch (\Exception $e) {
+                    // Log error but don't fail investment creation
+                    \Log::warning('Failed to generate ROI snapshot during investment creation', [
+                        'investment_id' => $investment->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            // Only schedule payouts if end_date is set
+            if ($investment->end_date) {
+                try {
+                    $this->schedulePayouts($investment);
+                } catch (\Exception $e) {
+                    // Log error but don't fail investment creation
+                    \Log::warning('Failed to schedule payouts during investment creation', [
+                        'investment_id' => $investment->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
 
             $this->auditLogger->log(auth()->id(), 'investment.created', $investment, $data);
 
@@ -63,14 +102,30 @@ class InvestmentService
 
     protected function schedulePayouts(Investment $investment): void
     {
-        if (! $investment->end_date) {
+        if (! $investment->end_date || ! $investment->start_date) {
             return;
         }
 
         $start = Carbon::parse($investment->start_date)->startOfMonth();
         $end = Carbon::parse($investment->end_date)->startOfMonth();
+        
+        // Ensure end is after start
+        if ($end->lte($start)) {
+            return; // Invalid date range
+        }
+
         $months = $start->diffInMonths($end) + 1;
-        $monthlyAmount = $months ? $investment->principal_amount / $months : $investment->principal_amount;
+        
+        if ($months <= 0) {
+            return; // Invalid month count
+        }
+
+        $principalAmount = (float) ($investment->principal_amount ?? 0);
+        if ($principalAmount <= 0) {
+            return; // Invalid principal amount
+        }
+
+        $monthlyAmount = $principalAmount / $months;
 
         for ($i = 0; $i < $months; $i++) {
             InvestmentPayout::firstOrCreate(
@@ -88,21 +143,40 @@ class InvestmentService
 
     protected function generateRoiSnapshot(Investment $investment): void
     {
-        $durationInYears = max(
-            0.01,
-            Carbon::parse($investment->start_date)->diffInMonths($investment->end_date ?? now()) / 12
-        );
+        if (!$investment->start_date) {
+            return; // Cannot calculate ROI without start date
+        }
 
-        $accrued = $investment->principal_amount * ($investment->expected_roi_rate / 100) * $durationInYears;
+        $startDate = Carbon::parse($investment->start_date);
+        $endDate = $investment->end_date ? Carbon::parse($investment->end_date) : now();
+        
+        // Ensure end date is not before start date
+        if ($endDate->lt($startDate)) {
+            $endDate = $startDate->copy()->addDay(); // Use at least 1 day
+        }
+
+        $durationInMonths = $startDate->diffInMonths($endDate);
+        $durationInYears = max(0.01, $durationInMonths / 12);
+
+        // Ensure principal_amount and expected_roi_rate are valid numbers
+        $principalAmount = (float) ($investment->principal_amount ?? 0);
+        $roiRate = (float) ($investment->expected_roi_rate ?? 0);
+
+        if ($principalAmount <= 0) {
+            return; // Cannot calculate ROI with zero or negative principal
+        }
+
+        $accrued = $principalAmount * ($roiRate / 100) * $durationInYears;
 
         RoiCalculation::create([
             'investment_id' => $investment->id,
-            'principal' => $investment->principal_amount,
+            'principal' => $principalAmount,
             'accrued_interest' => round($accrued, 2),
             'calculated_on' => now()->toDateString(),
             'inputs' => [
+                'duration_months' => $durationInMonths,
                 'duration_years' => $durationInYears,
-                'roi_rate' => $investment->expected_roi_rate,
+                'roi_rate' => $roiRate,
             ],
         ]);
     }
