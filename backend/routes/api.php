@@ -134,6 +134,15 @@ Route::prefix('v1')->group(function () {
             Route::get('/mfa/setup', [MobileAuthController::class, 'getMfaSetup']);
             Route::post('/mfa/verify', [MobileAuthController::class, 'verifyMfa']);
 
+            // Mobile Terms & Conditions
+            Route::get('/terms', [MobileAuthController::class, 'getTerms']);
+            Route::post('/terms/accept', [MobileAuthController::class, 'acceptTerms']);
+
+            // Mobile Offline Sync
+            Route::get('/offline/data', [\App\Http\Controllers\API\OfflineSyncController::class, 'getOfflineData']);
+            Route::post('/offline/sync', [\App\Http\Controllers\API\OfflineSyncController::class, 'sync']);
+            Route::get('/offline/status', [\App\Http\Controllers\API\OfflineSyncController::class, 'syncStatus']);
+
             // Mobile KYC Documents
             Route::post('/kyc/documents/front-id', [MobileAuthController::class, 'uploadFrontId']);
             Route::post('/kyc/documents/back-id', [MobileAuthController::class, 'uploadBackId']);

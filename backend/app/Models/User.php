@@ -24,6 +24,10 @@ class User extends Authenticatable
         'password_changed_at',
         'password_reset_token',
         'password_reset_expires_at',
+        'terms_accepted',
+        'terms_accepted_at',
+        'terms_version',
+        'terms_accepted_ip',
     ];
 
     protected $hidden = [
@@ -42,6 +46,8 @@ class User extends Authenticatable
             'must_change_password' => 'boolean',
             'password_changed_at' => 'datetime',
             'password_reset_expires_at' => 'datetime',
+            'terms_accepted' => 'boolean',
+            'terms_accepted_at' => 'datetime',
         ];
     }
 

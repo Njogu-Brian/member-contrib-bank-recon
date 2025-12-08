@@ -31,13 +31,31 @@ class AuthController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => [
+                'required',
+                'string',
+                'min:8',
+                'confirmed',
+                'regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/',
+            ],
+            'terms_accepted' => ['required', 'accepted'],
+            'terms_version' => ['nullable', 'string'],
+        ], [
+            'password.regex' => 'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)',
+            'terms_accepted.required' => 'You must accept the terms and conditions to register',
+            'terms_accepted.accepted' => 'You must accept the terms and conditions to register',
         ]);
+
+        $currentTermsVersion = \App\Models\Setting::get('terms_version', '1.0');
 
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
+            'terms_accepted' => true,
+            'terms_accepted_at' => now(),
+            'terms_version' => $validated['terms_version'] ?? $currentTermsVersion,
+            'terms_accepted_ip' => $request->ip(),
         ]);
 
         $profile = UserProfile::create([
@@ -47,7 +65,9 @@ class AuthController extends Controller
 
         $token = $user->createToken('mobile_auth')->plainTextToken;
 
-        $this->auditLogger->log($user->id, 'user.registered');
+        $this->auditLogger->log($user->id, 'user.registered', $user, [
+            'terms_version' => $user->terms_version,
+        ]);
 
         return response()->json([
             'user' => $user,
@@ -90,7 +110,73 @@ class AuthController extends Controller
 
     public function user(Request $request): JsonResponse
     {
-        return response()->json($request->user());
+        $user = $request->user();
+        $currentTermsVersion = \App\Models\Setting::get('terms_version', '1.0');
+        
+        return response()->json([
+            'user' => $user,
+            'terms' => [
+                'accepted' => $user->terms_accepted ?? false,
+                'accepted_at' => $user->terms_accepted_at,
+                'accepted_version' => $user->terms_version,
+                'current_version' => $currentTermsVersion,
+                'needs_acceptance' => !$user->terms_accepted || ($user->terms_version !== $currentTermsVersion),
+            ],
+        ]);
+    }
+
+    /**
+     * Accept terms and conditions
+     */
+    public function acceptTerms(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'terms_version' => ['required', 'string'],
+        ]);
+
+        $user = $request->user();
+        $currentTermsVersion = \App\Models\Setting::get('terms_version', '1.0');
+
+        if ($validated['terms_version'] !== $currentTermsVersion) {
+            return response()->json([
+                'message' => 'Invalid terms version. Please refresh and accept the latest terms.',
+                'current_version' => $currentTermsVersion,
+            ], 422);
+        }
+
+        $user->update([
+            'terms_accepted' => true,
+            'terms_accepted_at' => now(),
+            'terms_version' => $currentTermsVersion,
+            'terms_accepted_ip' => $request->ip(),
+        ]);
+
+        $this->auditLogger->log($user->id, 'user.terms_accepted', $user, [
+            'terms_version' => $currentTermsVersion,
+        ]);
+
+        return response()->json([
+            'message' => 'Terms and conditions accepted successfully',
+            'user' => $user->fresh(),
+        ]);
+    }
+
+    /**
+     * Get current terms and conditions
+     */
+    public function getTerms(Request $request): JsonResponse
+    {
+        $termsContent = \App\Models\Setting::get('terms_content', '');
+        $termsVersion = \App\Models\Setting::get('terms_version', '1.0');
+        $lastUpdated = \App\Models\Setting::where('key', 'terms_content')
+            ->orWhere('key', 'terms_version')
+            ->max('updated_at');
+
+        return response()->json([
+            'content' => $termsContent,
+            'version' => $termsVersion,
+            'last_updated' => $lastUpdated,
+        ]);
     }
 
     public function logout(Request $request): JsonResponse
