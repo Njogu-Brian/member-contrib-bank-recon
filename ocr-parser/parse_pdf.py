@@ -264,6 +264,27 @@ def parse_paybill_table(tables_data):
             if header_row:
                 break
 
+    # If header had no Paid In/Withdrawn, infer from data: last 2 cols often = Paid In, Withdrawn
+    if paid_in_col is None and withdrawn_col is None and rows:
+        data_rows = [r for r in rows if r and len(r) >= 2 and not any(
+            str(c).strip().upper() in ('RECEIPT NO', 'PAID IN', 'WITHDRAWN', 'COMPLETION TIME', 'DETAILS')
+            for c in (r or [])
+        )][:10]
+        if data_rows:
+            ncols = max(len(r) for r in data_rows)
+            if ncols >= 2:
+                paid_in_col = ncols - 2
+                withdrawn_col = ncols - 1
+            for i in range(min(ncols, 5)):
+                if completion_time_col is None and any(
+                    re.search(r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}', str((r[i] or '')))
+                    for r in data_rows
+                ):
+                    completion_time_col = i
+                    break
+            if details_col is None and ncols >= 3:
+                details_col = min(2, ncols - 3)  # often column 2 or 3
+
     # Need at least one amount column (Paid In or Withdrawn) to be able to parse
     if paid_in_col is None and withdrawn_col is None:
         return transactions
@@ -1603,6 +1624,10 @@ def parse_date(date_str):
         '%Y-%m-%d %H:%M:%S',
         '%d-%m-%Y %H:%M:%S',
         '%d/%m/%Y %H:%M:%S',
+        '%d/%m/%Y %I:%M:%S %p',
+        '%d/%m/%Y %I:%M %p',
+        '%d-%m-%Y %I:%M:%S %p',
+        '%d-%m-%Y %I:%M %p',
         '%d/%m/%Y',
         '%d-%m-%Y',
         '%Y-%m-%d',
@@ -1854,14 +1879,30 @@ def main():
         with open(args.output, 'w') as f:
             f.write(output_json)
         
-        # Also write debug text
+        # Debug file: why 0 transactions when PDF was parsed
         debug_path = args.output.replace('.json', '_debug.txt')
-        with open(debug_path, 'w') as f:
+        with open(debug_path, 'w', encoding='utf-8') as f:
             f.write(f"Extracted {len(transactions)} transactions\n\n")
             if result:
-                f.write(f"Text length: {len(result.get('text', ''))}\n")
-                f.write(f"Tables found: {len(result.get('tables', []))}\n")
+                pages = result.get('pages', [])
                 f.write(f"Is Paybill: {result.get('is_paybill', False)}\n")
+                f.write(f"Pages: {len(pages)}\n")
+                for i, page in enumerate(pages):
+                    tables = page.get('tables', [])
+                    f.write(f"  Page {i+1}: {len(tables)} table(s)\n")
+                    for ti, tbl in enumerate(tables):
+                        rrows = tbl.get('rows') if isinstance(tbl.get('rows'), list) else []
+                        header = tbl.get('header') or (rrows[0] if rrows else None)
+                        rows = rrows
+                        f.write(f"    Table {ti+1}: header={header}, data_rows={len(rows)}\n")
+                        if rows and len(rows) <= 3:
+                            for ri, row in enumerate(rows[:5]):
+                                f.write(f"      row{ri}: {row}\n")
+                        elif rows:
+                            f.write(f"      first row: {rows[0]}\n")
+                            f.write(f"      second row: {rows[1]}\n")
+                if result.get('is_paybill') and len(transactions) == 0 and pages:
+                    f.write("\n--- Paybill but 0 transactions: check column names (Receipt/Completion/Details/Paid In/Withdrawn) and date/amount formats in rows above ---\n")
     else:
         print(output_json)
     
