@@ -14,8 +14,8 @@ export default function StatementHeader({ member, isPublic = false, onPrint, onD
     queryKey: ['public-settings'],
     queryFn: async () => {
       try {
-        const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
-        let url = `${baseUrl}/public/settings`
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+        let url = `${baseUrl}/api/v1/public/settings`
         if (url.startsWith('/')) {
           url = window.location.origin + url
         }

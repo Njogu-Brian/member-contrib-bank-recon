@@ -104,13 +104,17 @@ export function AuthProvider({ children }) {
     refetchInterval: false,
     // Suppress error logging for 401s and timeouts (expected when not authenticated or backend unavailable)
     onError: (error) => {
-      // Only log non-401, non-timeout errors
-      if (error.response?.status !== 401 && 
-          error.status !== 401 && 
-          error.message !== 'Request timeout' &&
-          error.code !== 'ECONNABORTED') {
-        console.error('Auth query error:', error)
+      // Suppress all 401 errors and timeouts - they're expected
+      if (error.response?.status === 401 || 
+          error.status === 401 || 
+          error.message === 'Request timeout' ||
+          error.code === 'ECONNABORTED' ||
+          error.suppressError) {
+        // Silently ignore - these are expected
+        return
       }
+      // Only log other errors
+      console.error('Auth query error:', error)
     },
     // For public statement routes, return immediately without making the request
     ...(isPublicStatementRoute && {

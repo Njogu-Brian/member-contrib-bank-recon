@@ -58,8 +58,6 @@ export default function Invoices() {
       page: membersPage, 
       per_page: 25,
       search: membersSearch,
-      sort_by: 'total_invoices_amount',
-      sort_order: 'desc',
     }),
     enabled: activeTab === 'members',
   })
@@ -137,21 +135,8 @@ export default function Invoices() {
     onError: (error) => alert(error.response?.data?.message || 'Failed to cancel invoice'),
   })
 
-  const bulkMatchMutation = useMutation({
-    mutationFn: bulkMatchInvoices,
-    onSuccess: (data) => {
-      queryClient.invalidateQueries(['invoices'])
-      const result = data.result || {}
-      alert(`Matched ${result.total_invoices_paid || 0} invoices to payments!`)
-    },
-    onError: (error) => alert(error.response?.data?.message || 'Failed to match invoices'),
-  })
-
-  const handleBulkMatch = () => {
-    if (confirm('This will automatically match all contributions to pending invoices. Continue?')) {
-      bulkMatchMutation.mutate()
-    }
-  }
+  // Auto-matching is now handled automatically via observers when transactions/contributions are created
+  // No need for manual bulk match button
 
   const resetForm = () => {
     setFormData({
@@ -288,13 +273,6 @@ export default function Invoices() {
       <div className="bg-white rounded-xl shadow-sm p-4">
         <div className="flex flex-wrap gap-3 justify-end">
           <button
-            onClick={handleBulkMatch}
-            disabled={bulkMatchMutation.isPending}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-md text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 transition-all"
-          >
-            {bulkMatchMutation.isPending ? 'Matching...' : '💰 Auto-Match Payments'}
-          </button>
-          <button
             onClick={() => {
               setEditingInvoice(null)
               resetForm()
@@ -359,23 +337,6 @@ export default function Invoices() {
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
               placeholder="Select month"
             />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Member</label>
-            <select
-              value={filters.member_id}
-              onChange={(e) => {
-                setFilters({ ...filters, member_id: e.target.value })
-                setPage(1)
-              }}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            >
-              <option value="">All Members</option>
-              {membersData?.data?.slice(0, 50).map((member) => (
-                <option key={member.id} value={member.id}>{member.name}</option>
-              ))}
-            </select>
           </div>
           
           <div>
@@ -472,7 +433,16 @@ export default function Invoices() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {invoice.member?.name || '-'}
+                      {invoice.member?.id ? (
+                        <button
+                          onClick={() => navigate(`/members/${invoice.member.id}`)}
+                          className="text-indigo-600 hover:text-indigo-900 hover:underline font-medium"
+                        >
+                          {invoice.member.name}
+                        </button>
+                      ) : (
+                        '-'
+                      )}
                     </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(invoice.amount)}
@@ -759,7 +729,10 @@ export default function Invoices() {
 
           {/* Members Table */}
           {isLoadingMembers ? (
-            <div className="text-center py-12">Loading...</div>
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
+              <p className="text-gray-500">Loading members...</p>
+            </div>
           ) : (
             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
               <table className="min-w-full divide-y divide-gray-200">
@@ -767,16 +740,12 @@ export default function Invoices() {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Invoices</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Amount</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Paid</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Pending</th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {membersWithInvoicesData?.data?.length === 0 ? (
                     <tr>
-                      <td colSpan="6" className="px-6 py-12 text-center text-sm text-gray-500">
+                      <td colSpan="2" className="px-6 py-12 text-center text-sm text-gray-500">
                         No members found.
                       </td>
                     </tr>
@@ -784,28 +753,18 @@ export default function Invoices() {
                     membersWithInvoicesData?.data?.map((member) => (
                       <tr key={member.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{member.name}</div>
-                          <div className="text-xs text-gray-500">{member.phone || member.email || member.member_code}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
-                          {member.total_invoices_count || 0}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                          {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(member.total_invoices_amount || 0)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-green-600">
-                          {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(member.paid_invoices_amount || 0)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-red-600">
-                          {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(member.pending_invoices_amount || 0)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
                           <button
                             onClick={() => navigate(`/members/${member.id}`)}
-                            className="text-indigo-600 hover:text-indigo-900"
+                            className="text-left text-sm font-medium text-indigo-600 hover:text-indigo-900 hover:underline"
                           >
-                            View Profile
+                            {member.name}
                           </button>
+                          {member.phone && (
+                            <div className="text-xs text-gray-500 mt-1">{member.phone}</div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
+                          {member.total_invoices || 0}
                         </td>
                       </tr>
                     ))

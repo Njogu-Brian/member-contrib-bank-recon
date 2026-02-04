@@ -48,10 +48,12 @@ class InvoicePaymentMatcher
 
             if ($remainingAmount >= $invoice->amount) {
                 // Full payment of invoice
+                $currentMetadata = is_array($invoice->metadata) ? $invoice->metadata : (is_string($invoice->metadata) ? json_decode($invoice->metadata, true) : []);
+                
                 $invoice->update([
                     'status' => 'paid',
                     'paid_at' => now(),
-                    'metadata' => array_merge($invoice->metadata ?? [], [
+                    'metadata' => array_merge($currentMetadata ?? [], [
                         'auto_matched' => true,
                         'transaction_id' => $transaction->id,
                         'matched_at' => now()->toDateTimeString(),
@@ -115,10 +117,12 @@ class InvoicePaymentMatcher
 
             if ($remainingAmount >= $invoice->amount) {
                 // Full payment of invoice
+                $currentMetadata = is_array($invoice->metadata) ? $invoice->metadata : (is_string($invoice->metadata) ? json_decode($invoice->metadata, true) : []);
+                
                 $invoice->update([
                     'status' => 'paid',
                     'paid_at' => now(),
-                    'metadata' => array_merge($invoice->metadata ?? [], [
+                    'metadata' => array_merge($currentMetadata ?? [], [
                         'auto_matched' => true,
                         'manual_contribution_id' => $contribution->id,
                         'matched_at' => now()->toDateTimeString(),
@@ -256,10 +260,12 @@ class InvoicePaymentMatcher
                 if ($amountNeeded <= 0) {
                     $primaryTransactionId = $usedTransactionIdsForInvoice[0];
                     
+                    $currentMetadata = is_array($invoice->metadata) ? $invoice->metadata : (is_string($invoice->metadata) ? json_decode($invoice->metadata, true) : []);
+                    
                     $invoice->update([
                         'status' => 'paid',
                         'paid_at' => now(),
-                        'metadata' => array_merge($invoice->metadata ?? [], [
+                        'metadata' => array_merge($currentMetadata ?? [], [
                             'auto_matched' => true,
                             'transaction_id' => $primaryTransactionId,
                             'matched_at' => now()->toDateTimeString(),
@@ -291,16 +297,18 @@ class InvoicePaymentMatcher
             ->filter(function($invoice) {
                 $metadata = is_string($invoice->metadata) 
                     ? json_decode($invoice->metadata, true) 
-                    : $invoice->metadata;
+                    : (is_array($invoice->metadata) ? $invoice->metadata : []);
                 return isset($metadata['manual_contribution_id']);
             })
-            ->pluck('metadata')
-            ->map(function($metadata) {
-                $meta = is_string($metadata) ? json_decode($metadata, true) : $metadata;
-                return $meta['manual_contribution_id'] ?? null;
+            ->map(function($invoice) {
+                $metadata = is_string($invoice->metadata) 
+                    ? json_decode($invoice->metadata, true) 
+                    : (is_array($invoice->metadata) ? $invoice->metadata : []);
+                return $metadata['manual_contribution_id'] ?? null;
             })
             ->filter()
             ->unique()
+            ->values()
             ->toArray();
 
         $contributions = ManualContribution::whereNotIn('id', $usedContributionIds)->get();

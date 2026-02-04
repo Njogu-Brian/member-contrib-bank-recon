@@ -319,26 +319,18 @@ class InvoiceController extends Controller
      */
     public function membersWithInvoices(Request $request)
     {
+        \Illuminate\Support\Facades\Log::info('membersWithInvoices START', [
+            'url' => $request->fullUrl(),
+            'method' => $request->method(),
+            'params' => $request->all(),
+            'user_id' => $request->user()?->id,
+        ]);
+        
         try {
+            \Illuminate\Support\Facades\Log::info('membersWithInvoices: Building query');
             $query = Member::where('is_active', true)
-                ->withCount([
-                    'invoices as total_invoices_count',
-                    'invoices as paid_invoices_count' => function ($q) {
-                        $q->where('status', 'paid');
-                    },
-                    'invoices as pending_invoices_count' => function ($q) {
-                        $q->whereIn('status', ['pending', 'overdue']);
-                    },
-                ])
-                ->withSum([
-                    'invoices as total_invoices_amount',
-                    'invoices as paid_invoices_amount' => function ($q) {
-                        $q->where('status', 'paid');
-                    },
-                    'invoices as pending_invoices_amount' => function ($q) {
-                        $q->whereIn('status', ['pending', 'overdue']);
-                    },
-                ], 'amount');
+                ->withCount('invoices')
+                ->orderBy('name', 'asc');
 
             // Search filter
             if ($request->has('search') && $request->search !== '') {
@@ -351,44 +343,51 @@ class InvoiceController extends Controller
                 });
             }
 
-            // Sort - for aggregated columns, use orderByRaw with subquery
-            $sortBy = $request->get('sort_by', 'total_invoices_amount');
-            $sortOrder = $request->get('sort_order', 'desc');
+            // Simple pagination
+            $perPage = min((int) $request->get('per_page', 25), 100);
+            $page = max(1, (int) $request->get('page', 1));
             
-            $allowedSortColumns = ['name', 'total_invoices_amount', 'total_invoices_count', 'pending_invoices_amount'];
-            if (!in_array($sortBy, $allowedSortColumns)) {
-                $sortBy = 'total_invoices_amount';
-            }
-            
-            $sortOrder = in_array($sortOrder, ['asc', 'desc']) ? $sortOrder : 'desc';
+            \Illuminate\Support\Facades\Log::info('membersWithInvoices: Paginate query', ['per_page' => $perPage, 'page' => $page]);
+            $members = $query->paginate($perPage, ['*'], 'page', $page);
+            \Illuminate\Support\Facades\Log::info('membersWithInvoices: Fetched ' . $members->count() . ' paginated members');
 
-            // Apply sorting
-            if ($sortBy === 'name') {
-                $query->orderBy('name', $sortOrder);
-            } elseif ($sortBy === 'total_invoices_amount') {
-                $query->orderByRaw("(SELECT COALESCE(SUM(amount), 0) FROM invoices WHERE invoices.member_id = members.id) {$sortOrder}");
-            } elseif ($sortBy === 'total_invoices_count') {
-                $query->orderByRaw("(SELECT COUNT(*) FROM invoices WHERE invoices.member_id = members.id) {$sortOrder}");
-            } elseif ($sortBy === 'pending_invoices_amount') {
-                $query->orderByRaw("(SELECT COALESCE(SUM(amount), 0) FROM invoices WHERE invoices.member_id = members.id AND invoices.status IN ('pending', 'overdue')) {$sortOrder}");
-            }
+            // operate on the underlying collection returned by the paginator
+            $collection = $members->getCollection();
 
-            $paginated = $query->paginate($request->get('per_page', 25));
+            $data = $collection->map(function ($member) {
+                return [
+                    'id' => $member->id,
+                    'name' => $member->name,
+                    'phone' => $member->phone,
+                    'email' => $member->email,
+                    'member_code' => $member->member_code,
+                    'total_invoices' => (int) ($member->invoices_count ?? 0),
+                ];
+            })->values(); // reindex numerical keys
 
-            // Return in standard Laravel pagination format
-            return response()->json([
-                'data' => $paginated->items(),
-                'meta' => [
-                    'current_page' => $paginated->currentPage(),
-                    'last_page' => $paginated->lastPage(),
-                    'per_page' => $paginated->perPage(),
-                    'total' => $paginated->total(),
-                    'from' => $paginated->firstItem(),
-                    'to' => $paginated->lastItem(),
-                ],
+
+            \Illuminate\Support\Facades\Log::info('membersWithInvoices: Preparing response', [
+                'total' => $members->total(),
+                'current_page' => $members->currentPage(),
+                'per_page' => $members->perPage(),
+                'paginated_count' => $data->count(),
             ]);
-        } catch (\Exception $e) {
+            
+            \Illuminate\Support\Facades\Log::info('membersWithInvoices: SUCCESS - Returning response');
+            return response()->json([
+                'data' => $data,
+                'meta' => [
+                    'current_page' => $members->currentPage(),
+                    'last_page' => $members->lastPage(),
+                    'per_page' => $members->perPage(),
+                    'total' => $members->total(),
+                    'from' => $members->firstItem(),
+                    'to' => $members->lastItem(),
+                ],
+            ], 200);
+        } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('Error in membersWithInvoices: ' . $e->getMessage(), [
+                'exception' => get_class($e),
                 'trace' => $e->getTraceAsString(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
@@ -397,6 +396,7 @@ class InvoiceController extends Controller
             return response()->json([
                 'message' => 'Error fetching members with invoices',
                 'error' => config('app.debug') ? $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() : 'An error occurred',
+                'exception_type' => get_class($e),
             ], 500);
         }
     }

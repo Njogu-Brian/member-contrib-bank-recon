@@ -1,72 +1,82 @@
+// src/api/auth.js — Token-based authentication
 import api from './axios'
 
-const AUTH_BASE = '/auth'
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+const AUTH_BASE = '/api/v1/auth' // <- use full API route prefix used by backend
 
-export const login = async (email, password) => {
-  const response = await api.post(`${AUTH_BASE}/login`, { email, password })
-  const token = response.data?.token
-  if (token) {
-    localStorage.setItem('token', token)
-    // Store timestamp for session management
-    localStorage.setItem('token_timestamp', Date.now().toString())
-    // Set session indicator in sessionStorage (expires when browser closes)
-    sessionStorage.setItem('session_active', 'true')
+/**
+ * Perform login:
+ * POST credentials to login endpoint (backend returns token)
+ * Token is stored in localStorage and added to Authorization header
+ */
+export async function login(email, password) {
+  // POST login - backend returns token
+  const res = await api.post(`${AUTH_BASE}/login`, { email, password })
+
+  // Store token in localStorage for subsequent requests
+  if (res.data?.token) {
+    localStorage.setItem('auth_token', res.data.token)
+    // Update axios default header to include token
+    api.defaults.headers.common['Authorization'] = `Bearer ${res.data.token}`
   }
-  return response.data
+
+  // Store client state
+  sessionStorage.setItem('session_active', 'true')
+  sessionStorage.setItem('last_login_at', String(Date.now()))
+
+  return res.data
 }
 
-export const logout = async () => {
-  await api.post(`${AUTH_BASE}/logout`)
-  localStorage.removeItem('token')
-  localStorage.removeItem('token_timestamp')
+export async function logout() {
+  // Call server logout to revoke token
+  try {
+    await api.post(`${AUTH_BASE}/logout`)
+  } catch (error) {
+    // Even if logout fails, clear local storage
+    console.warn('Logout request failed:', error)
+  }
+  
+  // Clear token and client-side indicators
+  localStorage.removeItem('auth_token')
+  delete api.defaults.headers.common['Authorization']
   sessionStorage.removeItem('session_active')
+  sessionStorage.removeItem('last_login_at')
 }
 
-export const requestPasswordReset = async (email) => {
-  const response = await api.post(`${AUTH_BASE}/password/reset-request`, { email })
-  return response.data
+export async function requestPasswordReset(email) {
+  const res = await api.post(`${AUTH_BASE}/password/reset-request`, { email })
+  return res.data
 }
 
-export const resetPassword = async (email, token, password, password_confirmation) => {
-  const response = await api.post(`${AUTH_BASE}/password/reset`, {
+export async function resetPassword(email, token, password, password_confirmation) {
+  const res = await api.post(`${AUTH_BASE}/password/reset`, {
     email,
     token,
     password,
     password_confirmation,
   })
-  return response.data
+  return res.data
 }
 
-export const changePassword = async (currentPassword, password, passwordConfirmation) => {
+export async function changePassword(currentPassword, password, passwordConfirmation) {
   const payload = {
     password,
     password_confirmation: passwordConfirmation,
   }
-  
-  // Only include current_password if provided AND not empty (not first login)
-  // Don't send empty string - backend will treat it as present but invalid
   if (currentPassword && currentPassword.trim() !== '') {
     payload.current_password = currentPassword
   }
-  
-  // Debug logging
-  console.log('changePassword API call:', {
-    hasCurrentPassword: !!currentPassword,
-    payloadKeys: Object.keys(payload),
-    payload: { ...payload, password: '***', password_confirmation: '***', current_password: currentPassword ? '***' : undefined },
-  })
-  
-  const response = await api.post(`${AUTH_BASE}/password/change`, payload)
-  return response.data
+  const res = await api.post(`${AUTH_BASE}/password/change`, payload)
+  return res.data
 }
 
-export const getCurrentUser = async () => {
-  const response = await api.get(`${AUTH_BASE}/me`)
-  return response.data
+export async function getCurrentUser() {
+  // make sure this route matches your backend route - many apps use /api/v1/auth/me
+  const res = await api.get(`${AUTH_BASE}/me`)
+  return res.data
 }
 
-export const fetch2faStatus = async () => {
-  const response = await api.get(`${AUTH_BASE}/2fa`)
-  return response.data
+export async function fetch2faStatus() {
+  const res = await api.get(`${AUTH_BASE}/2fa`)
+  return res.data
 }
-

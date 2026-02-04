@@ -1,0 +1,20 @@
+[33m79f1739[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32muat-fixes[m[33m)[m Phase 6: Implement terms acceptance and mobile offline sync support
+[33m3c436fd[m Phase 5: Configure WhatsApp service with webhook support and enhance SMS service
+[33m75489bd[m Phase 4: Add running balance to statements and enhance accounting reports with expense report
+[33mf0cddc6[m Phase 4: Add audit log routes
+[33mff8a6e6[m Phase 4: Add system audit log API endpoints
+[33ma5f79dc[m Phase 3: Add validation improvements - staff role verification, payment amount checks, expense validation
+[33m97119ca[m Phase 3: Add password policy validation message
+[33m66ea24d[m Phase 3: Enforce password policy in change password and enhance session timeout with settings
+[33mc7a9bae[m Phase 3: Add expense approval hierarchy endpoint
+[33m1db7afa[m Phase 3: Implement expense approval hierarchy with role-based thresholds
+[33m1f838a1[m Phase 2: Add admin KYC document upload endpoint and logging
+[33m8dc32f5[m Phase 2: Implement savings goal CRUD and enhance KYC document upload with validation
+[33m87520e7[m Phase 2: Fix journal entry posting - Add validation for accounts, periods, and better error handling
+[33m027161c[m Phase 2: Fix investment management - Add validation and error handling for edge cases
+[33m246778a[m Phase 1: Fix critical financial integrity issues - Duplicate payment prevention, Payment->Ledger atomic posting, Duplicate ID registration
+[33m7c9784a[m[33m ([m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmaster[m[33m)[m Fix KYC documents query error, build frontend, remove .md files and Android app folders
+[33ma53eb46[m Clean up unused imports in ProfileController
+[33m62642b3[m Unify KYC and profile approvals, remove public KYC uploads, add mobile validation
+[33m80f2b1e[m Merge profile approval with KYC management and add document upload/validation
+[33m0235ba2[m Fix profile update flow and add uniqueness validation

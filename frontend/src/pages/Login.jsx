@@ -17,7 +17,7 @@ export default function Login() {
   const { data: publicSettings } = useQuery({
     queryKey: ['public-settings'],
     queryFn: async () => {
-      const response = await api.get('/public/settings')
+      const response = await api.get('/api/v1/public/settings')
       return response.data
     },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
@@ -40,7 +40,7 @@ export default function Login() {
   const { data: snapshot } = useQuery({
     queryKey: ['public-dashboard-snapshot'],
     queryFn: async () => {
-      const response = await api.get('/public/dashboard/snapshot')
+      const response = await api.get('/api/v1/public/dashboard/snapshot')
       return response.data
     },
     staleTime: 60000, // Cache for 1 minute
@@ -51,7 +51,7 @@ export default function Login() {
   const { data: announcements } = useQuery({
     queryKey: ['public-announcements'],
     queryFn: async () => {
-      const response = await api.get('/public/announcements')
+      const response = await api.get('/api/v1/public/announcements')
       return response.data || []
     },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes

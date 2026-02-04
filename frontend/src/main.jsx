@@ -27,18 +27,22 @@
       }
     }
 
-    // Suppress browser extension errors from console
+    // Suppress browser extension errors and expected 401 errors from console
     const originalError = console.error
     console.error = function(...args) {
       // Filter out browser extension errors
       const errorMessage = args[0]?.toString() || ''
+      const fullMessage = args.map(a => a?.toString() || '').join(' ')
       if (
         errorMessage.includes('runtime.lastError') ||
         errorMessage.includes('Could not establish connection') ||
         errorMessage.includes('Receiving end does not exist') ||
-        errorMessage.includes('Extension context invalidated')
+        errorMessage.includes('Extension context invalidated') ||
+        fullMessage.includes('401 (Unauthorized)') ||
+        fullMessage.includes('GET') && fullMessage.includes('/api/v1/auth/me') && fullMessage.includes('401') ||
+        fullMessage.includes('GET') && fullMessage.includes('/api/v1/admin/settings') && fullMessage.includes('401')
       ) {
-        // Silently ignore browser extension errors
+        // Silently ignore browser extension errors and expected 401s
         return
       }
       // Call original console.error for other errors

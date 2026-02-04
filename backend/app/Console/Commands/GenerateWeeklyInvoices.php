@@ -63,12 +63,13 @@ class GenerateWeeklyInvoices extends Command
             
             Invoice::create([
                 'member_id' => $member->id,
-                'invoice_number' => Invoice::generateInvoiceNumber(),
+                'invoice_number' => Invoice::generateInvoiceNumber(Invoice::TYPE_WEEKLY, $issueDate),
                 'amount' => $weeklyAmount,
                 'due_date' => $dueDate,
                 'issue_date' => $issueDate,
                 'status' => 'pending',
                 'period' => $currentWeek,
+                'invoice_type' => Invoice::TYPE_WEEKLY,
                 'description' => "Weekly contribution for week {$currentWeek}",
             ]);
             

@@ -40,11 +40,15 @@ export function SettingsProvider({ children }) {
     refetchOnWindowFocus: false, // Don't refetch on window focus
     // Suppress error logging for 401s and 500s (expected when not authenticated or server issues)
     onError: (error) => {
-      // Only log non-401, non-500 errors
-      if (error.response?.status !== 401 && error.status !== 401 && 
-          error.response?.status !== 500 && error.status !== 500) {
-        console.error('Settings query error:', error)
+      // Suppress all 401 and 500 errors - they're expected
+      if (error.response?.status === 401 || error.status === 401 || 
+          error.response?.status === 500 || error.status === 500 ||
+          error.suppressError) {
+        // Silently ignore - these are expected
+        return
       }
+      // Only log other errors
+      console.error('Settings query error:', error)
     },
   })
 

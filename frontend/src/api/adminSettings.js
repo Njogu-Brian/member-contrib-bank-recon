@@ -1,10 +1,10 @@
 import api from './axios'
 
 export const getAdminSettings = () => {
-  return api.get('/v1/admin/settings')
+  return api.get('/api/v1/admin/settings')
 }
 
 export const updateAdminSettings = (data) => {
-  return api.put('/v1/admin/settings', data)
+  return api.put('/api/v1/admin/settings', data)
 }
 
