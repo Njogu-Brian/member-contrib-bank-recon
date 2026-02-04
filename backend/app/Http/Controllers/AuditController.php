@@ -991,29 +991,32 @@ class AuditController extends Controller
      */
     protected function reparseStatement(string $filePath): array
     {
-        // base_path() returns the backend directory, so we need to go up one level
         $projectRoot = dirname(base_path());
         $parserScript = $projectRoot . DIRECTORY_SEPARATOR . 'ocr-parser' . DIRECTORY_SEPARATOR . 'parse_pdf.py';
+        $parserScript = is_file($parserScript) ? realpath($parserScript) : $parserScript;
         $outputFile = storage_path('app/temp_audit_' . uniqid() . '.json');
-        
-        // Check if parser script exists
+        $pythonPath = env('PYTHON_PATH', 'python3');
+
         if (!file_exists($parserScript)) {
             throw new \Exception("Parser script not found at: {$parserScript}");
         }
-        
-        // Run Python parser
-        // Use proc_open for better control over arguments, especially for Windows paths with spaces
+
+        $absolutePath = is_file($filePath) ? realpath($filePath) : $filePath;
+        if (!file_exists($absolutePath)) {
+            throw new \Exception("PDF file not found: {$filePath}");
+        }
+
+        // proc_open with array: no shell, so paths with spaces stay as one argument
         $descriptorspec = [
-            0 => ['pipe', 'r'],  // stdin
-            1 => ['pipe', 'w'],  // stdout
-            2 => ['pipe', 'w'],  // stderr
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
         ];
-        
         $process = proc_open(
             [
-                'python',
+                $pythonPath,
                 $parserScript,
-                $filePath,
+                $absolutePath,
                 '--output',
                 $outputFile,
             ],

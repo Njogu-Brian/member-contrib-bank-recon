@@ -13,14 +13,15 @@ class OcrParserService
     public function __construct()
     {
         $this->pythonPath = env('PYTHON_PATH', 'python3');
-        $this->scriptPath = base_path('../ocr-parser/parse_pdf.py');
+        $scriptPath = base_path('../ocr-parser/parse_pdf.py');
+        $this->scriptPath = is_file($scriptPath) ? realpath($scriptPath) : $scriptPath;
     }
 
     public function parsePdf(string $pdfPath): array
     {
         try {
-            $absolutePath = Storage::disk('statements')->path($pdfPath);
-            
+            $absolutePath = realpath(Storage::disk('statements')->path($pdfPath)) ?: Storage::disk('statements')->path($pdfPath);
+
             if (!file_exists($absolutePath)) {
                 throw new \Exception("PDF file not found: {$absolutePath}");
             }
@@ -28,27 +29,37 @@ class OcrParserService
             $outputPath = tempnam(sys_get_temp_dir(), 'ocr_output_') . '.json';
             $debugPath = $outputPath . '_debug.txt';
 
-            // On Windows, we need to properly escape paths with spaces
-            // Use escapeshellarg which handles Windows paths correctly
-            $pythonCmd = escapeshellarg($this->pythonPath);
-            $scriptCmd = escapeshellarg($this->scriptPath);
-            $pdfCmd = escapeshellarg($absolutePath);
-            $outputCmd = escapeshellarg($outputPath);
-            
-            // Construct command without extra quotes since escapeshellarg already adds them
-            $command = "{$pythonCmd} {$scriptCmd} {$pdfCmd} --output {$outputCmd} 2>&1";
+            // Use proc_open with array of arguments so paths with spaces are never split by the shell
+            $descriptorspec = [
+                0 => ['pipe', 'r'],
+                1 => ['pipe', 'w'],
+                2 => ['pipe', 'w'],
+            ];
+            $cmd = [
+                $this->pythonPath,
+                $this->scriptPath,
+                $absolutePath,
+                '--output',
+                $outputPath,
+            ];
 
             Log::info("Executing OCR parser", [
-                'command' => $command,
                 'pdf_path' => $absolutePath,
             ]);
 
-            $output = [];
-            $returnVar = 0;
-            exec($command, $output, $returnVar);
+            $process = proc_open($cmd, $descriptorspec, $pipes);
+            if (!is_resource($process)) {
+                throw new \Exception('Failed to start OCR parser process');
+            }
+            fclose($pipes[0]);
+            $stdout = stream_get_contents($pipes[1]);
+            $stderr = stream_get_contents($pipes[2]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            $returnVar = proc_close($process);
 
-            $stderr = implode("\n", $output);
-            
+            $stderr = trim($stderr ?: $stdout ?: '');
+
             if ($returnVar !== 0) {
                 Log::error("OCR parser failed", [
                     'return_code' => $returnVar,
