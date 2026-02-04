@@ -1,0 +1,58 @@
+Extracted 323 transactions
+
+Is Paybill: True
+Pages: 13
+  Page 1: 2 table(s)
+    Table 1: header=['TRANSACTION TYPE', 'PAID IN', 'PAID OUT'], data_rows=1
+      row0: ['Total', '982,320.00', '1,039,020.00']
+    Table 2: header=['Receipt No.', 'Completion Time', 'Details', 'Transaction Status', 'Paid In', 'Withdrawn', 'Balance'], data_rows=17
+      first row: ['UB2AB5JLAN', '2026-02-02\n12:33:39', 'Pay Bill from 254*****4176 -\nRUTH MUNASIA Acc. Ruth\nmunasia', 'Completed', '1,000.00', '0.00', '9,300.00']
+      second row: ['UB2A45EK82', '2026-02-02\n06:13:31', 'Pay Bill from 254*****1963 -\nKENNEDY KARANJA Acc.\nKennedy Chege Karanj', 'Completed', '3,000.00', '0.00', '8,300.00']
+  Page 2: 1 table(s)
+    Table 1: header=['UAGD83W9BS', '2026-01-16\n08:38:06', 'Pay Bill Online from\n254*****2217 - JOSEPH\nRUCHIAKA Acc. JOSEPH\nKINYUA RUCHIA', 'Completed', '4,000.00', '0.00', '12,000.00'], data_rows=25
+      first row: ['UAGD83W9BS', '2026-01-16\n08:38:06', 'Pay Bill Online from\n254*****2217 - JOSEPH\nRUCHIAKA Acc. JOSEPH\nKINYUA RUCHIA', 'Completed', '4,000.00', '0.00', '12,000.00']
+      second row: ['UAG8R3WHK9', '2026-01-16\n04:38:34', 'Pay Bill from 254*****0263 -\nJackson Njogu Acc. Jackson\nnjogu', 'Completed', '5,000.00', '0.00', '8,000.00']
+  Page 3: 1 table(s)
+    Table 1: header=['UA1922N3KT', '2026-01-01\n20:00:46', 'Pay Bill from 254*****7545 -\nJOHN NJOROGE Acc. John\nMbugua Njoroge', 'Completed', '13,000.00', '0.00', '13,000.00'], data_rows=26
+      first row: ['UA1922N3KT', '2026-01-01\n20:00:46', 'Pay Bill from 254*****7545 -\nJOHN NJOROGE Acc. John\nMbugua Njoroge', 'Completed', '13,000.00', '0.00', '13,000.00']
+      second row: ['UA1SU5DWAR', '2026-01-01\n06:19:36', 'Utility Account to\nOrganization Settlement\nAccount', 'Completed', '0.00', '30,002.00', '0.00']
+  Page 4: 1 table(s)
+    Table 1: header=['TLFMT13AOK', '2025-12-15\n19:37:28', 'Pay Bill Online from\n254*****1362 - CAROLINE\nMWANGI Acc. Carolime\nWangui', 'Completed', '10,000.00', '0.00', '46,000.00'], data_rows=26
+      first row: ['TLFMT13AOK', '2025-12-15\n19:37:28', 'Pay Bill Online from\n254*****1362 - CAROLINE\nMWANGI Acc. Carolime\nWangui', 'Completed', '10,000.00', '0.00', '46,000.00']
+      second row: ['TLE7R11A2Y', '2025-12-14\n20:50:53', 'Pay Bill from 254*****6551 -\nMUSYOKAH PHYLIS Acc.\nMusyokah Phylis', 'Completed', '5,000.00', '0.00', '36,000.00']
+  Page 5: 1 table(s)
+    Table 1: header=['TL5DPBV7CA', '2025-12-05\n07:26:58', 'Pay Bill Online from\n254*****1608 - JOSEPH\nKIHUMBA Acc. JOSEPH\nCHEGE KIHUMBA', 'Completed', '5,000.00', '0.00', '5,000.00'], data_rows=26
+      first row: ['TL5DPBV7CA', '2025-12-05\n07:26:58', 'Pay Bill Online from\n254*****1608 - JOSEPH\nKIHUMBA Acc. JOSEPH\nCHEGE KIHUMBA', 'Completed', '5,000.00', '0.00', '5,000.00']
+      second row: ['TL4SU4ETSM', '2025-12-04\n06:23:42', 'Utility Account to\nOrganization Settlement\nAccount', 'Completed', '0.00', '46,000.00', '0.00']
+  Page 6: 1 table(s)
+    Table 1: header=['TKKSU3WPG2', '2025-11-20\n06:20:23', 'Utility Account to\nOrganization Settlement\nAccount', 'Completed', '0.00', '165,514.00', '0.00'], data_rows=26
+      first row: ['TKKSU3WPG2', '2025-11-20\n06:20:23', 'Utility Account to\nOrganization Settlement\nAccount', 'Completed', '0.00', '165,514.00', '0.00']
+      second row: ['TKJJAAKLKI', '2025-11-19\n11:35:20', 'Pay Bill from 254*****8187 -\nGEOFFREY MONGARE Acc.\nGEOFFREY MONGARE', 'Completed', '1,000.00', '0.00', '165,514.00']
+  Page 7: 1 table(s)
+    Table 1: header=['TKE37A763D', '2025-11-14\n09:03:20', "Pay Bill Online from\n254*****9808 - ALVIN\nELUNG'AT Acc. INV-1", 'Completed', '1.00', '0.00', '68,512.00'], data_rows=26
+      first row: ['TKE37A763D', '2025-11-14\n09:03:20', "Pay Bill Online from\n254*****9808 - ALVIN\nELUNG'AT Acc. INV-1", 'Completed', '1.00', '0.00', '68,512.00']
+      second row: ['TKE37A77N6', '2025-11-14\n09:01:53', "Pay Bill Online from\n254*****9808 - ALVIN\nELUNG'AT Acc. WALLET-1-\n1763100106793", 'Completed', '1.00', '0.00', '68,511.00']
+  Page 8: 1 table(s)
+    Table 1: header=['TK5DA996TA', '2025-11-05\n12:39:07', 'Pay Bill from 254*****5673 -\nMARY MATHENGE Acc. Mary\nWa Mathenge', 'Completed', '3,000.00', '0.00', '58,003.00'], data_rows=26
+      first row: ['TK5DA996TA', '2025-11-05\n12:39:07', 'Pay Bill from 254*****5673 -\nMARY MATHENGE Acc. Mary\nWa Mathenge', 'Completed', '3,000.00', '0.00', '58,003.00']
+      second row: ['TK58X996A9', '2025-11-05\n12:16:26', 'Pay Bill from 254*****0719 -\nHANNAH NJOROGE Acc.\nHannah w. Njoroge', 'Completed', '4,000.00', '0.00', '55,003.00']
+  Page 9: 1 table(s)
+    Table 1: header=['TJSRS8JIIZ', '2025-10-28\n11:51:33', 'Pay Bill from 254*****9435 -\nJAMES LETARO Acc. James L\nLetaro', 'Completed', '10,000.00', '0.00', '10,000.00'], data_rows=25
+      first row: ['TJSRS8JIIZ', '2025-10-28\n11:51:33', 'Pay Bill from 254*****9435 -\nJAMES LETARO Acc. James L\nLetaro', 'Completed', '10,000.00', '0.00', '10,000.00']
+      second row: ['TJRSU32QNM', '2025-10-27\n16:38:22', 'Utility Account to\nOrganization Settlement\nAccount', 'Completed', '0.00', '55,002.00', '0.00']
+  Page 10: 1 table(s)
+    Table 1: header=['TJKJA7X26I', '2025-10-20\n22:27:13', 'Pay Bill from 254*****8187 -\nGEOFFREY MONGARE Acc.\nGEOFFREY MONGARE', 'Completed', '1,000.00', '0.00', '25,500.00'], data_rows=26
+      first row: ['TJKJA7X26I', '2025-10-20\n22:27:13', 'Pay Bill from 254*****8187 -\nGEOFFREY MONGARE Acc.\nGEOFFREY MONGARE', 'Completed', '1,000.00', '0.00', '25,500.00']
+      second row: ['TJKLD7WABJ', '2025-10-20\n11:43:32', 'Pay Bill from 254*****5216 -\nanna waweru Acc. ANNA\nWANJIRA WAWERU', 'Completed', '5,000.00', '0.00', '24,500.00']
+  Page 11: 1 table(s)
+    Table 1: header=['TJCLZ75TGE', '2025-10-12\n06:23:02', 'Pay Bill Online from\n0*****9956 - JACINTA THEURI\nAcc. jacinta wanjiru', 'Completed', '5,000.00', '0.00', '26,000.00'], data_rows=25
+      first row: ['TJCLZ75TGE', '2025-10-12\n06:23:02', 'Pay Bill Online from\n0*****9956 - JACINTA THEURI\nAcc. jacinta wanjiru', 'Completed', '5,000.00', '0.00', '26,000.00']
+      second row: ['TJBOE75T47', '2025-10-11\n18:31:54', 'Pay Bill from 254*****0490 -\nERIC KIREA Acc. Eric Muriuki\nKirea', 'Completed', '10,000.00', '0.00', '21,000.00']
+  Page 12: 1 table(s)
+    Table 1: header=['TJ6MQ6NIAE', '2025-10-06\n11:25:35', 'Pay Bill Online from\n254*****9303 - NANCY\nKIROGO Acc. Not needed', 'Completed', '1.00', '0.00', '3.00'], data_rows=25
+      first row: ['TJ6MQ6NIAE', '2025-10-06\n11:25:35', 'Pay Bill Online from\n254*****9303 - NANCY\nKIROGO Acc. Not needed', 'Completed', '1.00', '0.00', '3.00']
+      second row: ['TJ6MQ6NGQK', '2025-10-06\n11:22:08', 'Pay Bill Online from\n254*****9303 - NANCY\nKIROGO Acc. Not needed', 'Completed', '1.00', '0.00', '2.00']
+  Page 13: 1 table(s)
+    Table 1: header=['TJ2SU26UP3', '2025-10-02\n12:34:12', 'Utility Account to\nOrganization Settlement\nAccount', 'Completed', '0.00', '3,001.00', '0.00'], data_rows=24
+      first row: ['TJ2SU26UP3', '2025-10-02\n12:34:12', 'Utility Account to\nOrganization Settlement\nAccount', 'Completed', '0.00', '3,001.00', '0.00']
+      second row: ['TJ2A4690EE', '2025-10-02\n12:23:12', 'Pay Bill Online from\n254*****1963 - KENNEDY\nKARANJA Acc. 4', 'Completed', '1,000.00', '0.00', '3,001.00']

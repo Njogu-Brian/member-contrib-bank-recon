@@ -1,0 +1,5 @@
+Extracted 0 transactions
+
+Is Paybill: False
+Pages: 1
+  Page 1: 0 table(s)
