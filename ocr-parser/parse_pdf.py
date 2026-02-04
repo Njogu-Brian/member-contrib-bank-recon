@@ -99,11 +99,35 @@ def extract_text_from_pdf_pdfplumber(pdf_path):
                                     'rows': table[1:] if len(table) > 1 else []
                                 })
                             else:
-                                page_data['tables'].append({
-                                    'page_number': page_index,
-                                    'header': None,
-                                    'rows': [row for row in table if row and len(row) >= 2]
-                                })
+                                # First row may be "Total Transactions: 323" or summary; find real header in rows
+                                data_rows = [row for row in table if row and len(row) >= 2]
+                                found_header_idx = None
+                                for ri, row in enumerate(data_rows[:10]):
+                                    if not row:
+                                        continue
+                                    has_receipt = any(col and "Receipt" in str(col) for col in row)
+                                    has_completion_or_details = any(
+                                        col and ("Completion" in str(col) or "Details" in str(col)) for col in row
+                                    )
+                                    has_amount_cols = any(
+                                        col and ("Paid" in str(col) and "In" in str(col)) or "Withdrawn" in str(col)
+                                        for col in row
+                                    )
+                                    if has_receipt and (has_completion_or_details or has_amount_cols) and has_amount_cols:
+                                        found_header_idx = ri
+                                        break
+                                if found_header_idx is not None:
+                                    page_data['tables'].append({
+                                        'page_number': page_index,
+                                        'header': data_rows[found_header_idx],
+                                        'rows': data_rows[found_header_idx + 1:]
+                                    })
+                                else:
+                                    page_data['tables'].append({
+                                        'page_number': page_index,
+                                        'header': None,
+                                        'rows': data_rows
+                                    })
                 else:
                     tables = []
                     try:
