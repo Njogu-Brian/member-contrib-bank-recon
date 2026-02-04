@@ -26,7 +26,7 @@ if pgrep -f "artisan.*queue:work" >/dev/null; then
   ps aux | grep -E "artisan.*queue" | grep -v grep || true
 else
   echo "WARNING: No 'php artisan queue:work' process found. Statements are processed by this job."
-  echo "  Start with: cd $BACKEND && nohup php artisan queue:work >> ../logs/queue-worker.log 2>&1 &"
+  echo "  Start with: cd $BACKEND && nohup php artisan queue:work >> storage/logs/queue-worker.log 2>&1 &"
 fi
 echo ""
 

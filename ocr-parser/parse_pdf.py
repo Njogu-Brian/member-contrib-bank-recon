@@ -52,6 +52,9 @@ def extract_text_from_pdf_pdfplumber(pdf_path):
                     # New format: green grid with Receipt No., Completion Time, Details, Paid In, Withdrawn
                     if not is_paybill and ("RECEIPT" in text_upper and ("PAID" in text_upper or "PAID IN" in text_upper) and ("COMPLETION" in text_upper or "DETAILS" in text_upper)):
                         is_paybill = True
+                    # Safaricom DETAILED STATEMENT: Receipt No., Withdrawn, Balance, etc.
+                    if not is_paybill and ("DETAILED STATEMENT" in text_upper and "WITHDRAWN" in text_upper and ("RECEIPT" in text_upper or "PAID IN" in text_upper)):
+                        is_paybill = True
                 page_cache.append({'index': page_index, 'page': page, 'text': text})
 
             # Second pass: extract per-page content
@@ -62,7 +65,7 @@ def extract_text_from_pdf_pdfplumber(pdf_path):
 
                 page_data = {
                     'page_number': page_index,
-                    'text': text if not is_paybill else "",
+                    'text': text or "",  # keep text for paybill text fallback when table extraction fails
                     'tables': []
                 }
 
@@ -420,6 +423,81 @@ def parse_paybill_table(tables_data):
             print(f"Error parsing row: {e}", file=sys.stderr)
             continue
     
+    return transactions
+
+
+def parse_paybill_from_text(page_texts):
+    """Fallback: parse M-Pesa DETAILED STATEMENT rows from raw page text when table extraction fails.
+    Expects lines with: ReceiptNo, Completion Time (YYYY-MM-DD HH:MM:SS), Details, Completed, Paid In, Withdrawn, Balance.
+    Tries (1) split on 2+ spaces/tabs for column layout, (2) regex for single-space-separated lines.
+    """
+    transactions = []
+    receipt_pattern = re.compile(r'^[A-Z0-9&]{6,12}$', re.IGNORECASE)
+    datetime_pattern = re.compile(r'^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}$')
+    # Regex for single-space layout: receipt, datetime, details..., Completed, paid_in, withdrawn, balance
+    line_regex = re.compile(
+        r'^([A-Z0-9&]{6,12})\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s+(.*?)\s+Completed\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)\s*$',
+        re.IGNORECASE
+    )
+    header_phrases = ('RECEIPT NO.', 'COMPLETION TIME', 'TRANSACTION STATUS', 'TOTAL TRANSACTIONS',
+                      'DETAILED STATEMENT', 'SUMMARY', 'TRANSACTION TYPE', 'PAID OUT')
+
+    def add_transaction(receipt_cand, date_cand, details, paid_in_str, withdrawn_str, pg_num):
+        if not receipt_pattern.match(receipt_cand) or not datetime_pattern.match(date_cand):
+            return False
+        line_upper = (receipt_cand + ' ' + details).upper()
+        if 'PAY BILL' not in line_upper and 'PAYBILL' not in line_upper and 'UTILITY ACCOUNT' not in line_upper:
+            if any(phrase in line_upper for phrase in header_phrases):
+                return False
+        credit = parse_amount(paid_in_str)
+        debit = parse_amount_allow_negative(withdrawn_str)
+        if credit is None:
+            credit = 0.0
+        if debit is None:
+            debit = 0.0
+        if credit <= 0 and debit <= 0:
+            return False
+        tran_date = parse_date(date_cand)
+        if not tran_date or not details or len(details) < 3:
+            return False
+        transactions.append({
+            'tran_date': tran_date,
+            'value_date': tran_date,
+            'particulars': details.strip(),
+            'credit': credit,
+            'debit': debit,
+            'balance': None,
+            'transaction_code': receipt_cand,
+            'page_number': pg_num,
+            'row_index': len(transactions),
+            'table_index': None,
+            'source': 'paybill_text_fallback'
+        })
+        return True
+
+    for page_number, text in enumerate(page_texts, start=1):
+        if not text or not text.strip():
+            continue
+        lines = text.split('\n')
+        for line in lines:
+            line = line.strip()
+            if len(line) < 30:
+                continue
+            # Strategy 1: split on 2+ spaces or tabs
+            parts = re.split(r'\s{2,}|\t', line)
+            if len(parts) >= 7 and parts[-4].strip().upper() == 'COMPLETED':
+                receipt_cand = (parts[0] or "").strip()
+                date_cand = (parts[1] or "").strip()
+                paid_in_str = (parts[-3] or "").strip()
+                withdrawn_str = (parts[-2] or "").strip()
+                details = ' '.join((p or "").strip() for p in parts[2:-4]).strip()
+                if add_transaction(receipt_cand, date_cand, details, paid_in_str, withdrawn_str, page_number):
+                    continue
+            # Strategy 2: regex for single-space-separated line
+            match = line_regex.match(line)
+            if match:
+                receipt_cand, date_cand, details, paid_in_str, withdrawn_str = match.group(1), match.group(2), match.group(3), match.group(4), match.group(5)
+                add_transaction(receipt_cand, date_cand, details, paid_in_str, withdrawn_str, page_number)
     return transactions
 
 
@@ -1823,6 +1901,10 @@ def main():
                 for table in page.get('tables', []):
                     paybill_tables.append(table)
             transactions = parse_paybill_table(paybill_tables)
+            # If table extraction returned nothing (e.g. green grid not detected), parse from page text
+            if not transactions and pages:
+                page_texts = [page.get('text') or '' for page in pages]
+                transactions = parse_paybill_from_text(page_texts)
         else:
             text_transactions = []
             table_transactions = []
