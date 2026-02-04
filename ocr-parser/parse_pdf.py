@@ -68,21 +68,23 @@ def extract_text_from_pdf_pdfplumber(pdf_path):
 
                 if is_paybill:
                     tables = page.extract_tables()
-                    # If no tables or no table has paybill header, try line-based extraction (green grid)
-                    if not tables or not any(
+                    # If no tables or no table has paybill header, try line-based then text-based (green grid)
+                    has_paybill_header = any(
                         t and len(t) > 0 and any(
-                            col and ("Receipt" in str(col) or "Paid" in str(col) or "PAID" in str(col).upper())
+                            col and ("Receipt" in str(col) or "Paid" in str(col) or "PAID" in str(col).upper() or "Withdrawn" in str(col))
                             for col in (t[0] if t else [])
                         )
-                        for t in tables
-                    ):
-                        try:
-                            tables = page.extract_tables({
-                                'vertical_strategy': 'lines',
-                                'horizontal_strategy': 'lines',
-                            })
-                        except Exception:
-                            pass
+                        for t in (tables or [])
+                    )
+                    if not tables or not has_paybill_header:
+                        for strategy in [{'vertical_strategy': 'lines', 'horizontal_strategy': 'lines'}, {'vertical_strategy': 'text', 'horizontal_strategy': 'text'}]:
+                            try:
+                                alt = page.extract_tables(strategy)
+                                if alt and any(t and len(t) > 1 for t in alt):
+                                    tables = alt
+                                    break
+                            except Exception:
+                                pass
                     for table in tables or []:
                         if table and len(table) > 0:
                             header_row = table[0] if table else []
@@ -172,10 +174,11 @@ def parse_paybill_table(tables_data):
 
     # Handle both old format (list of rows) and new format (list of dicts with header/rows/page)
     if tables_data and isinstance(tables_data[0], dict):
+        all_headers = []
         for table_index, table_data in enumerate(tables_data):
             header_candidate = table_data.get('header')
-            if header_candidate and not header_row:
-                header_row = header_candidate
+            if header_candidate:
+                all_headers.append(header_candidate)
 
             table_rows = table_data.get('rows', []) or []
             rows.extend(table_rows)
@@ -183,6 +186,27 @@ def parse_paybill_table(tables_data):
             page_number = table_data.get('page_number')
             row_page_numbers.extend([page_number] * len(table_rows))
             row_table_indices.extend([table_index] * len(table_rows))
+
+        # Prefer the header that looks like the TRANSACTION table (Receipt, Completion/Details, Paid In/Withdrawn),
+        # not the summary table (e.g. "PAID IN" | "PAID OUT" on page 1).
+        def _score_header(h):
+            if not h:
+                return 0
+            score = 0
+            for cell in h:
+                c = str(cell).strip().upper() if cell else ""
+                if "RECEIPT" in c:
+                    score += 4
+                if "COMPLETION" in c or "DETAILS" in c:
+                    score += 2
+                if ("PAID" in c and "IN" in c) or "WITHDRAWN" in c:
+                    score += 2
+            return score
+
+        if all_headers:
+            header_row = max(all_headers, key=_score_header)
+            if _score_header(header_row) < 2:
+                header_row = all_headers[0]
     else:
         rows = tables_data or []
         row_page_numbers = [None] * len(rows)
@@ -244,8 +268,19 @@ def parse_paybill_table(tables_data):
     if paid_in_col is None and withdrawn_col is None:
         return transactions
 
-    # Process data rows - skip header row if it's the first row
-    start_idx = 1 if (header_row and rows and len(rows) > 0 and header_row == rows[0]) else 0
+    # Skip the header row wherever it appears in concatenated rows (may be first row or later if page1 had summary table)
+    start_idx = 0
+    if header_row and rows:
+        for i, r in enumerate(rows):
+            if r and len(r) >= len(header_row) and all(
+                str(a).strip() == str(b).strip()
+                for a, b in zip(r[:len(header_row)], header_row)
+            ):
+                start_idx = i + 1
+                break
+        else:
+            if rows and header_row == rows[0]:
+                start_idx = 1
     for row_offset, row in enumerate(rows[start_idx:], start=0):
         if not row or len(row) < 2:
             continue
