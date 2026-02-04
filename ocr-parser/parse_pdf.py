@@ -41,11 +41,17 @@ def extract_text_from_pdf_pdfplumber(pdf_path):
             page_cache = []
             is_paybill = False
 
-            # First pass: cache text and detect paybill format
+            # First pass: cache text and detect paybill format (old and new M-Pesa statement format)
             for page_index, page in enumerate(pdf.pages, start=1):
                 text = page.extract_text() or ""
-                if not is_paybill and "Receipt No" in text and "Paid In" in text and "Completion Time" in text:
-                    is_paybill = True
+                text_upper = text.upper()
+                if not is_paybill:
+                    # Old format: Receipt No, Paid In, Completion Time
+                    if "Receipt No" in text and "Paid In" in text and "Completion Time" in text:
+                        is_paybill = True
+                    # New format: green grid with Receipt No., Completion Time, Details, Paid In, Withdrawn
+                    if not is_paybill and ("RECEIPT" in text_upper and ("PAID" in text_upper or "PAID IN" in text_upper) and ("COMPLETION" in text_upper or "DETAILS" in text_upper)):
+                        is_paybill = True
                 page_cache.append({'index': page_index, 'page': page, 'text': text})
 
             # Second pass: extract per-page content
@@ -62,10 +68,29 @@ def extract_text_from_pdf_pdfplumber(pdf_path):
 
                 if is_paybill:
                     tables = page.extract_tables()
-                    for table in tables:
+                    # If no tables or no table has paybill header, try line-based extraction (green grid)
+                    if not tables or not any(
+                        t and len(t) > 0 and any(
+                            col and ("Receipt" in str(col) or "Paid" in str(col) or "PAID" in str(col).upper())
+                            for col in (t[0] if t else [])
+                        )
+                        for t in tables
+                    ):
+                        try:
+                            tables = page.extract_tables({
+                                'vertical_strategy': 'lines',
+                                'horizontal_strategy': 'lines',
+                            })
+                        except Exception:
+                            pass
+                    for table in tables or []:
                         if table and len(table) > 0:
                             header_row = table[0] if table else []
-                            if any(col and ("Receipt No" in str(col) or "Paid In" in str(col)) for col in header_row):
+                            header_ok = any(
+                                col and ("Receipt" in str(col) or "Paid" in str(col) or "PAID" in str(col).upper() or "Withdrawn" in str(col))
+                                for col in header_row
+                            )
+                            if header_ok:
                                 page_data['tables'].append({
                                     'page_number': page_index,
                                     'header': header_row,
@@ -75,7 +100,7 @@ def extract_text_from_pdf_pdfplumber(pdf_path):
                                 page_data['tables'].append({
                                     'page_number': page_index,
                                     'header': None,
-                                    'rows': [row for row in table if row and len(row) >= 4]
+                                    'rows': [row for row in table if row and len(row) >= 2]
                                 })
                 else:
                     tables = []
@@ -133,9 +158,11 @@ def extract_text_from_pdf_ocr(pdf_path):
 
 
 def parse_paybill_table(tables_data):
-    """Parse M-Pesa Paybill table rows
-    Columns: Receipt No, Initiation Time (ignore), Completion Time, Details, Currency (ignore), 
-    Transaction Status (ignore), Balance (ignore), Paid In, Withdrawn (ignore), Trade Order Id (ignore)
+    """Parse M-Pesa Paybill table rows (old and new format).
+    Old format: Receipt No., Completion Time, Details, Transaction Status, Paid In, Withdrawn, Balance.
+    New format: Receipt No., Initiation Time, Completion Time, Details, Currency, Transaction Status,
+    Balance, Paid In, Withdrawn, Trade Order Id, Reason Type, Other Party Info.
+    receiptno = reference, completion time = date, details = narration, paid in = credit, withdrawn = debit; ignore balance.
     """
     transactions = []
     header_row = None
@@ -161,31 +188,31 @@ def parse_paybill_table(tables_data):
         row_page_numbers = [None] * len(rows)
         row_table_indices = [0] * len(rows)
         header_row = None
-    
-    # Identify column indices from header row
+
+    # Identify column indices from header row (flexible for old and new format)
     paid_in_col = None
     completion_time_col = None
     details_col = None
     receipt_no_col = None
     balance_col = None
     withdrawn_col = None
-    
+
     if header_row:
         for i, cell in enumerate(header_row):
             cell_str = str(cell).strip().upper() if cell else ""
-            if "PAID IN" in cell_str or "PAIDIN" in cell_str:
+            if "PAID" in cell_str and "IN" in cell_str:
                 paid_in_col = i
             elif "BALANCE" in cell_str:
-                balance_col = i  # Track balance column to exclude it
+                balance_col = i
             elif "WITHDRAWN" in cell_str:
-                withdrawn_col = i  # Track withdrawn column to exclude it
-            elif "COMPLETION" in cell_str or "COMPLETION TIME" in cell_str:
+                withdrawn_col = i
+            elif "COMPLETION" in cell_str:
                 completion_time_col = i
             elif "DETAILS" in cell_str:
                 details_col = i
-            elif "RECEIPT" in cell_str and "NO" in cell_str:
+            elif "RECEIPT" in cell_str:  # "Receipt No" or "Receipt No."
                 receipt_no_col = i
-    
+
     # If no header found, try to find it in first few rows
     if not header_row:
         for row in rows[:5]:
@@ -193,111 +220,106 @@ def parse_paybill_table(tables_data):
                 continue
             for i, cell in enumerate(row):
                 cell_str = str(cell).strip().upper() if cell else ""
-                if "PAID IN" in cell_str or "PAIDIN" in cell_str:
+                if ("PAID" in cell_str and "IN" in cell_str) or "WITHDRAWN" in cell_str:
                     header_row = row
-                    paid_in_col = i
+                    for j, c in enumerate(header_row):
+                        cs = str(c).strip().upper() if c else ""
+                        if "PAID" in cs and "IN" in cs:
+                            paid_in_col = j
+                        elif "WITHDRAWN" in cs:
+                            withdrawn_col = j
+                        elif "BALANCE" in cs:
+                            balance_col = j
+                        elif "COMPLETION" in cs:
+                            completion_time_col = j
+                        elif "DETAILS" in cs:
+                            details_col = j
+                        elif "RECEIPT" in cs:
+                            receipt_no_col = j
                     break
-                elif "BALANCE" in cell_str:
-                    balance_col = i
             if header_row:
                 break
-    
-    # Process data rows - skip header row if found
-    start_idx = 1 if header_row and header_row in rows else 0
+
+    # Need at least one amount column (Paid In or Withdrawn) to be able to parse
+    if paid_in_col is None and withdrawn_col is None:
+        return transactions
+
+    # Process data rows - skip header row if it's the first row
+    start_idx = 1 if (header_row and rows and len(rows) > 0 and header_row == rows[0]) else 0
     for row_offset, row in enumerate(rows[start_idx:], start=0):
-        if not row or len(row) < 4:
+        if not row or len(row) < 2:
             continue
-        
+
         try:
             receipt_no = ""
             completion_time = ""
             details = ""
             paid_in = ""
-            
-            # Use column indices if available - STRICTLY use only Paid In column
-            if paid_in_col is not None and paid_in_col < len(row):
-                paid_in_str = str(row[paid_in_col]).strip() if row[paid_in_col] else ""
-                if paid_in_str and parse_amount(paid_in_str):
-                    paid_in = paid_in_str
-            else:
-                # If we don't have Paid In column index, we CANNOT guess - skip this row
-                # This prevents picking up Balance or other columns
-                continue
-            
-            if completion_time_col is not None and completion_time_col < len(row):
-                completion_time = str(row[completion_time_col]).strip() if row[completion_time_col] else ""
-            
-            if details_col is not None and details_col < len(row):
-                details = str(row[details_col]).strip() if row[details_col] else ""
-            
-            if receipt_no_col is not None and receipt_no_col < len(row):
-                receipt_no = str(row[receipt_no_col]).strip() if row[receipt_no_col] else ""
-            
-            # Extract Withdrawn (debit) amount
             withdrawn = ""
+
+            if paid_in_col is not None and paid_in_col < len(row):
+                paid_in = str(row[paid_in_col]).strip() if row[paid_in_col] else ""
             if withdrawn_col is not None and withdrawn_col < len(row):
                 withdrawn = str(row[withdrawn_col]).strip() if row[withdrawn_col] else ""
-            
-            # NO FALLBACK - if we don't have column indices, we skip the row
-            # This ensures we only extract from the correct "Paid In" column
-            
-            # Fallback for other fields if column indices not available (but we already have paid_in)
+
+            if completion_time_col is not None and completion_time_col < len(row):
+                completion_time = str(row[completion_time_col]).strip() if row[completion_time_col] else ""
+            if details_col is not None and details_col < len(row):
+                details = str(row[details_col]).strip() if row[details_col] else ""
+            if receipt_no_col is not None and receipt_no_col < len(row):
+                receipt_no = str(row[receipt_no_col]).strip() if row[receipt_no_col] else ""
+
+            # Fallback for date/details/receipt from other cells if needed
             if not completion_time:
                 for i, cell in enumerate(row):
-                    if i == paid_in_col or i == balance_col or i == withdrawn_col:
+                    if i in (paid_in_col, balance_col, withdrawn_col):
                         continue
                     cell_str = str(cell).strip() if cell else ""
                     if re.search(r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}', cell_str):
                         completion_time = cell_str
                         break
-            
+
             if not details:
                 for i, cell in enumerate(row):
-                    if i == paid_in_col or i == balance_col or i == withdrawn_col:
+                    if i in (paid_in_col, balance_col, withdrawn_col):
                         continue
                     cell_str = str(cell).strip() if cell else ""
-                    if "Pay Bill" in cell_str or "Paybill" in cell_str or (len(cell_str) > 20 and not re.match(r'^[\d,.\s]+$', cell_str.replace(',', '').replace('.', '').replace(' ', ''))):
+                    if "Pay Bill" in cell_str or "Paybill" in cell_str or (len(cell_str) > 20 and not re.match(r'^[\d,.\s\-]+$', cell_str.replace(',', '').replace('.', '').replace(' ', '').replace('-', ''))):
                         details = cell_str
                         break
-            
+
             if not receipt_no:
                 for i, cell in enumerate(row):
-                    if i == paid_in_col or i == balance_col or i == withdrawn_col:
+                    if i in (paid_in_col, balance_col, withdrawn_col):
                         continue
                     cell_str = str(cell).strip() if cell else ""
-                    if cell_str and len(cell_str) > 5 and not re.search(r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}', cell_str) and not parse_amount(cell_str):
+                    if cell_str and len(cell_str) > 5 and not re.search(r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}', cell_str) and parse_amount(cell_str) is None and parse_amount_allow_negative(cell_str) is None:
                         receipt_no = cell_str
                         break
-            
+
             # Skip header rows
-            if "Receipt No" in receipt_no or "Completion Time" in completion_time or "Paid In" in paid_in:
+            row_str_upper = (receipt_no + " " + completion_time + " " + paid_in).upper()
+            if "RECEIPT NO" in row_str_upper or "COMPLETION TIME" in row_str_upper or "PAID IN" in row_str_upper:
                 continue
-            
-            # Skip empty rows or rows without paid in amount
-            if not receipt_no and not details:
-                continue
-            
-            # Parse date from completion time
-            tran_date = parse_date(completion_time)
-            if not tran_date:
-                continue
-            
-            # Parse amounts - process both Paid In (credits) and Withdrawn (debits)
+
+            # Parse amounts: credit from Paid In, debit from Withdrawn (new format uses negative e.g. -11000.00)
             credit = parse_amount(paid_in) if paid_in else None
-            debit = parse_amount(withdrawn) if withdrawn else None
-            
-            # Skip if both credit and debit are None or zero
-            # Note: parse_amount returns None for invalid amounts, or a float (including 0.0) for valid amounts
+            debit = parse_amount_allow_negative(withdrawn) if withdrawn else None
+
             has_valid_credit = credit is not None and credit > 0
             has_valid_debit = debit is not None and debit > 0
-            
+
             if not has_valid_credit and not has_valid_debit:
                 continue
-            
-            # Set to 0.0 if None (for database storage)
+
             credit = credit if credit is not None else 0.0
             debit = debit if debit is not None else 0.0
-            
+
+            # Parse date from completion time (required)
+            tran_date = parse_date(completion_time) if completion_time else None
+            if not tran_date:
+                continue
+
             page_number = row_page_numbers[start_idx + row_offset] if row_page_numbers else None
             table_index = row_table_indices[start_idx + row_offset] if row_table_indices else None
 
@@ -1541,8 +1563,11 @@ def parse_date(date_str):
     
     date_str = date_str.strip()
     
-    # Common date formats
+    # Common date formats (with and without time for M-Pesa Completion Time)
     formats = [
+        '%Y-%m-%d %H:%M:%S',
+        '%d-%m-%Y %H:%M:%S',
+        '%d/%m/%Y %H:%M:%S',
         '%d/%m/%Y',
         '%d-%m-%Y',
         '%Y-%m-%d',
@@ -1574,54 +1599,66 @@ def parse_date(date_str):
 
 
 def parse_amount(amount_str):
-    """Parse amount string to float, preserving decimal places (.00 for cents)"""
+    """Parse amount string to float, preserving decimal places (.00 for cents). Credits only (no negatives)."""
+    result = _parse_amount_internal(amount_str, allow_negative=False)
+    return result
+
+
+def parse_amount_allow_negative(amount_str):
+    """Parse amount string; negative values (e.g. Withdrawn -11000.00) return abs value for debit."""
+    return _parse_amount_internal(amount_str, allow_negative=True)
+
+
+def _parse_amount_internal(amount_str, allow_negative=False):
+    """Parse amount string to float. If allow_negative=True, negative values return abs(value)."""
     if not amount_str:
         return None
-    
+
     amount_str = str(amount_str).strip()
-    
+
     # Reject if it looks like a date (contains date patterns)
     if re.search(r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}', amount_str):
         return None
-    
+
     # Reject if it's too long (likely not an amount)
     if len(amount_str) > 25:
         return None
-    
-    # Remove currency symbols and thousand separators (commas), but keep decimal point
-    # Handle formats like: "12,001.00", "12001.00", "12,001", "12001"
+
+    # Remove currency symbols and thousand separators (commas), but keep decimal point and leading minus
+    # Handle formats: "12,001.00", "-11000.00", "12001.00"
+    has_minus = amount_str.lstrip().startswith('-')
     cleaned = amount_str.replace(',', '').replace(' ', '')
-    
-    # Remove any currency symbols but keep digits and decimal point
     cleaned = re.sub(r'[^\d.]', '', cleaned)
-    
+
     # Must have at least one digit
     if not cleaned or not re.search(r'\d', cleaned):
         return None
-    
-    # Validate format - should be digits with optional decimal point and 0-2 decimal places
+
+    # Validate format - digits with optional decimal and 0-2 decimal places
     if not re.match(r'^\d+\.?\d{0,2}$', cleaned):
         return None
-    
+
     try:
         value = float(cleaned)
-        
-        # Reject if value is too large (max for decimal(15,2) is 999999999999999.99)
-        # But we'll be more conservative - reject anything over 1 billion
-        if value > 1000000000:
+        if has_minus:
+            value = -value
+
+        # Reject if value is too large (max for decimal(15,2))
+        if abs(value) > 1000000000:
             return None
-        
-        # Reject negative values (we only want credits)
-        if value < 0:
+
+        # Reject negative values unless allow_negative (for debit column)
+        if value < 0 and not allow_negative:
             return None
-        
+        if value < 0 and allow_negative:
+            value = abs(value)
+
         # Reject zero
         if value == 0:
             return None
-        
-        # Round to 2 decimal places to preserve .00 format
+
         return round(value, 2)
-    except:
+    except Exception:
         return None
 
 
