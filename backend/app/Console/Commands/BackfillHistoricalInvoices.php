@@ -87,14 +87,8 @@ class BackfillHistoricalInvoices extends Command
                     continue;
                 }
                 
-                // Generate invoice number based on week start date, not today
-                $prefix = 'INV';
-                $dateStr = $weekStart->format('Ymd');
-                $sequence = Invoice::whereDate('issue_date', $weekStart->toDateString())
-                    ->count() + 1;
-                $invoiceNumber = sprintf('%s-%s-%04d', $prefix, $dateStr, $sequence);
+                $invoiceNumber = Invoice::generateInvoiceNumber(Invoice::TYPE_WEEKLY, $weekStart);
                 
-                // Create the invoice
                 Invoice::create([
                     'member_id' => $member->id,
                     'invoice_number' => $invoiceNumber,
@@ -103,6 +97,7 @@ class BackfillHistoricalInvoices extends Command
                     'issue_date' => $weekStart,
                     'status' => 'pending',
                     'period' => $weekPeriod,
+                    'invoice_type' => Invoice::TYPE_WEEKLY,
                     'description' => "Weekly contribution for week {$weekPeriod}",
                 ]);
                 

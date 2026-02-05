@@ -51,6 +51,11 @@ fi
 PARSER_SCRIPT="$EVIMERIA_ROOT/ocr-parser/parse_pdf.py"
 if [ -f "$PARSER_SCRIPT" ]; then
   echo "OK: Parser script exists: $PARSER_SCRIPT"
+  if grep -q "parse_paybill_from_text" "$PARSER_SCRIPT" 2>/dev/null; then
+    echo "OK: M-PESA paybill text fallback present (updated parser)"
+  else
+    echo "WARNING: Parser may be old (no parse_paybill_from_text). Pull uat-fixes and re-deploy."
+  fi
 else
   echo "ERROR: Parser script NOT found: $PARSER_SCRIPT"
   echo "  OcrParserService expects: backend/../ocr-parser/parse_pdf.py"

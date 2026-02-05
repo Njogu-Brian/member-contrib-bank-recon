@@ -221,21 +221,21 @@ class MemberController extends Controller
 
     public function show(Member $member)
     {
-        $member->load(['transactions' => function($query) {
-            $query->orderBy('tran_date', 'desc');
-        }, 'manualContributions', 'expenses']);
-        
-        // Calculate contribution statistics
+        // Do not eager-load all transactions/contributions/expenses – profile page uses
+        // paginated statement endpoint. Loading thousands of transactions caused timeouts.
+        $member->loadCount(['transactions', 'manualContributions']);
+
+        // Contribution stats use accessors (aggregate queries only)
         $member->total_contributions = $member->total_contributions;
         $member->expected_contributions = $member->expected_contributions;
         $member->contribution_status = $member->contribution_status;
-        
+
         // Ensure public share token exists
         if (!$member->public_share_token) {
             $member->getPublicShareToken();
             $member->refresh();
         }
-        
+
         return response()->json($member);
     }
 
