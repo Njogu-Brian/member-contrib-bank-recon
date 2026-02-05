@@ -174,17 +174,20 @@ class Member extends Model
 
     public function getContributionStatusAttribute(): string
     {
-        return $this->resolveContributionStatusRule()->slug ?? 'unknown';
+        $rule = $this->resolveContributionStatusRule();
+        return $rule?->slug ?? 'unknown';
     }
 
     public function getContributionStatusLabelAttribute(): ?string
     {
-        return $this->resolveContributionStatusRule()->name ?? null;
+        $rule = $this->resolveContributionStatusRule();
+        return $rule?->name ?? null;
     }
 
     public function getContributionStatusColorAttribute(): ?string
     {
-        return $this->resolveContributionStatusRule()->color ?? '#6b7280';
+        $rule = $this->resolveContributionStatusRule();
+        return $rule?->color ?? '#6b7280';
     }
 
     public function recordInvestmentDate($date): void
