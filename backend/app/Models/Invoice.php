@@ -91,11 +91,11 @@ class Invoice extends Model
     }
 
     /**
-     * Generate unique invoice number based on type
+     * Generate unique invoice number based on type and issue date.
+     * Sequence is per (type + issue date) so backfilling past weeks does not reuse numbers.
      */
     public static function generateInvoiceNumber(string $type = self::TYPE_WEEKLY, ?Carbon $issueDate = null): string
     {
-        // Different prefixes for different invoice types
         $prefixes = [
             self::TYPE_WEEKLY => 'INV',
             self::TYPE_REGISTRATION => 'REG',
@@ -103,18 +103,19 @@ class Invoice extends Model
             self::TYPE_SOFTWARE => 'SFT',
             self::TYPE_CUSTOM => 'CST',
         ];
-        
+
         $prefix = $prefixes[$type] ?? 'INV';
         $date = $issueDate ? $issueDate->format('Ymd') : Carbon::now()->format('Ymd');
-        
-        // Get last invoice of this type created today
+        $pattern = "{$prefix}-{$date}-%";
+
+        // Base sequence on existing invoices with same type and same date (issue_date), not "created today"
         $lastInvoice = static::where('invoice_type', $type)
-            ->whereDate('created_at', Carbon::today())
+            ->where('invoice_number', 'like', $pattern)
             ->orderBy('id', 'desc')
             ->first();
-        
+
         $sequence = $lastInvoice ? (intval(substr($lastInvoice->invoice_number, -4)) + 1) : 1;
-        
+
         return sprintf('%s-%s-%04d', $prefix, $date, $sequence);
     }
     
