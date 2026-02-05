@@ -12,10 +12,10 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // Generate weekly invoices every Monday at 00:00
+        // Generate weekly invoices automatically every Monday at 00:00 (one invoice per active member for that week)
         $schedule->command('invoices:generate-weekly')
             ->weeklyOn(1, '00:00')
-            ->withoutOverlapping()
+            ->withoutOverlapping(60)
             ->onSuccess(function () {
                 \Log::info('Weekly invoices generated successfully');
             })
