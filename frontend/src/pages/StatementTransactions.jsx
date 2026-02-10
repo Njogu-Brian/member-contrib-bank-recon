@@ -437,9 +437,8 @@ export default function StatementTransactions() {
   const pagination = transactionsData?.meta || transactionsData || {}
   const metrics = statementData.metrics || {}
   const assignmentBreakdown = metrics.assignment_breakdown || {}
-  const selectableTransactionIds = transactions
-    .filter((tx) => !tx.is_archived)
-    .map((tx) => tx.id)
+  // Include archived transactions so previously rejected payments can be linked
+  const selectableTransactionIds = transactions.map((tx) => tx.id)
   const archivingId = archiveMutation.variables?.id
   const unarchivingId = unarchiveMutation.variables
 
@@ -720,17 +719,13 @@ export default function StatementTransactions() {
                         type="checkbox"
                         checked={selectedTransactions.includes(transaction.id)}
                         onChange={(e) => {
-                          if (transaction.is_archived) {
-                            return
-                          }
                           if (e.target.checked) {
                             setSelectedTransactions([...new Set([...selectedTransactions, transaction.id])])
                           } else {
                             setSelectedTransactions(selectedTransactions.filter(id => id !== transaction.id))
                           }
                         }}
-                        disabled={transaction.is_archived}
-                        title={transaction.is_archived ? 'Archived transactions cannot be selected' : undefined}
+                        title={transaction.is_archived ? 'Select to assign (will restore and link)' : undefined}
                         className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                       />
                     </td>
@@ -810,54 +805,54 @@ export default function StatementTransactions() {
                           <div className="absolute right-0 mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
                             <div className="py-1">
                               {transaction.is_archived ? (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault()
-                                    e.stopPropagation()
-                                    
-                                    console.log('=== Restore button clicked ===')
-                                    console.log('Transaction ID:', transaction.id)
-                                    console.log('Transaction object:', transaction)
-                                    
-                                    if (!transaction || !transaction.id) {
-                                      console.error('No transaction ID found', transaction)
-                                      alert('Error: Transaction ID not found')
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      setSelectedTransactions([transaction.id])
+                                      setShowAssignModal(true)
                                       setActionMenuOpen(null)
-                                      return
-                                    }
-                                    
-                                    const transactionId = transaction.id
-                                    
-                                    // Close menu first to prevent interference
-                                    setActionMenuOpen(null)
-                                    
-                                    // Use setTimeout to ensure menu closes before confirm
-                                    setTimeout(() => {
-                                      // Show confirm dialog
-                                      if (!confirm('Restore this transaction?')) {
-                                        console.log('User cancelled restore')
+                                    }}
+                                    className="block w-full text-left px-4 py-2 text-sm text-indigo-600 hover:bg-gray-100"
+                                  >
+                                    {transaction.member_id ? 'Reassign' : 'Assign'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      handleTransfer(transaction)
+                                      setActionMenuOpen(null)
+                                    }}
+                                    className="block w-full text-left px-4 py-2 text-sm text-purple-600 hover:bg-gray-100"
+                                  >
+                                    {transaction.member_id ? 'Transfer/Share' : 'Assign/Share'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      e.stopPropagation()
+                                      if (!transaction?.id) {
+                                        setActionMenuOpen(null)
                                         return
                                       }
-                                      
-                                      // Call mutation directly
-                                      console.log('Calling unarchiveMutation.mutate with ID:', transactionId)
-                                      console.log('Unarchive mutation object:', unarchiveMutation)
-                                      
-                                      try {
+                                      const transactionId = transaction.id
+                                      setActionMenuOpen(null)
+                                      setTimeout(() => {
+                                        if (!confirm('Restore this transaction?')) return
                                         unarchiveMutation.mutate(transactionId)
-                                        console.log('Mutation called successfully')
-                                      } catch (error) {
-                                        console.error('Error calling mutation:', error)
-                                        alert('Error: ' + error.message)
-                                      }
-                                    }, 50)
-                                  }}
-                                  disabled={unarchiveMutation.isPending && unarchivingId === transaction.id}
-                                  className="block w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-100 disabled:opacity-50"
-                                >
-                                  {unarchiveMutation.isPending && unarchivingId === transaction.id ? 'Restoring...' : 'Restore'}
-                                </button>
+                                      }, 50)
+                                    }}
+                                    disabled={unarchiveMutation.isPending && unarchivingId === transaction.id}
+                                    className="block w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-100 disabled:opacity-50"
+                                  >
+                                    {unarchiveMutation.isPending && unarchivingId === transaction.id ? 'Restoring...' : 'Restore only'}
+                                  </button>
+                                </>
                               ) : (
                                 <>
                                   <button
@@ -1000,6 +995,7 @@ export default function StatementTransactions() {
 
                     {isShareMode ? (
                       <div className="mt-4 space-y-4">
+                        <div className="max-h-64 overflow-y-auto space-y-4 pr-1">
                         {shareEntries.map((entry, index) => (
                           <div key={index} className="border rounded-md p-3 space-y-2">
                             <div className="flex items-center justify-between gap-3">
@@ -1037,7 +1033,7 @@ export default function StatementTransactions() {
                             </div>
                           </div>
                         ))}
-
+                        </div>
                         <div className="flex items-center justify-between text-sm">
                           <div>
                             Total shared:{' '}
@@ -1060,6 +1056,9 @@ export default function StatementTransactions() {
                         >
                           + Add another member
                         </button>
+                        <p className="text-xs text-gray-500 mt-1">
+                          You can add as many members as needed; amounts must sum to the transaction total.
+                        </p>
                       </div>
                     ) : (
                       <div className="mt-4">

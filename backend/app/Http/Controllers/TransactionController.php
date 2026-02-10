@@ -111,10 +111,13 @@ class TransactionController extends Controller
 
     public function assign(Request $request, Transaction $transaction)
     {
+        // Allow linking previously rejected (archived) payments: unarchive then assign
         if ($transaction->is_archived) {
-            return response()->json([
-                'message' => 'Cannot assign an archived transaction',
-            ], 422);
+            $transaction->update([
+                'is_archived' => false,
+                'archived_at' => null,
+                'archive_reason' => null,
+            ]);
         }
 
         $request->validate([
@@ -182,10 +185,13 @@ class TransactionController extends Controller
 
     public function split(Request $request, Transaction $transaction)
     {
+        // Allow linking previously rejected (archived) payments: unarchive then split
         if ($transaction->is_archived) {
-            return response()->json([
-                'message' => 'Cannot split an archived transaction',
-            ], 422);
+            $transaction->update([
+                'is_archived' => false,
+                'archived_at' => null,
+                'archive_reason' => null,
+            ]);
         }
 
         $request->validate([
@@ -1547,9 +1553,13 @@ class TransactionController extends Controller
                 try {
                     $transaction = Transaction::findOrFail($transactionId);
 
+                    // Allow linking previously rejected (archived) payments: unarchive then assign
                     if ($transaction->is_archived) {
-                        $errors[] = "Transaction {$transactionId}: Archived transactions cannot be assigned";
-                        continue;
+                        $transaction->update([
+                            'is_archived' => false,
+                            'archived_at' => null,
+                            'archive_reason' => null,
+                        ]);
                     }
 
                     $oldMemberId = $transaction->member_id;
@@ -1828,10 +1838,13 @@ class TransactionController extends Controller
 
     public function transfer(Request $request, Transaction $transaction)
     {
+        // Allow linking previously rejected (archived) payments: unarchive then transfer
         if ($transaction->is_archived) {
-            return response()->json([
-                'message' => 'Cannot transfer an archived transaction',
-            ], 422);
+            $transaction->update([
+                'is_archived' => false,
+                'archived_at' => null,
+                'archive_reason' => null,
+            ]);
         }
 
         // Support both single transfer and multiple recipients (split)
