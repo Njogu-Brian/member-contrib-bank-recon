@@ -104,47 +104,57 @@ php artisan invoices:backfill --from=2025-02-02 --to=2025-03-05
 Replace dates with your desired range. Existing invoices for a week are skipped.
 
 ### Queue worker (statement parsing)
-Bank statement parsing runs in the Laravel queue (`ProcessBankStatement` job). If the queue worker is not running, uploaded statements will not be parsed until you start it manually. To have it start automatically on boot and restart on failure, use a systemd user service.
+Bank statement parsing runs in the Laravel queue (`ProcessBankStatement` job). If the queue worker is not running, uploaded statements will not be parsed until you start it manually. Many shared hosting servers do **not** have `systemctl` (systemd); use the cron method below.
 
-**Option A: systemd user service (recommended)**
+**Option A: cron @reboot (use this when `systemctl` is not available)**  
+Add to crontab so the queue worker starts after every reboot:
 
-1. On the production server, create the user systemd directory and copy the service file (after pulling the repo so `backend/deploy/` exists):
-   ```bash
-   ssh -p 1980 royalce1@breysomsolutions.co.ke
-   cd ~/laravel-app/evimeria
-   git pull origin master   # or your branch
-   mkdir -p ~/.config/systemd/user
-   cp backend/deploy/evimeria-queue.service ~/.config/systemd/user/
-   ```
+```bash
+crontab -e
+```
 
-2. Edit the service file and set the correct paths. Replace `/home/royalce1` with your actual home path if different (run `echo $HOME` to check). Update `WorkingDirectory` and `Environment=HOME` to that path. If PHP is not at `/usr/bin/php`, run `which php` and update `ExecStart`:
-   ```bash
-   nano ~/.config/systemd/user/evimeria-queue.service
-   ```
+Add this line (replace `royalce1` with your username if your home path is different):
 
-3. Enable and start the service:
-   ```bash
-   systemctl --user daemon-reload
-   systemctl --user enable evimeria-queue
-   systemctl --user start evimeria-queue
-   ```
-
-4. (Optional) Enable lingering so the queue worker keeps running after you log out:
-   ```bash
-   loginctl enable-linger $USER
-   ```
-
-**Useful commands:**
-- Check status: `systemctl --user status evimeria-queue`
-- Restart: `systemctl --user restart evimeria-queue`
-- View logs: `journalctl --user -u evimeria-queue -f`
-
-**Option B: cron @reboot (if systemd user is not available)**  
-Add to crontab (`crontab -e`):
 ```bash
 @reboot sleep 30 && cd ~/laravel-app/evimeria/backend && nohup php artisan queue:work --sleep=3 --tries=3 >> storage/logs/queue-worker.log 2>&1 &
 ```
-This starts the worker after each reboot but does not restart it if it crashes.
+
+Or use the startup script (after `git pull` so the script exists):
+
+```bash
+@reboot sleep 30 && bash ~/laravel-app/evimeria/backend/deploy/start-queue-worker.sh
+```
+
+**Start the worker now (without rebooting):**
+
+```bash
+cd ~/laravel-app/evimeria/backend
+nohup php artisan queue:work --sleep=3 --tries=3 >> storage/logs/queue-worker.log 2>&1 &
+```
+
+Or run the script:
+
+```bash
+cd ~/laravel-app/evimeria
+bash backend/deploy/start-queue-worker.sh
+```
+
+**Useful commands:**
+- Check if worker is running: `pgrep -f "artisan.*queue:work"`
+- View logs: `tail -f ~/laravel-app/evimeria/backend/storage/logs/queue-worker.log`
+- Stop worker: `pkill -f "artisan queue:work"` (then start again with the commands above)
+
+**Option B: systemd user service (only if your server has `systemctl`)**  
+If you have systemd, you can use the service file instead for auto-restart on failure:
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp backend/deploy/evimeria-queue.service ~/.config/systemd/user/
+nano ~/.config/systemd/user/evimeria-queue.service   # set WorkingDirectory and Environment=HOME to your $HOME path
+systemctl --user daemon-reload
+systemctl --user enable evimeria-queue
+systemctl --user start evimeria-queue
+```
 
 ### Database Credentials
 - **Host**: localhost
