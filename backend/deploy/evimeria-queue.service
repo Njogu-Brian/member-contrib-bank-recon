@@ -5,7 +5,7 @@
 #    mkdir -p ~/.config/systemd/user
 #    cp backend/deploy/evimeria-queue.service ~/.config/systemd/user/
 #
-# 2. Edit and set the correct paths (replace /home/royalce1 with your $HOME if different):
+# 2. Edit and set the correct paths (replace /home2/royalcel with your $HOME if different):
 #    nano ~/.config/systemd/user/evimeria-queue.service
 #
 # 3. Enable and start (survives reboot; runs after logout if lingering is enabled):
@@ -27,11 +27,11 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/royalce1/laravel-app/evimeria/backend
+WorkingDirectory=/home2/royalcel/laravel-app/evimeria/backend
 ExecStart=/usr/bin/php artisan queue:work --sleep=3 --tries=3 --max-time=3600
 Restart=always
 RestartSec=10
-Environment=HOME=/home/royalce1
+Environment=HOME=/home2/royalcel
 
 [Install]
 WantedBy=default.target
