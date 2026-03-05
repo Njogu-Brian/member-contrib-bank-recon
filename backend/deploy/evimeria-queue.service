@@ -1,0 +1,37 @@
+# Evimeria Laravel queue worker – runs ProcessBankStatement (statement parsing) and other jobs.
+# Install as a user systemd service so it starts on boot and restarts on failure.
+#
+# 1. Copy to user systemd directory (on production server):
+#    mkdir -p ~/.config/systemd/user
+#    cp backend/deploy/evimeria-queue.service ~/.config/systemd/user/
+#
+# 2. Edit and set the correct paths (replace /home/royalce1 with your $HOME if different):
+#    nano ~/.config/systemd/user/evimeria-queue.service
+#
+# 3. Enable and start (survives reboot; runs after logout if lingering is enabled):
+#    systemctl --user daemon-reload
+#    systemctl --user enable evimeria-queue
+#    systemctl --user start evimeria-queue
+#
+# 4. Optional: enable lingering so the service runs when you are logged out:
+#    loginctl enable-linger $USER
+#
+# Useful commands:
+#   systemctl --user status evimeria-queue
+#   systemctl --user restart evimeria-queue
+#   journalctl --user -u evimeria-queue -f
+
+[Unit]
+Description=Evimeria Laravel queue worker (statement parsing, etc.)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/royalce1/laravel-app/evimeria/backend
+ExecStart=/usr/bin/php artisan queue:work --sleep=3 --tries=3 --max-time=3600
+Restart=always
+RestartSec=10
+Environment=HOME=/home/royalce1
+
+[Install]
+WantedBy=default.target
