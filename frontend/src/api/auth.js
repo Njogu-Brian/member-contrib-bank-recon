@@ -1,8 +1,8 @@
 // src/api/auth.js — Token-based authentication
 import api from './axios'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-const AUTH_BASE = '/api/v1/auth' // <- use full API route prefix used by backend
+// Axios baseURL is already set to VITE_API_BASE_URL (e.g. .../api/v1), so auth paths are relative to that
+const AUTH_BASE = '/auth'
 
 /**
  * Perform login:
