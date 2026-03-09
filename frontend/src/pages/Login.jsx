@@ -189,7 +189,13 @@ export default function Login() {
       }
     },
     onError: (err) => {
-      setError(err.response?.data?.message ?? 'Invalid credentials. Please try again.')
+      // Distinguish network/connection errors from auth failures
+      const isNetworkError = !err.response && (err.code === 'ERR_NETWORK' || err.message?.includes('timeout') || err.message?.includes('Network Error'))
+      if (isNetworkError) {
+        setError('Unable to connect to the server. Please check your connection and try again.')
+      } else {
+        setError(err.response?.data?.message ?? 'Invalid credentials. Please try again.')
+      }
     },
   })
 
