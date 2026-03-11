@@ -4,7 +4,9 @@ import { HiXMark } from 'react-icons/hi2'
 // Kenya is the only allowed country code
 const KENYA_CODE = '+254'
 
-export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, initialData = {} }) {
+const DOC_LABELS = { front_id: 'ID Front', back_id: 'ID Back', selfie: 'Passport Photo' }
+
+export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, initialData = {}, initialDocuments = {} }) {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -25,6 +27,8 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
   const [errors, setErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [checkingDuplicates, setCheckingDuplicates] = useState({})
+  const [documents, setDocuments] = useState({ front_id: null, back_id: null, selfie: null })
+  const [uploadingDoc, setUploadingDoc] = useState(null)
 
   // Debounce timer ref
   const debounceTimerRef = useRef({})
@@ -102,6 +106,47 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
       delete debounceTimerRef.current[field]
     }, 500)
   }, [checkDuplicateValue])
+
+  // Document upload handler
+  const handleDocumentUpload = async (documentType, file) => {
+    if (!file || !token) return
+    setUploadingDoc(documentType)
+    try {
+      const formData = new FormData()
+      formData.append('document_type', documentType)
+      formData.append('document', file)
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+      const url = baseUrl.startsWith('http') ? `${baseUrl}/public/profile/${token}/documents` : `${window.location.origin}${baseUrl}/public/profile/${token}/documents`
+      const response = await fetch(url, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        alert(data.message || 'Upload failed')
+        return
+      }
+      setDocuments(prev => ({ ...prev, [documentType]: { id: data.document.id, file_name: data.document.file_name } }))
+    } catch (err) {
+      console.error('Upload error:', err)
+      alert('Upload failed. Please try again.')
+    } finally {
+      setUploadingDoc(null)
+    }
+  }
+
+  useEffect(() => {
+    if (Object.keys(initialDocuments).length > 0) {
+      setDocuments(prev => {
+        const next = { ...prev }
+        Object.entries(initialDocuments).forEach(([type, doc]) => {
+          next[type] = doc
+        })
+        return next
+      })
+    }
+  }, [initialDocuments])
 
   useEffect(() => {
     if (initialData) {
@@ -745,6 +790,47 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
                 </select>
                 {errors.next_of_kin_relationship && <p className="mt-1 text-sm text-red-600">{errors.next_of_kin_relationship}</p>}
               </div>
+            </div>
+          </div>
+
+          {/* Document Uploads */}
+          <div className="border-t pt-6 mt-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Identity Documents</h3>
+            <p className="text-sm text-gray-500 mb-4">Upload ID front, ID back, and passport-style photo (optional but recommended)</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {['front_id', 'back_id', 'selfie'].map((docType) => (
+                <div key={docType} className="border rounded-lg p-4 bg-gray-50">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{DOC_LABELS[docType]}</label>
+                  {documents[docType] ? (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-green-600 truncate" title={documents[docType].file_name}>
+                        ✓ {documents[docType].file_name}
+                      </span>
+                      <input
+                        type="file"
+                        accept=".jpg,.jpeg,.png,.pdf"
+                        className="hidden"
+                        id={`replace-${docType}`}
+                        onChange={(e) => e.target.files[0] && handleDocumentUpload(docType, e.target.files[0])}
+                      />
+                      <label htmlFor={`replace-${docType}`} className="text-xs text-indigo-600 hover:underline cursor-pointer">
+                        Replace
+                      </label>
+                    </div>
+                  ) : (
+                    <div>
+                      <input
+                        type="file"
+                        accept=".jpg,.jpeg,.png,.pdf"
+                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                        onChange={(e) => e.target.files[0] && handleDocumentUpload(docType, e.target.files[0])}
+                        disabled={uploadingDoc === docType}
+                      />
+                      {uploadingDoc === docType && <p className="mt-1 text-xs text-blue-500">Uploading...</p>}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
 

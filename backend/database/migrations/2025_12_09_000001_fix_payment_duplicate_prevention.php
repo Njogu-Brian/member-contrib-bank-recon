@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -27,24 +28,19 @@ return new class extends Migration
         ');
 
         // Add unique index on mpesa_transaction_id to prevent duplicates at database level
-        Schema::table('payments', function (Blueprint $table) {
-            // Check if unique index already exists
-            $indexes = Schema::getConnection()
-                ->getDoctrineSchemaManager()
-                ->listTableIndexes('payments');
-            
-            $hasUniqueIndex = false;
-            foreach ($indexes as $index) {
-                if ($index->isUnique() && in_array('mpesa_transaction_id', $index->getColumns())) {
-                    $hasUniqueIndex = true;
-                    break;
-                }
+        if (Schema::hasColumn('payments', 'mpesa_transaction_id')) {
+            $indexExists = DB::select("
+                SELECT 1 FROM information_schema.statistics 
+                WHERE table_schema = DATABASE() 
+                AND table_name = 'payments' 
+                AND index_name = 'payments_mpesa_transaction_id_unique'
+            ");
+            if (empty($indexExists)) {
+                Schema::table('payments', function (Blueprint $table) {
+                    $table->unique('mpesa_transaction_id', 'payments_mpesa_transaction_id_unique');
+                });
             }
-            
-            if (!$hasUniqueIndex && Schema::hasColumn('payments', 'mpesa_transaction_id')) {
-                $table->unique('mpesa_transaction_id', 'payments_mpesa_transaction_id_unique');
-            }
-        });
+        }
     }
 
     public function down(): void

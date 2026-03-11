@@ -216,27 +216,42 @@ class MemberController extends Controller
 
         $member = Member::create($validated);
 
+        // Ensure all members have a public share/registration link
+        $member->getPublicShareToken();
+        $member->refresh();
+
         return response()->json($member, 201);
     }
 
     public function show(Member $member)
     {
-        // Do not eager-load all transactions/contributions/expenses – profile page uses
-        // paginated statement endpoint. Loading thousands of transactions caused timeouts.
-        $member->loadCount(['transactions', 'manualContributions']);
+        try {
+            // Do not eager-load all transactions/contributions/expenses – profile page uses
+            // paginated statement endpoint. Loading thousands of transactions caused timeouts.
+            $member->loadCount(['transactions', 'manualContributions']);
 
-        // Contribution stats use accessors (aggregate queries only)
-        $member->total_contributions = $member->total_contributions;
-        $member->expected_contributions = $member->expected_contributions;
-        $member->contribution_status = $member->contribution_status;
+            // Contribution stats use accessors (aggregate queries only)
+            $member->total_contributions = $member->total_contributions;
+            $member->expected_contributions = $member->expected_contributions;
+            $member->contribution_status = $member->contribution_status;
 
-        // Ensure public share token exists
-        if (!$member->public_share_token) {
-            $member->getPublicShareToken();
-            $member->refresh();
+            // Ensure public share token exists
+            if (!$member->public_share_token) {
+                $member->getPublicShareToken();
+                $member->refresh();
+            }
+
+            return response()->json($member);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Error fetching member ' . $member->id . ': ' . $e->getMessage(), [
+                'member_id' => $member->id,
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'message' => 'Error loading member profile',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred while loading this member. Check server logs for details.',
+            ], 500);
         }
-
-        return response()->json($member);
     }
 
     public function statement(Member $member, Request $request)

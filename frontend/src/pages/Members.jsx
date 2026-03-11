@@ -51,10 +51,15 @@ export default function Members() {
 
   const createMutation = useMutation({
     mutationFn: createMember,
-    onSuccess: () => {
+    onSuccess: (member) => {
       queryClient.invalidateQueries(['members'])
       setShowModal(false)
       resetForm()
+      if (member?.public_share_token) {
+        const link = `${window.location.origin}/s/${member.public_share_token}`
+        navigator.clipboard.writeText(link)
+        alert(`Member created! Registration link copied to clipboard:\n${link}\n\nShare this with the new member to complete their profile.`)
+      }
     },
   })
 

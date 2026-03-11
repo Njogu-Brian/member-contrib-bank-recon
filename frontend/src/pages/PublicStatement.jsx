@@ -29,6 +29,7 @@ export default function PublicStatement() {
   const [perPage, setPerPage] = useState(parseInt(searchParams.get('per_page') || '25', 10))
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [profileData, setProfileData] = useState(null)
+  const [profileDocuments, setProfileDocuments] = useState({})
   const [profileIncompleteError, setProfileIncompleteError] = useState(null)
   const [showEditProfileModal, setShowEditProfileModal] = useState(false)
 
@@ -79,8 +80,9 @@ export default function PublicStatement() {
           
           // Special handling for profile incomplete error
           if (response.status === 403 && errorData.requires_profile_update) {
-            // Fetch profile data to pre-populate modal
+            // Fetch profile data to pre-populate modal (including document status)
             let memberData = null
+            let documentsData = {}
             try {
               const profileResponse = await fetch(
                 `${window.location.origin}/api/v1/public/profile/${token}/status`
@@ -88,6 +90,7 @@ export default function PublicStatement() {
               if (profileResponse.ok) {
                 const profileInfo = await profileResponse.json()
                 memberData = profileInfo.member
+                documentsData = profileInfo.documents || {}
               }
             } catch (e) {
               console.error('Error fetching profile status:', e)
@@ -99,6 +102,7 @@ export default function PublicStatement() {
               profileIncomplete: true,
               error: errorData,
               member: memberData,
+              documents: documentsData,
             }
           }
           
@@ -148,6 +152,9 @@ export default function PublicStatement() {
     }
     if (data.member && !profileData) {
       setProfileData(data.member)
+    }
+    if (data.documents && Object.keys(profileDocuments).length === 0) {
+      setProfileDocuments(data.documents)
     }
     if (!showProfileModal) {
       setShowProfileModal(true)
@@ -212,6 +219,7 @@ export default function PublicStatement() {
           onUpdate={handleProfileUpdate}
           token={token}
           initialData={profileData}
+          initialDocuments={profileDocuments}
         />
       </>
     )
@@ -293,6 +301,7 @@ export default function PublicStatement() {
                 if (response.ok) {
                   const profileInfo = await response.json()
                   setProfileData(profileInfo.member)
+                  setProfileDocuments(profileInfo.documents || {})
                 } else {
                   setProfileData(member)
                 }
@@ -347,6 +356,7 @@ export default function PublicStatement() {
           }}
           token={token}
           initialData={profileData}
+          initialDocuments={profileDocuments}
         />
       )}
 

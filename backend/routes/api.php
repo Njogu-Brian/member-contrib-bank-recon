@@ -69,6 +69,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/profile/{token}/status', [ProfileController::class, 'checkProfileStatus']);
         Route::get('/profile/{token}/check-duplicate', [ProfileController::class, 'checkDuplicate']);
         Route::post('/profile/{token}/update', [ProfileController::class, 'updateProfile']);
+        Route::post('/profile/{token}/documents', [ProfileController::class, 'uploadDocument']);
     });
 
     Route::prefix('webhooks')->group(function () {

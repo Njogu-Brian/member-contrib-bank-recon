@@ -681,7 +681,7 @@ export default function MemberProfile() {
             </div>
           )}
           <div className="col-span-2 md:col-span-3">
-            <label className="text-sm font-medium text-gray-500">Public Statement Link</label>
+            <label className="text-sm font-medium text-gray-500">Registration / Statement Link</label>
             <div className="mt-2 flex items-center gap-2">
               {member.public_share_token ? (
                 <>
@@ -704,11 +704,11 @@ export default function MemberProfile() {
                   </button>
                 </>
               ) : (
-                <span className="text-gray-400 text-sm">No public link available</span>
+                <span className="text-gray-400 text-sm">Link will be generated when you view this profile</span>
               )}
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Share this link with members who don't receive SMS. They can view their statement without logging in.
+              Share with new members to complete their profile (including ID uploads) or with existing members to view their statement.
             </p>
           </div>
         </div>

@@ -184,19 +184,23 @@ class DashboardController extends Controller
             }
             
             try {
-                $activeAnnouncements = Announcement::where('is_active', true)->count();
+                // announcements table uses published_at, not is_active
+                $activeAnnouncements = Announcement::whereNotNull('published_at')
+                    ->where('published_at', '<=', now())
+                    ->count();
             } catch (\Exception $e) {
                 \Illuminate\Support\Facades\Log::warning('Error getting active announcements: ' . $e->getMessage());
             }
 
             // Member status breakdown (with error handling)
+            // contribution_status_label is an accessor, not a DB column - compute in PHP
             $memberStatusBreakdown = [];
             try {
-                $memberStatusBreakdown = Member::select('contribution_status_label', DB::raw('count(*) as count'))
-                    ->where('is_active', true)
-                    ->groupBy('contribution_status_label')
-                    ->get()
-                    ->mapWithKeys(fn($item) => [$item->contribution_status_label ?? 'Unknown' => $item->count]);
+                $members = Member::where('is_active', true)->get();
+                foreach ($members as $member) {
+                    $label = $member->contribution_status_label ?? 'Unknown';
+                    $memberStatusBreakdown[$label] = ($memberStatusBreakdown[$label] ?? 0) + 1;
+                }
             } catch (\Exception $e) {
                 \Illuminate\Support\Facades\Log::warning('Error getting member status breakdown: ' . $e->getMessage());
             }

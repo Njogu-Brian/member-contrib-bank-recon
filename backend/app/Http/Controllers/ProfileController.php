@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\KycDocument;
 use App\Models\Member;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -56,10 +57,21 @@ class ProfileController extends Controller
                 }
             }
 
+            // Document upload status (front_id, back_id, selfie) - include pending and approved
+            $documents = KycDocument::where('member_id', $member->id)
+                ->whereIn('document_type', ['front_id', 'back_id', 'selfie'])
+                ->whereIn('status', ['pending', 'approved'])
+                ->orderByDesc('created_at')
+                ->get()
+                ->unique('document_type')
+                ->keyBy('document_type')
+                ->map(fn ($d) => ['id' => $d->id, 'file_name' => $d->file_name, 'status' => $d->status]);
+
             return [
                 'is_complete' => $member->isProfileCompleteWithPending(),
                 'missing_fields' => $member->getMissingProfileFields(),
                 'profile_completed_at' => $member->profile_completed_at,
+                'documents' => $documents,
                 'member' => array_merge($memberData, [
                     'member_code' => $member->member_code,
                     'member_number' => $member->member_number,
@@ -302,4 +314,101 @@ class ProfileController extends Controller
         }
     }
 
+    /**
+     * Upload KYC document (public - member self-upload via share link)
+     * Accepts: front_id (ID front), back_id (ID back), selfie (passport-style photo)
+     */
+    public function uploadDocument(Request $request, $token)
+    {
+        // Rate limiting: max 20 uploads per hour per IP
+        $key = 'profile-upload:' . $request->ip() . ':' . $token;
+        if (RateLimiter::tooManyAttempts($key, 20)) {
+            return response()->json([
+                'error' => 'Too many upload attempts',
+                'message' => 'Please wait before uploading more documents.',
+            ], 429);
+        }
+        RateLimiter::hit($key, 3600);
+
+        $member = Member::where('public_share_token', $token)->firstOrFail();
+
+        $validated = $request->validate([
+            'document_type' => 'required|string|in:front_id,back_id,selfie',
+            'document' => [
+                'required',
+                'file',
+                'mimes:jpg,jpeg,png,pdf',
+                'max:5120', // 5MB
+            ],
+        ]);
+
+        $file = $request->file('document');
+
+        // Optional: validate file (skip if service throws)
+        try {
+            $documentValidationService = app(\App\Services\DocumentValidationService::class);
+            $validationResult = $documentValidationService->validate($file);
+            if (!$validationResult['valid']) {
+                return response()->json([
+                    'message' => 'Document validation failed: ' . ($validationResult['error'] ?? 'Invalid file'),
+                ], 422);
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Document validation error', ['error' => $e->getMessage()]);
+        }
+
+        $path = $file->store('kyc', 'public');
+        $fileName = $file->getClientOriginalName();
+
+        // Delete any existing pending document of the same type for this member
+        KycDocument::where('member_id', $member->id)
+            ->where('document_type', $validated['document_type'])
+            ->where('status', 'pending')
+            ->delete();
+
+        // For public uploads, user_id is null (member self-upload via share link)
+        // Fallback to first user if user_id column doesn't allow null (pre-migration)
+        $userId = null;
+        try {
+            $document = KycDocument::create([
+                'user_id' => null,
+                'member_id' => $member->id,
+                'document_type' => $validated['document_type'],
+                'file_name' => $fileName,
+                'disk' => 'public',
+                'path' => $path,
+                'status' => 'pending',
+            ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            if (str_contains($e->getMessage(), 'user_id') || str_contains($e->getMessage(), 'null')) {
+                $userId = \App\Models\User::orderBy('id')->first()?->id;
+                $document = KycDocument::create([
+                    'user_id' => $userId,
+                    'member_id' => $member->id,
+                    'document_type' => $validated['document_type'],
+                    'file_name' => $fileName,
+                    'disk' => 'public',
+                    'path' => $path,
+                    'status' => 'pending',
+                ]);
+            } else {
+                throw $e;
+            }
+        }
+
+        try {
+            app(\App\Services\KycService::class)->logDocumentUpload($document, $userId ?? null);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('KYC log error', ['error' => $e->getMessage()]);
+        }
+
+        return response()->json([
+            'message' => 'Document uploaded successfully',
+            'document' => [
+                'id' => $document->id,
+                'document_type' => $document->document_type,
+                'file_name' => $document->file_name,
+            ],
+        ], 201);
+    }
 }
