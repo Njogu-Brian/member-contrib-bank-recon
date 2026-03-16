@@ -838,7 +838,26 @@ export default function MemberProfile() {
             </div>
           </div>
           {statementData ? (
-            <>
+          <>
+          {/* Invoice Type Summary */}
+          {statementData.invoice_summary && (
+            <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {Object.entries(statementData.invoice_summary).map(([key, item]) => (
+                <div key={key} className="border rounded-lg p-4 bg-slate-50">
+                  <p className="text-xs font-medium text-slate-500 uppercase mb-1">
+                    {item.label}
+                  </p>
+                  <p className="text-lg font-semibold text-slate-900">
+                    {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(Number(item.total_amount || 0))}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {item.count || 0} invoice{(item.count || 0) === 1 ? '' : 's'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-1 border rounded-lg overflow-hidden">
               <div className="px-4 py-2 border-b bg-gray-50">

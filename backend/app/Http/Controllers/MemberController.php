@@ -342,6 +342,36 @@ class MemberController extends Controller
         $memberData = $member->toArray();
         $memberData['date_of_registration'] = $firstTransactionDate;
 
+        // Invoice summary by type for this member (for statement view)
+        $invoiceSummary = \App\Models\Invoice::selectRaw('invoice_type, COUNT(*) as total_count, SUM(amount) as total_amount')
+            ->where('member_id', $member->id)
+            ->groupBy('invoice_type')
+            ->get()
+            ->keyBy('invoice_type');
+
+        $invoiceSummaryFormatted = [
+            'registration' => [
+                'label' => 'Registration Fee',
+                'total_amount' => (float) ($invoiceSummary[\App\Models\Invoice::TYPE_REGISTRATION]->total_amount ?? 0),
+                'count' => (int) ($invoiceSummary[\App\Models\Invoice::TYPE_REGISTRATION]->total_count ?? 0),
+            ],
+            'software' => [
+                'label' => 'Software Acquisition',
+                'total_amount' => (float) ($invoiceSummary[\App\Models\Invoice::TYPE_SOFTWARE]->total_amount ?? 0),
+                'count' => (int) ($invoiceSummary[\App\Models\Invoice::TYPE_SOFTWARE]->total_count ?? 0),
+            ],
+            'annual' => [
+                'label' => 'Annual Subscription',
+                'total_amount' => (float) ($invoiceSummary[\App\Models\Invoice::TYPE_ANNUAL]->total_amount ?? 0),
+                'count' => (int) ($invoiceSummary[\App\Models\Invoice::TYPE_ANNUAL]->total_count ?? 0),
+            ],
+            'weekly' => [
+                'label' => 'Weekly Contributions',
+                'total_amount' => (float) ($invoiceSummary[\App\Models\Invoice::TYPE_WEEKLY]->total_amount ?? 0),
+                'count' => (int) ($invoiceSummary[\App\Models\Invoice::TYPE_WEEKLY]->total_count ?? 0),
+            ],
+        ];
+
         return response()->json([
             'member' => $memberData,
             'statement' => $paginatedStatement->items(),
@@ -349,6 +379,7 @@ class MemberController extends Controller
                 'opening_balance' => $openingBalance,
                 'closing_balance' => $runningBalance,
             ]),
+            'invoice_summary' => $invoiceSummaryFormatted,
             'pagination' => [
                 'current_page' => $paginatedStatement->currentPage(),
                 'per_page' => $paginatedStatement->perPage(),

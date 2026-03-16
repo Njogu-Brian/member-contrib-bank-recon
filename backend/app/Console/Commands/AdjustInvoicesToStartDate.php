@@ -10,12 +10,15 @@ use Illuminate\Console\Command;
 
 class AdjustInvoicesToStartDate extends Command
 {
-    protected $signature = 'invoices:adjust-to-start-date {--dry-run : Show what would be done without making changes}';
-    protected $description = 'Adjust weekly invoices to match the contribution start date setting';
+    protected $signature = 'invoices:adjust-to-start-date
+                            {--dry-run : Show what would be done without making changes}
+                            {--delete-before-start : Delete weekly invoices before contribution_start_date (DANGEROUS)}';
+    protected $description = 'Generate missing weekly invoices (optionally delete invoices before start date)';
 
     public function handle()
     {
         $isDryRun = $this->option('dry-run');
+        $deleteBeforeStart = (bool) $this->option('delete-before-start');
         
         if ($isDryRun) {
             $this->info('🔍 DRY RUN MODE - No changes will be made');
@@ -27,21 +30,25 @@ class AdjustInvoicesToStartDate extends Command
         $startDate = Carbon::parse(Setting::get('contribution_start_date'));
         $this->info("   Contribution Start Date: {$startDate->format('M d, Y')}");
         
-        // Step 1: Find and delete weekly invoices before start date
+        // Step 1 (optional): Find and delete weekly invoices before start date
         $beforeCount = Invoice::where('invoice_type', Invoice::TYPE_WEEKLY)
             ->whereDate('issue_date', '<', $startDate)
             ->count();
-        
+
         if ($beforeCount > 0) {
             $this->warn("   Found {$beforeCount} weekly invoices BEFORE start date");
-            
-            if (!$isDryRun) {
-                Invoice::where('invoice_type', Invoice::TYPE_WEEKLY)
-                    ->whereDate('issue_date', '<', $startDate)
-                    ->delete();
-                $this->info("   ✅ Deleted {$beforeCount} invoices");
+
+            if ($deleteBeforeStart) {
+                if (!$isDryRun) {
+                    Invoice::where('invoice_type', Invoice::TYPE_WEEKLY)
+                        ->whereDate('issue_date', '<', $startDate)
+                        ->delete();
+                    $this->info("   ✅ Deleted {$beforeCount} invoices (delete enabled via --delete-before-start)");
+                } else {
+                    $this->line("   Would delete {$beforeCount} invoices (delete enabled via --delete-before-start)");
+                }
             } else {
-                $this->line("   Would delete {$beforeCount} invoices");
+                $this->info("   Skipping deletion (run with --delete-before-start to delete)");
             }
         } else {
             $this->info("   ✅ No invoices found before start date");

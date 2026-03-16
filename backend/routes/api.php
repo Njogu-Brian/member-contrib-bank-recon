@@ -298,12 +298,12 @@ Route::prefix('v1')->group(function () {
         Route::post('/expenses/{expense}/approve', [ExpenseController::class, 'approve']);
         Route::post('/expenses/{expense}/reject', [ExpenseController::class, 'reject']);
         
-        // Invoices
+        // Invoices - specific routes must come BEFORE apiResource to avoid /invoices/members-summary matching {invoice}
+        Route::get('/invoices/members-summary', [InvoiceController::class, 'membersWithInvoices']);
+        Route::post('/invoices/bulk-match', [InvoiceController::class, 'bulkMatch']);
         Route::apiResource('invoices', InvoiceController::class);
         Route::post('/invoices/{invoice}/mark-paid', [InvoiceController::class, 'markAsPaid']);
         Route::post('/invoices/{invoice}/cancel', [InvoiceController::class, 'cancel']);
-        Route::post('/invoices/bulk-match', [InvoiceController::class, 'bulkMatch']);
-        Route::get('/invoices/members-summary', [InvoiceController::class, 'membersWithInvoices']);
 
         // Invoice Types
         Route::apiResource('invoice-types', InvoiceTypeController::class);
