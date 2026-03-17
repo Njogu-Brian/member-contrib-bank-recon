@@ -84,9 +84,12 @@ export default function PublicStatement() {
             let memberData = null
             let documentsData = {}
             try {
-              const profileResponse = await fetch(
-                `${window.location.origin}/api/v1/public/profile/${token}/status`
-              )
+              let profileUrl = `${import.meta.env.VITE_API_BASE_URL || '/api/v1'}/public/profile/${token}/status`
+              if (profileUrl.startsWith('/')) profileUrl = window.location.origin + profileUrl
+              const profileResponse = await fetch(profileUrl, {
+                headers: { 'Accept': 'application/json' },
+                credentials: 'include',
+              })
               if (profileResponse.ok) {
                 const profileInfo = await profileResponse.json()
                 memberData = profileInfo.member
@@ -145,21 +148,15 @@ export default function PublicStatement() {
     await refetch()
   }
 
-  // Handle profile incomplete response
-  if (data?.profileIncomplete) {
-    if (!profileIncompleteError) {
+  // Sync profile data when we receive a profile-incomplete response (useEffect to avoid setState during render)
+  useEffect(() => {
+    if (data?.profileIncomplete) {
       setProfileIncompleteError(data.error)
-    }
-    if (data.member && !profileData) {
-      setProfileData(data.member)
-    }
-    if (data.documents && Object.keys(profileDocuments).length === 0) {
-      setProfileDocuments(data.documents)
-    }
-    if (!showProfileModal) {
+      if (data.member) setProfileData(data.member)
+      if (data.documents && Object.keys(data.documents).length > 0) setProfileDocuments(data.documents)
       setShowProfileModal(true)
     }
-  }
+  }, [data?.profileIncomplete, data?.error, data?.member, data?.documents])
 
   if (isLoading) {
     return (
@@ -172,7 +169,7 @@ export default function PublicStatement() {
     )
   }
 
-  if (error && !profileIncompleteError && !data?.profileIncomplete) {
+  if (error && !data?.profileIncomplete) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-6 text-center">
@@ -189,8 +186,8 @@ export default function PublicStatement() {
     )
   }
 
-  // Show profile update modal if profile is incomplete
-  if (profileIncompleteError) {
+  // Show profile update modal if profile is incomplete (check data?.profileIncomplete since useEffect sets profileIncompleteError async)
+  if (data?.profileIncomplete || profileIncompleteError) {
     return (
       <>
         <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center p-4">
@@ -198,7 +195,7 @@ export default function PublicStatement() {
             <div className="text-indigo-600 text-6xl mb-4">👤</div>
             <h1 className="text-3xl font-bold text-gray-900 mb-3">Profile Incomplete</h1>
             <p className="text-gray-600 mb-6 text-lg">
-              {profileIncompleteError.message}
+              {(profileIncompleteError || data?.error)?.message || 'Please complete your profile before viewing your statement.'}
             </p>
             <div className="bg-indigo-50 rounded-lg p-4 mb-6">
               <p className="text-sm text-indigo-800 font-medium">
@@ -218,8 +215,8 @@ export default function PublicStatement() {
           onClose={() => setShowProfileModal(false)}
           onUpdate={handleProfileUpdate}
           token={token}
-          initialData={profileData}
-          initialDocuments={profileDocuments}
+          initialData={profileData ?? data?.member}
+          initialDocuments={Object.keys(profileDocuments).length > 0 ? profileDocuments : (data?.documents || {})}
         />
       </>
     )
