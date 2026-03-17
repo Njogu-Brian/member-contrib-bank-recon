@@ -28,6 +28,7 @@ export const NAVIGATION = [
       { label: 'Dashboard', icon: HiOutlineHome, path: '/', roles: [] },
       { label: 'Members', icon: HiOutlineUsers, path: '/members', roles: [], submenu: [
         { label: 'All Members', path: '/members' },
+        { label: 'Pending Signups', path: '/members/pending-signups' },
         { label: 'Profile Update Status', path: '/members/profile-update-status' },
         { label: 'Pending Profile Changes', path: '/members/pending-profile-changes', roles: [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MANAGER] },
       ]},

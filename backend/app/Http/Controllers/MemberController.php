@@ -38,6 +38,12 @@ class MemberController extends Controller
             $query->where('is_active', $request->boolean('is_active'));
         }
 
+        // Pending signups: self-registered, awaiting admin approval
+        if ($request->boolean('pending_signups')) {
+            $query->whereNotNull('registration_requested_at')
+                ->where('is_active', false);
+        }
+
         return response()->json($query->paginate($request->get('per_page', 20)));
     }
 

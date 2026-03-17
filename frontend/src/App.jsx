@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard'
 import Members from './pages/Members'
 import ProfileUpdateStatus from './pages/ProfileUpdateStatus'
 import PendingProfileChanges from './pages/PendingProfileChanges'
+import PendingSignups from './pages/PendingSignups'
 import Statements from './pages/Statements'
 import StatementTransactions from './pages/StatementTransactions'
 import StatementViewer from './pages/StatementViewer'
@@ -35,6 +36,7 @@ import BulkSms from './pages/BulkSms'
 import BulkEmail from './pages/BulkEmail'
 import Unauthorized from './pages/Unauthorized'
 import PublicStatement from './pages/PublicStatement'
+import Join from './pages/Join'
 import UiKit from './pages/UiKit'
 import StaffManagement from './pages/StaffManagement'
 import RoleManagement from './pages/RoleManagement'
@@ -90,13 +92,15 @@ function App() {
   const location = useLocation()
   const pathname = location.pathname
   
-  // Check if this is a public statement route (needs special handling)
+  // Check if this is a public route that bypasses auth (statement view, join/signup)
   const isPublicStatementRoute = pathname.startsWith('/s/') || pathname.startsWith('/public/')
+  const isPublicJoinRoute = pathname === '/join'
   
-  // For public statement routes, use PublicApp (bypasses auth completely)
-  if (isPublicStatementRoute) {
+  // For public routes that bypass auth (statement view, join)
+  if (isPublicStatementRoute || isPublicJoinRoute) {
     return (
       <Routes>
+        <Route path="/join" element={<Join />} />
         <Route path="/s/:token" element={<PublicStatement />} />
         <Route path="*" element={
           <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -178,6 +182,7 @@ function App() {
           <Route index element={<Members />} />
           <Route path="profile-update-status" element={<ProfileUpdateStatus />} />
           <Route path="pending-profile-changes" element={<PendingProfileChanges />} />
+          <Route path="pending-signups" element={<PendingSignups />} />
           <Route path=":id" element={<MemberProfile />} />
         </Route>
         <Route path="statements">

@@ -25,6 +25,7 @@ use App\Http\Controllers\MeetingAttendanceUploadController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\PublicMemberStatementController;
+use App\Http\Controllers\PublicMemberRegistrationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SmsController;
 use App\Http\Controllers\StatementController;
@@ -70,6 +71,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/profile/{token}/check-duplicate', [ProfileController::class, 'checkDuplicate']);
         Route::post('/profile/{token}/update', [ProfileController::class, 'updateProfile']);
         Route::post('/profile/{token}/documents', [ProfileController::class, 'uploadDocument']);
+
+        // Public member signup (pending admin approval)
+        Route::post('/register', [PublicMemberRegistrationController::class, 'register']);
     });
 
     Route::prefix('webhooks')->group(function () {

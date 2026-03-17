@@ -47,6 +47,14 @@ class Kernel extends ConsoleKernel
                 \Log::error('Failed to process invoice reminders');
             });
 
+        // Process queued statement parsing jobs every minute (for shared hosting without persistent queue worker)
+        if (config('queue.default') === 'database') {
+            $schedule->command('queue:work --once')
+                ->everyMinute()
+                ->withoutOverlapping(5)
+                ->appendOutputTo(storage_path('logs/queue-cron.log'));
+        }
+
         // Process scheduled reports - check every hour for reports that need to run
         $schedule->call(function () {
             \App\Models\ScheduledReport::where('is_active', true)

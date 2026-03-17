@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { login } from '../api/auth'
 import { useQuery } from '@tanstack/react-query'
@@ -395,13 +395,21 @@ export default function Login() {
                   <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
                   Secure Connection
                 </span>
-                <button 
-                  type="button" 
-                  onClick={() => navigate('/forgot-password')}
-                  className="font-semibold text-purple-600 hover:text-purple-700 underline decoration-2 underline-offset-2"
-                >
-                  Forgot password?
-                </button>
+                <div className="flex flex-wrap gap-3">
+                  <button 
+                    type="button" 
+                    onClick={() => navigate('/forgot-password')}
+                    className="font-semibold text-purple-600 hover:text-purple-700 underline decoration-2 underline-offset-2"
+                  >
+                    Forgot password?
+                  </button>
+                  <Link 
+                    to="/join" 
+                    className="font-semibold text-purple-600 hover:text-purple-700 underline decoration-2 underline-offset-2"
+                  >
+                    Apply for membership
+                  </Link>
+                </div>
               </div>
 
               <button

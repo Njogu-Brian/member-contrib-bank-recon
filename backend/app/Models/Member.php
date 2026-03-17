@@ -40,6 +40,7 @@ class Member extends Model
         'activated_at',
         'activated_by',
         'profile_completed_at',
+        'registration_requested_at',
     ];
 
     protected $casts = [
@@ -48,6 +49,7 @@ class Member extends Model
         'kyc_approved_at' => 'datetime',
         'activated_at' => 'datetime',
         'profile_completed_at' => 'datetime',
+        'registration_requested_at' => 'datetime',
     ];
 
     protected $appends = [
