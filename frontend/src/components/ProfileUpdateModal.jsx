@@ -57,13 +57,17 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
     setCheckingDuplicates(prev => ({ ...prev, [field]: true }))
 
     try {
-      // Use public endpoint for duplicate checking
-      const response = await fetch(`/api/v1/public/profile/${token}/check-duplicate?field=${field}&value=${encodeURIComponent(value)}`, {
+      // Use public endpoint for duplicate checking (absolute URL for correct API routing)
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+      let checkUrl = `${baseUrl}/public/profile/${token}/check-duplicate?field=${field}&value=${encodeURIComponent(value)}`
+      if (checkUrl.startsWith('/')) checkUrl = window.location.origin + checkUrl
+      const response = await fetch(checkUrl, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
       })
 
       if (response.ok) {
@@ -429,12 +433,17 @@ export default function ProfileUpdateModal({ isOpen, onClose, onUpdate, token, i
     setIsSubmitting(true)
 
     try {
-      const response = await fetch(`/api/v1/public/profile/${token}/update`, {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+      let updateUrl = `${baseUrl}/public/profile/${token}/update`
+      if (updateUrl.startsWith('/')) updateUrl = window.location.origin + updateUrl
+      const response = await fetch(updateUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify(formData),
+        credentials: 'include',
       })
 
       const data = await response.json()
