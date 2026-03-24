@@ -204,6 +204,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/members/{member}/statement/export', [MemberController::class, 'exportStatement'])->where('member', '[0-9]+');
         Route::get('/members/{member}/investment-report/export', [MemberController::class, 'exportInvestmentReport'])->where('member', '[0-9]+');
         Route::get('/members/statements/export', [MemberController::class, 'exportBulkStatements']);
+        Route::get('/members/export-contributions', [MemberController::class, 'exportContributionsSummary']);
         Route::post('/members/{member}/activate', [KycController::class, 'activateMember'])->where('member', '[0-9]+');
         Route::get('/members/check-duplicate', [MemberController::class, 'checkDuplicate']);
         

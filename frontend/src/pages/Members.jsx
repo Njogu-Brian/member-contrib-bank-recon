@@ -8,6 +8,7 @@ import {
   deleteMember,
   bulkUploadMembers,
   exportAllMemberStatements,
+  exportMembersContributionSummary,
   checkDuplicate,
 } from '../api/members'
 import Pagination from '../components/Pagination'
@@ -20,6 +21,7 @@ export default function Members() {
   const [showModal, setShowModal] = useState(false)
   const [editingMember, setEditingMember] = useState(null)
   const [bulkExportingFormat, setBulkExportingFormat] = useState(null)
+  const [contributionsSummaryExporting, setContributionsSummaryExporting] = useState(false)
   const [isExportModalOpen, setIsExportModalOpen] = useState(false)
   const [pendingExportFormat, setPendingExportFormat] = useState('pdf')
   const [formData, setFormData] = useState({
@@ -337,6 +339,36 @@ export default function Members() {
     setIsExportModalOpen(true)
   }
 
+  const handleExportContributionSummary = async () => {
+    try {
+      setContributionsSummaryExporting(true)
+      const response = await exportMembersContributionSummary()
+      const blob = new Blob([response.data], {
+        type:
+          response.headers['content-type'] ||
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      })
+      let filename = 'members-contribution-summary.xlsx'
+      const disposition = response.headers['content-disposition']
+      if (disposition) {
+        const match = /filename="?([^"]+)"?/i.exec(disposition)
+        if (match?.[1]) {
+          filename = match[1]
+        }
+      }
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      link.click()
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      alert(error.response?.data?.message || 'Export failed')
+    } finally {
+      setContributionsSummaryExporting(false)
+    }
+  }
+
   const handleBulkExport = async (format, memberIds = []) => {
     try {
       setBulkExportingFormat(format)
@@ -414,6 +446,15 @@ export default function Members() {
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-60 transition-colors"
             >
               {bulkExportingFormat === 'excel' ? 'Exporting Excel…' : 'Export All (Excel)'}
+            </button>
+            <button
+              type="button"
+              onClick={handleExportContributionSummary}
+              disabled={!!bulkExportingFormat || contributionsSummaryExporting}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-emerald-700 hover:bg-emerald-800 disabled:opacity-60 transition-colors"
+              title="Spreadsheet: name, phone, ID, expected and total contributions"
+            >
+              {contributionsSummaryExporting ? 'Preparing summary…' : 'Export summary (XLSX)'}
             </button>
           </div>
           <label className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 cursor-pointer transition-colors">

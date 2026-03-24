@@ -56,6 +56,15 @@ export const exportAllMemberStatements = async (params = {}) => {
   return response
 }
 
+/** XLSX: name, phone, ID, expected vs total contributions */
+export const exportMembersContributionSummary = async (params = {}) => {
+  const response = await api.get('/admin/members/export-contributions', {
+    params,
+    responseType: 'blob',
+  })
+  return response
+}
+
 export const getProfileUpdateStatus = async (params = {}) => {
   const response = await api.get('/admin/members/profile-update-status', { params })
   return response.data

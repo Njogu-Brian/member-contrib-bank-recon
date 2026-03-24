@@ -84,6 +84,7 @@ class AuditMiddleware
         $auditableGetPaths = [
             'admin/statements/export',
             'admin/members/export',
+            'admin/members/export-contributions',
             'admin/reports/download',
             'admin/settings',
         ];

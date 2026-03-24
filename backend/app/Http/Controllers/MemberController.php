@@ -480,6 +480,55 @@ class MemberController extends Controller
         return $this->exportBulkStatementsPdf($payload, $filters);
     }
 
+    /**
+     * Export all members with expected vs actual contributions (Excel).
+     */
+    public function exportContributionsSummary(Request $request)
+    {
+        $validated = $request->validate([
+            'is_active' => 'sometimes|boolean',
+        ]);
+
+        $query = Member::query()->orderBy('name');
+
+        if (array_key_exists('is_active', $validated)) {
+            $query->where('is_active', (bool) $validated['is_active']);
+        }
+
+        $members = $query->get();
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $sheet->setCellValue('A1', 'Members — contribution summary');
+        $sheet->mergeCells('A1:E1');
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+
+        $headers = ['Name', 'Phone', 'ID Number', 'Expected contribution (KES)', 'Total contribution so far (KES)'];
+        $sheet->fromArray($headers, null, 'A3');
+        $sheet->getStyle('A3:E3')->getFont()->setBold(true);
+
+        $row = 4;
+        foreach ($members as $member) {
+            $sheet->setCellValue('A' . $row, $member->name);
+            $sheet->setCellValue('B' . $row, $member->phone ?? '');
+            $sheet->setCellValue('C' . $row, $member->id_number ?? '');
+            $sheet->setCellValue('D' . $row, round((float) $member->expected_contributions, 2));
+            $sheet->setCellValue('E' . $row, round((float) $member->total_contributions, 2));
+            $row++;
+        }
+
+        foreach (range('A', 'E') as $column) {
+            $sheet->getColumnDimension($column)->setAutoSize(true);
+        }
+
+        $filename = 'members-contribution-summary-' . now()->format('Ymd_His') . '.xlsx';
+        $tempFile = tempnam(sys_get_temp_dir(), 'members_contrib_sum_');
+        (new Xlsx($spreadsheet))->save($tempFile);
+
+        return response()->download($tempFile, $filename)->deleteFileAfterSend(true);
+    }
+
     protected function buildStatementData(Member $member, array $filters = []): array
     {
         $startDate = $filters['start_date'] ?? null;
