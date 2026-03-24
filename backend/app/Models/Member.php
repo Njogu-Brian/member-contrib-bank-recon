@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use App\Models\ContributionStatusRule;
 use App\Models\Setting;
 
@@ -128,36 +129,52 @@ class Member extends Model
 
     public function getTotalContributionsAttribute()
     {
-        $manual = $this->manualContributions()->sum('amount');
+        try {
+            $manual = $this->manualContributions()->sum('amount');
 
-        $baseTransactions = DB::table('transactions')
-            ->leftJoin('transaction_splits', 'transactions.id', '=', 'transaction_splits.transaction_id')
-            ->select(
-                'transactions.id',
-                DB::raw('transactions.credit as credit'),
-                DB::raw('COALESCE(SUM(transaction_splits.amount), 0) as distributed')
-            )
-            ->where('transactions.member_id', $this->id)
-            ->whereNotIn('transactions.assignment_status', ['unassigned', 'duplicate'])
-            ->where('transactions.is_archived', false)
-            ->groupBy('transactions.id', 'transactions.credit')
-            ->get()
-            ->sum(function ($row) {
-                $remainder = (float) $row->credit - (float) $row->distributed;
-                return $remainder > 0 ? $remainder : 0;
-            });
+            $baseTransactions = DB::table('transactions')
+                ->leftJoin('transaction_splits', 'transactions.id', '=', 'transaction_splits.transaction_id')
+                ->select(
+                    'transactions.id',
+                    DB::raw('transactions.credit as credit'),
+                    DB::raw('COALESCE(SUM(transaction_splits.amount), 0) as distributed')
+                )
+                ->where('transactions.member_id', $this->id)
+                ->whereNotIn('transactions.assignment_status', ['unassigned', 'duplicate'])
+                ->where('transactions.is_archived', false)
+                ->groupBy('transactions.id', 'transactions.credit')
+                ->get()
+                ->sum(function ($row) {
+                    $remainder = (float) $row->credit - (float) $row->distributed;
+                    return $remainder > 0 ? $remainder : 0;
+                });
 
-        $splitShare = $this->transactionSplits()->sum('amount');
+            $splitShare = $this->transactionSplits()->sum('amount');
 
-        return $manual + $baseTransactions + $splitShare;
+            return $manual + $baseTransactions + $splitShare;
+        } catch (\Throwable $e) {
+            Log::warning('Member total_contributions calculation failed', [
+                'member_id' => $this->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return 0.0;
+        }
     }
 
     public function getExpectedContributionsAttribute()
     {
-        // Expected contributions = Total invoices issued for this member
-        // This merges the invoice and expected contributions modules into one
-        // Invoices represent what the member should have paid
-        return $this->invoices()->sum('amount');
+        try {
+            // Expected contributions = Total invoices issued for this member
+            return $this->invoices()->sum('amount');
+        } catch (\Throwable $e) {
+            Log::warning('Member expected_contributions calculation failed', [
+                'member_id' => $this->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return 0.0;
+        }
     }
 
     protected function resolveContributionStatusRule(): ?ContributionStatusRule
@@ -166,12 +183,21 @@ class Member extends Model
             return $this->statusRuleCache;
         }
 
-        $expected = (float) $this->expected_contributions;
-        $actual = (float) $this->total_contributions;
+        try {
+            $expected = (float) $this->expected_contributions;
+            $actual = (float) $this->total_contributions;
 
-        $this->statusRuleCache = ContributionStatusRule::resolveForTotals($actual, $expected);
+            $this->statusRuleCache = ContributionStatusRule::resolveForTotals($actual, $expected);
 
-        return $this->statusRuleCache;
+            return $this->statusRuleCache;
+        } catch (\Throwable $e) {
+            Log::warning('Member contribution status rule resolution failed', [
+                'member_id' => $this->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 
     public function getContributionStatusAttribute(): string
