@@ -51,6 +51,8 @@ class Member extends Model
         'activated_at' => 'datetime',
         'profile_completed_at' => 'datetime',
         'registration_requested_at' => 'datetime',
+        'public_share_token_expires_at' => 'datetime',
+        'public_share_last_accessed_at' => 'datetime',
     ];
 
     protected $appends = [
@@ -59,6 +61,62 @@ class Member extends Model
     ];
 
     protected ?ContributionStatusRule $statusRuleCache = null;
+
+    protected static function booted(): void
+    {
+        // Invalid MySQL dates (e.g. 0000-00-00) or corrupt strings break date/datetime casts during JSON serialization.
+        static::retrieved(function (Member $member) {
+            $dateCols = ['date_of_registration'];
+            $dateTimeCols = [
+                'kyc_approved_at',
+                'activated_at',
+                'profile_completed_at',
+                'registration_requested_at',
+                'public_share_token_expires_at',
+                'public_share_last_accessed_at',
+            ];
+
+            foreach ($dateCols as $col) {
+                $member->sanitizeInvalidDateColumn($col, true);
+            }
+            foreach ($dateTimeCols as $col) {
+                $member->sanitizeInvalidDateColumn($col, false);
+            }
+        });
+    }
+
+    /**
+     * Clear invalid date values so casts and JSON encoding do not throw.
+     */
+    protected function sanitizeInvalidDateColumn(string $column, bool $dateOnly): void
+    {
+        if (! array_key_exists($column, $this->attributes)) {
+            return;
+        }
+
+        $v = $this->attributes[$column];
+        if ($v === null || $v === '') {
+            return;
+        }
+
+        if (is_string($v) && preg_match('/^0000-00-00/', $v)) {
+            Log::warning('Member invalid date cleared', ['member_id' => $this->id, 'column' => $column]);
+            $this->attributes[$column] = null;
+
+            return;
+        }
+
+        try {
+            Carbon::parse($v);
+        } catch (\Throwable $e) {
+            Log::warning('Member unparseable date cleared', [
+                'member_id' => $this->id,
+                'column' => $column,
+                'value' => is_string($v) ? substr($v, 0, 32) : '[non-string]',
+            ]);
+            $this->attributes[$column] = null;
+        }
+    }
 
     public function transactions()
     {

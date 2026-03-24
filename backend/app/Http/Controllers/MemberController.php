@@ -234,20 +234,70 @@ class MemberController extends Controller
         try {
             // Do not eager-load all transactions/contributions/expenses – profile page uses
             // paginated statement endpoint. Loading thousands of transactions caused timeouts.
-            $member->loadCount(['transactions', 'manualContributions']);
+            try {
+                $member->loadCount(['transactions', 'manualContributions']);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Member loadCount failed', [
+                    'member_id' => $member->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             // Contribution stats use accessors (aggregate queries only)
-            $member->total_contributions = $member->total_contributions;
-            $member->expected_contributions = $member->expected_contributions;
-            $member->contribution_status = $member->contribution_status;
+            try {
+                $member->total_contributions = $member->total_contributions;
+                $member->expected_contributions = $member->expected_contributions;
+                $member->contribution_status = $member->contribution_status;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Member contribution stats on show failed', [
+                    'member_id' => $member->id,
+                    'error' => $e->getMessage(),
+                ]);
+                $member->setAttribute('total_contributions', 0);
+                $member->setAttribute('expected_contributions', 0);
+                $member->setAttribute('contribution_status', 'unknown');
+            }
 
             // Ensure public share token exists
             if (!$member->public_share_token) {
-                $member->getPublicShareToken();
-                $member->refresh();
+                try {
+                    $member->getPublicShareToken();
+                    $member->refresh();
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Member getPublicShareToken failed', [
+                        'member_id' => $member->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
 
-            return response()->json($member);
+            try {
+                return response()->json($member);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('Member profile JSON serialization failed', [
+                    'member_id' => $member->id,
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+
+                $member->setAppends([]);
+                try {
+                    return response()->json($member);
+                } catch (\Throwable $e2) {
+                    \Illuminate\Support\Facades\Log::error('Member profile fallback JSON failed', [
+                        'member_id' => $member->id,
+                        'error' => $e2->getMessage(),
+                    ]);
+
+                    return response()->json([
+                        'id' => $member->id,
+                        'name' => $member->name,
+                        'phone' => $member->phone,
+                        'email' => $member->email,
+                        'message' => 'Profile loaded with limited fields due to a data formatting issue. Please contact support.',
+                    ]);
+                }
+            }
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('Error fetching member ' . $member->id . ': ' . $e->getMessage(), [
                 'member_id' => $member->id,
