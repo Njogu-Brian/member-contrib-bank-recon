@@ -27,10 +27,10 @@ export default function ProfileUpdateStatus() {
     mutationFn: resetMemberProfileLink,
     onSuccess: () => {
       queryClient.invalidateQueries(['profile-update-status'])
-      alert('Profile link reset successfully')
+      alert('Statement link regenerated. Share the new URL; the old one no longer works.')
     },
     onError: (error) => {
-      alert(error.response?.data?.message || 'Failed to reset profile link')
+      alert(error.response?.data?.message || 'Failed to regenerate statement link')
     },
   })
 
@@ -38,10 +38,12 @@ export default function ProfileUpdateStatus() {
     mutationFn: resetAllProfileLinks,
     onSuccess: (data) => {
       queryClient.invalidateQueries(['profile-update-status'])
-      alert(`Profile links reset successfully for ${data.count || 0} member(s)`)
+      alert(
+        `New statement links issued for ${data.count || 0} member(s). Old links no longer work.`
+      )
     },
     onError: (error) => {
-      alert(error.response?.data?.message || 'Failed to reset profile links')
+      alert(error.response?.data?.message || 'Failed to regenerate statement links')
     },
   })
 
@@ -75,11 +77,15 @@ export default function ProfileUpdateStatus() {
         gradient="from-green-600 to-emerald-600"
       />
 
-      {/* Reset Links Button */}
+      {/* Bulk regenerate statement links */}
       <div className="flex justify-end">
         <button
           onClick={() => {
-            if (confirm('Are you sure you want to reset profile links for ALL members? This action cannot be undone.')) {
+            if (
+              confirm(
+                'Regenerate statement links for ALL members? Each person gets a new URL; every previously shared link will stop working.'
+              )
+            ) {
               resetAllLinksMutation.mutate()
             }
           }}
@@ -87,7 +93,7 @@ export default function ProfileUpdateStatus() {
           className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <HiArrowPath className={`w-4 h-4 mr-2 ${resetAllLinksMutation.isPending ? 'animate-spin' : ''}`} />
-          Reset All Profile Links
+          Regenerate all statement links
         </button>
       </div>
 
@@ -303,20 +309,22 @@ export default function ProfileUpdateStatus() {
                         >
                           View Profile
                         </Link>
-                        {member.has_public_token && (
-                          <button
-                            onClick={() => {
-                              if (confirm(`Reset profile link for ${member.name}?`)) {
-                                resetLinkMutation.mutate(member.id)
-                              }
-                            }}
-                            disabled={resetLinkMutation.isPending}
-                            className="text-red-600 hover:text-red-900 font-medium text-xs disabled:opacity-50"
-                            title="Reset profile share link"
-                          >
-                            <HiArrowPath className={`w-4 h-4 inline ${resetLinkMutation.isPending ? 'animate-spin' : ''}`} />
-                          </button>
-                        )}
+                        <button
+                          onClick={() => {
+                            if (
+                              confirm(
+                                `Regenerate statement link for ${member.name}? The old URL will stop working.`
+                              )
+                            ) {
+                              resetLinkMutation.mutate(member.id)
+                            }
+                          }}
+                          disabled={resetLinkMutation.isPending}
+                          className="text-red-600 hover:text-red-900 font-medium text-xs disabled:opacity-50"
+                          title="Regenerate statement link"
+                        >
+                          <HiArrowPath className={`w-4 h-4 inline ${resetLinkMutation.isPending ? 'animate-spin' : ''}`} />
+                        </button>
                       </div>
                     </td>
                   </tr>

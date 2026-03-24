@@ -9,7 +9,7 @@ class GenerateMemberShareTokens extends Command
 {
     protected $signature = 'members:generate-share-tokens {--dry-run : Show what would be updated without making changes}';
 
-    protected $description = 'Generate public share/registration tokens for members that are missing them';
+    protected $description = 'Ensure every member has a public statement link token (idempotent; does not rotate existing tokens)';
 
     public function handle(): int
     {

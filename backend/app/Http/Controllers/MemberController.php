@@ -1070,61 +1070,66 @@ class MemberController extends Controller
     }
 
     /**
-     * Reset profile share link for a single member
+     * Regenerate this member's statement link (new token). Old /s/{token} URLs stop working.
      */
     public function resetProfileLink(Request $request, Member $member)
     {
         try {
-            $member->public_share_token = null;
-            $member->public_share_token_expires_at = null;
-            $member->public_share_last_accessed_at = null;
-            $member->public_share_access_count = 0;
-            $member->save();
+            $token = $member->regeneratePublicShareToken();
 
             return response()->json([
-                'message' => 'Profile share link reset successfully',
+                'message' => 'Statement link regenerated. Share the new URL with the member.',
                 'member' => [
                     'id' => $member->id,
                     'name' => $member->name,
-                    'public_share_token' => null,
+                    'public_share_token' => $token,
                 ],
             ]);
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Error resetting profile link: ' . $e->getMessage(), [
+            \Illuminate\Support\Facades\Log::error('Error regenerating profile link: ' . $e->getMessage(), [
                 'member_id' => $member->id,
                 'trace' => $e->getTraceAsString(),
             ]);
             return response()->json([
-                'message' => 'Error resetting profile link',
+                'message' => 'Error regenerating statement link',
                 'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
             ], 500);
         }
     }
 
     /**
-     * Reset profile share links for all members
+     * Regenerate a new statement link for every member (bulk). Old URLs stop working; everyone keeps a link.
      */
     public function resetAllProfileLinks(Request $request)
     {
         try {
-            $count = Member::whereNotNull('public_share_token')
-                ->update([
-                    'public_share_token' => null,
-                    'public_share_token_expires_at' => null,
-                    'public_share_last_accessed_at' => null,
-                    'public_share_access_count' => 0,
-                ]);
+            set_time_limit(0);
+            $count = 0;
+
+            Member::query()->orderBy('id')->chunkById(100, function ($members) use (&$count) {
+                foreach ($members as $member) {
+                    try {
+                        $member->regeneratePublicShareToken();
+                        $count++;
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::error('Bulk link regenerate failed', [
+                            'member_id' => $member->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            });
 
             return response()->json([
-                'message' => "Profile share links reset successfully for {$count} member(s)",
+                'message' => "Statement links regenerated for {$count} member(s). Distribute new URLs as needed.",
                 'count' => $count,
             ]);
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Error resetting all profile links: ' . $e->getMessage(), [
+            \Illuminate\Support\Facades\Log::error('Error regenerating all profile links: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
             ]);
             return response()->json([
-                'message' => 'Error resetting profile links',
+                'message' => 'Error regenerating statement links',
                 'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
             ], 500);
         }

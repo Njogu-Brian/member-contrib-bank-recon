@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getMember, ensureMemberShareToken, updateMember, getMemberStatement, exportMemberStatement, checkDuplicate } from '../api/members'
+import { getMember, ensureMemberShareToken, resetMemberProfileLink, updateMember, getMemberStatement, exportMemberStatement, checkDuplicate } from '../api/members'
 import useDebounce from '../hooks/useDebounce'
 import { getMemberAuditResults } from '../api/audit'
 import MemberSearchModal from '../components/MemberSearchModal'
@@ -157,6 +157,17 @@ export default function MemberProfile() {
     onSuccess: () => {
       queryClient.invalidateQueries(['member', id])
       setShowEditModal(false)
+    },
+  })
+
+  const regenerateStatementLinkMutation = useMutation({
+    mutationFn: () => resetMemberProfileLink(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['member', id] })
+      alert('New statement link is ready. Copy it and share with the member; the previous URL no longer works.')
+    },
+    onError: (error) => {
+      alert(error.response?.data?.message || 'Could not regenerate link')
     },
   })
 
@@ -703,17 +714,21 @@ export default function MemberProfile() {
           )}
           <div className="col-span-2 md:col-span-3">
             <label className="text-sm font-medium text-gray-500">Registration / Statement Link</label>
-            <div className="mt-2 flex items-center gap-2">
+            <p className="text-xs text-gray-500 mb-2">
+              This URL stays the same until you regenerate it. Old links stop working after regeneration.
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               {member.public_share_token ? (
                 <>
                   <input
                     type="text"
                     readOnly
                     value={`${window.location.origin}/s/${member.public_share_token}`}
-                    className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-sm font-mono"
+                    className="flex-1 min-w-[12rem] px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-sm font-mono"
                     onClick={(e) => e.target.select()}
                   />
                   <button
+                    type="button"
                     onClick={() => {
                       const link = `${window.location.origin}/s/${member.public_share_token}`
                       navigator.clipboard.writeText(link)
@@ -723,9 +738,28 @@ export default function MemberProfile() {
                   >
                     Copy Link
                   </button>
+                  <button
+                    type="button"
+                    disabled={regenerateStatementLinkMutation.isPending}
+                    onClick={() => {
+                      if (
+                        !confirm(
+                          'Regenerate this member’s statement link? The old URL will stop working immediately.'
+                        )
+                      ) {
+                        return
+                      }
+                      regenerateStatementLinkMutation.mutate()
+                    }}
+                    className="px-4 py-2 border border-amber-300 text-amber-900 bg-amber-50 rounded-md hover:bg-amber-100 text-sm font-medium disabled:opacity-50"
+                  >
+                    {regenerateStatementLinkMutation.isPending ? 'Regenerating…' : 'Regenerate link'}
+                  </button>
                 </>
               ) : (
-                <span className="text-gray-400 text-sm">Link will be generated when you view this profile</span>
+                <span className="text-gray-500 text-sm">
+                  Creating link… (if this persists, run <code className="text-xs bg-gray-100 px-1 rounded">php artisan migrate</code> on the server)
+                </span>
               )}
             </div>
             <p className="text-xs text-gray-500 mt-1">

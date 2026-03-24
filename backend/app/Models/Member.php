@@ -377,6 +377,33 @@ class Member extends Model
     }
 
     /**
+     * Replace the public share token with a new one (admin action only).
+     * Invalidates old /s/{token} URLs for this member.
+     */
+    public function regeneratePublicShareToken(): string
+    {
+        return DB::transaction(function () {
+            $locked = static::whereKey($this->getKey())->lockForUpdate()->firstOrFail();
+
+            $token = $this->generateUniqueToken();
+            $locked->public_share_token = $token;
+            $locked->public_share_token_expires_at = null;
+            $locked->public_share_last_accessed_at = null;
+            $locked->public_share_access_count = 0;
+
+            if (! $locked->saveQuietly()) {
+                Log::error('Failed to persist regenerated public_share_token', ['member_id' => $this->id]);
+
+                throw new \RuntimeException('Could not save new statement link token');
+            }
+
+            $this->refresh();
+
+            return $this->public_share_token;
+        });
+    }
+
+    /**
      * Generate a unique public share token
      */
     protected function generateUniqueToken(): string
