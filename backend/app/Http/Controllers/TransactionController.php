@@ -25,7 +25,7 @@ class TransactionController extends Controller
 
     public function index(Request $request)
     {
-        $query = Transaction::with(['member', 'bankStatement', 'matchLogs']);
+        $query = Transaction::with(['member', 'bankStatement', 'matchLogs', 'splits.member']);
 
         // Handle archived filter
         if ($request->has('archived')) {

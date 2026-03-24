@@ -8,6 +8,45 @@ import Pagination from '../components/Pagination'
 import PageHeader from '../components/PageHeader'
 import { HiEllipsisVertical, HiOutlineChevronDown } from 'react-icons/hi2'
 
+/** Shows assigned member(s): splits (multi-recipient / shared) or single member. */
+function TransactionMemberCell({ tx, navigate, compact = false }) {
+  const fmt = (n) =>
+    new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(Number(n || 0))
+  const splits = Array.isArray(tx.splits) ? tx.splits.filter((s) => s.member?.id) : []
+  if (splits.length > 0) {
+    return (
+      <div className={compact ? 'flex flex-wrap gap-1' : 'max-w-xs space-y-1'}>
+        {splits.map((split) => (
+          <div key={split.id} className={compact ? 'inline-flex items-center gap-1' : 'flex flex-wrap items-baseline gap-x-1'}>
+            <button
+              type="button"
+              onClick={() => navigate(`/members/${split.member.id}?highlight=${tx.id}`)}
+              className="text-indigo-600 hover:text-indigo-900 hover:underline text-left text-xs"
+              title="View member statement"
+            >
+              {split.member.name}
+            </button>
+            <span className="text-xs text-gray-500">{fmt(split.amount)}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+  if (tx.member?.id) {
+    return (
+      <button
+        type="button"
+        onClick={() => navigate(`/members/${tx.member.id}?highlight=${tx.id}`)}
+        className="max-w-xs truncate text-indigo-600 hover:text-indigo-900 hover:underline text-left"
+        title={`View ${tx.member.name}'s statement`}
+      >
+        {tx.member.name}
+      </button>
+    )
+  }
+  return <span className="text-gray-400">—</span>
+}
+
 export default function Transactions({
   initialArchivedFilter = 'active',
   isArchivedView = false,
@@ -888,13 +927,8 @@ export default function Transactions({
                             {tx.transaction_type}
                           </span>
                         )}
-                        {tx.member?.name && (
-                          <button
-                            onClick={() => navigate(`/members/${tx.member.id}?highlight=${tx.id}`)}
-                            className="text-xs text-indigo-600 hover:text-indigo-900 hover:underline"
-                          >
-                            {tx.member.name}
-                          </button>
+                        {(tx.splits?.length > 0 || tx.member?.name) && (
+                          <TransactionMemberCell tx={tx} navigate={navigate} compact />
                         )}
                       </div>
                     </td>
@@ -914,19 +948,7 @@ export default function Transactions({
                       {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', minimumFractionDigits: 0 }).format(tx.credit || tx.debit || 0)}
                     </td>
                     <td className="px-2 py-2 text-sm text-gray-500 hidden md:table-cell">
-                      {tx.member?.id ? (
-                        <button
-                          onClick={() => navigate(`/members/${tx.member.id}?highlight=${tx.id}`)}
-                          className="max-w-xs truncate text-indigo-600 hover:text-indigo-900 hover:underline text-left"
-                          title={`View ${tx.member.name}'s statement`}
-                        >
-                          {tx.member.name}
-                        </button>
-                      ) : (
-                        <div className="max-w-xs truncate">
-                          -
-                        </div>
-                      )}
+                      <TransactionMemberCell tx={tx} navigate={navigate} />
                     </td>
                     <td className="px-2 py-2 hidden lg:table-cell">
                       <span className={`inline-flex px-1.5 py-0.5 text-xs font-semibold rounded-full ${
@@ -934,6 +956,7 @@ export default function Transactions({
                         tx.assignment_status === 'manual_assigned' ? 'bg-blue-100 text-blue-800' :
                         tx.assignment_status === 'draft' ? 'bg-yellow-100 text-yellow-800' :
                         tx.assignment_status === 'duplicate' ? 'bg-orange-100 text-orange-800' :
+                        tx.assignment_status === 'transferred' ? 'bg-purple-100 text-purple-800' :
                         'bg-gray-100 text-gray-800'
                       }`}>
                         {tx.assignment_status}

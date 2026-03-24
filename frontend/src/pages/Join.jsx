@@ -80,15 +80,9 @@ export default function Join() {
         <div className="max-w-md w-full bg-white shadow-xl rounded-2xl p-8 text-center">
           <div className="text-6xl mb-4">✓</div>
           <h1 className="text-2xl font-bold text-gray-900 mb-3">Application Submitted</h1>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-600">
             Your membership application has been received. An administrator will review it and notify you once approved.
           </p>
-          <Link
-            to="/login"
-            className="inline-block px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700"
-          >
-            Back to Login
-          </Link>
         </div>
       </div>
     )
