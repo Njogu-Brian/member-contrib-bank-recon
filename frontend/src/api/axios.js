@@ -1,7 +1,20 @@
 // /src/api/axios.js
 import axios from 'axios'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+/**
+ * VITE_API_BASE_URL should end with /api/v1 (e.g. https://domain.com/api/v1).
+ * Paths passed to axios must NOT include /api/v1 again (use /admin/..., /auth/..., /public/...).
+ */
+export function getApiBaseUrl() {
+  const env = import.meta.env.VITE_API_BASE_URL
+  if (!env || env === '') {
+    return 'http://localhost:8000/api/v1'
+  }
+  const trimmed = env.replace(/\/$/, '')
+  return trimmed.endsWith('/api/v1') ? trimmed : `${trimmed}/api/v1`
+}
+
+const API_BASE = getApiBaseUrl()
 
 // Create the main axios instance (token-based auth)
 const api = axios.create({
@@ -72,13 +85,11 @@ api.interceptors.response.use(
 )
 
 /**
- * Helper to build admin-prefixed paths.
- * Returns a path like "/api/v1/admin/<cleanPath>"
- * Adjust the '/api/v1' prefix if your backend uses different base.
+ * Admin routes under baseURL (/api/v1). Returns "/admin/<path>" only.
  */
 const withAdminPrefix = (path = '') => {
   const cleanPath = path.startsWith('/') ? path.slice(1) : path
-  return `/api/v1/admin/${cleanPath}`.replace(/\/+$/, '').replace(/\/{2,}/g, '/')
+  return `/admin/${cleanPath}`.replace(/\/+$/, '').replace(/\/{2,}/g, '/')
 }
 
 // Named export: adminApi — simple wrapper around `api` with admin prefix

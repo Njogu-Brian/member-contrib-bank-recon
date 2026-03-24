@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
+import { getApiBaseUrl } from '../api/axios'
 
 /**
  * Statement Header Component with Logo
@@ -30,15 +31,11 @@ export default function StatementHeader({ member, isPublic = false, onPrint, onD
             let fixedLogoUrl = data.logo_url
             if (fixedLogoUrl.startsWith('http://localhost/')) {
               // Replace with backend URL
-              const backendUrl = import.meta.env.VITE_API_BASE_URL 
-                ? import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '') 
-                : 'http://localhost'
+              const backendUrl = getApiBaseUrl().replace(/\/api\/v1$/, '') || 'http://localhost'
               fixedLogoUrl = fixedLogoUrl.replace('http://localhost', backendUrl)
             } else if (fixedLogoUrl.startsWith('/storage/')) {
               // Prepend backend origin
-              const backendUrl = import.meta.env.VITE_API_BASE_URL 
-                ? import.meta.env.VITE_API_BASE_URL.replace('/api/v1', '') 
-                : window.location.origin
+              const backendUrl = getApiBaseUrl().replace(/\/api\/v1$/, '') || window.location.origin
               fixedLogoUrl = backendUrl + fixedLogoUrl
             }
             setLogoUrl(fixedLogoUrl)

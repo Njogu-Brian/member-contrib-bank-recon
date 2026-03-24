@@ -30,7 +30,7 @@ export default function Join() {
   const { data: publicSettings } = useQuery({
     queryKey: ['public-settings'],
     queryFn: async () => {
-      const response = await api.get('/api/v1/public/settings')
+      const response = await api.get('/public/settings')
       return response.data
     },
     staleTime: 5 * 60 * 1000,
