@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getMember, updateMember, getMemberStatement, exportMemberStatement, checkDuplicate } from '../api/members'
+import { getMember, ensureMemberShareToken, updateMember, getMemberStatement, exportMemberStatement, checkDuplicate } from '../api/members'
 import useDebounce from '../hooks/useDebounce'
 import { getMemberAuditResults } from '../api/audit'
 import MemberSearchModal from '../components/MemberSearchModal'
@@ -59,13 +59,34 @@ export default function MemberProfile() {
   const [actionMenuOpen, setActionMenuOpen] = useState(null)
   const actionMenuRef = useRef(null)
   const highlightedRowRef = useRef(null)
+  const ensureShareTokenOnceRef = useRef(null)
   const queryClient = useQueryClient()
 
   const { data: member, isLoading } = useQuery({
     queryKey: ['member', id],
     queryFn: () => getMember(id),
     enabled: !!id,
+    staleTime: 30 * 1000,
   })
+
+  // Create statement link token once if missing (GET /members/:id is read-only; avoids rotating tokens on every refetch)
+  useEffect(() => {
+    if (!id || !member) return
+    if (member.public_share_token) {
+      ensureShareTokenOnceRef.current = null
+      return
+    }
+    const key = String(id)
+    if (ensureShareTokenOnceRef.current === key) return
+    ensureShareTokenOnceRef.current = key
+    ensureMemberShareToken(id)
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['member', id] })
+      })
+      .catch(() => {
+        ensureShareTokenOnceRef.current = null
+      })
+  }, [id, member, queryClient])
 
   const { data: statementData, isLoading: isStatementLoading } = useQuery({
     queryKey: ['member-statement', id, page, perPage, transactionFilter],

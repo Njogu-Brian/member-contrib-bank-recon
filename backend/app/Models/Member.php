@@ -344,16 +344,36 @@ class Member extends Model
     }
 
     /**
-     * Get or generate public share token for this member
+     * Get or generate public share token for this member.
+     * Uses a row lock so concurrent callers cannot overwrite each other's tokens.
      */
     public function getPublicShareToken(): string
     {
-        if (!$this->public_share_token) {
-            $this->public_share_token = $this->generateUniqueToken();
-            $this->saveQuietly();
+        if (filled($this->public_share_token)) {
+            return $this->public_share_token;
         }
 
-        return $this->public_share_token;
+        return DB::transaction(function () {
+            $locked = static::whereKey($this->getKey())->lockForUpdate()->firstOrFail();
+
+            if (filled($locked->public_share_token)) {
+                $this->refresh();
+
+                return $this->public_share_token;
+            }
+
+            $token = $this->generateUniqueToken();
+            $locked->public_share_token = $token;
+            if (! $locked->saveQuietly()) {
+                Log::error('Failed to persist public_share_token', ['member_id' => $this->id]);
+
+                throw new \RuntimeException('Could not save statement link token');
+            }
+
+            $this->refresh();
+
+            return $this->public_share_token;
+        });
     }
 
     /**

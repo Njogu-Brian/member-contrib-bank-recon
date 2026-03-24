@@ -197,6 +197,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/members/pending-profile-changes', [PendingProfileChangeController::class, 'index']);
         Route::get('/members/pending-profile-changes/statement', [PendingProfileChangeController::class, 'statement']);
         Route::get('/members/profile-update-status', [MemberController::class, 'profileUpdateStatus']);
+        Route::post('/members/{member}/ensure-share-token', [MemberController::class, 'ensureStatementLink'])->where('member', '[0-9]+');
         Route::post('/members/{member}/reset-profile-link', [MemberController::class, 'resetProfileLink'])->where('member', '[0-9]+');
         Route::post('/members/reset-all-profile-links', [MemberController::class, 'resetAllProfileLinks']);
         Route::post('/members/bulk-upload', [MemberController::class, 'bulkUpload']);

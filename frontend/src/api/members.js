@@ -10,6 +10,12 @@ export const getMember = async (id) => {
   return response.data
 }
 
+/** One-time create of public statement link token (GET member no longer does this). */
+export const ensureMemberShareToken = async (id) => {
+  const response = await api.post(`/admin/members/${id}/ensure-share-token`)
+  return response.data
+}
+
 export const createMember = async (data) => {
   const response = await api.post('/admin/members', data)
   return response.data

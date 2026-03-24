@@ -258,18 +258,8 @@ class MemberController extends Controller
                 $member->setAttribute('contribution_status', 'unknown');
             }
 
-            // Ensure public share token exists
-            if (!$member->public_share_token) {
-                try {
-                    $member->getPublicShareToken();
-                    $member->refresh();
-                } catch (\Throwable $e) {
-                    \Illuminate\Support\Facades\Log::warning('Member getPublicShareToken failed', [
-                        'member_id' => $member->id,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            }
+            // Do not generate public_share_token on GET — refetches (React Query, focus, etc.) would
+            // hammer the DB and rotate links. Use POST .../ensure-share-token when a link is needed.
 
             try {
                 return response()->json($member);
@@ -1051,6 +1041,32 @@ class MemberController extends Controller
         $member->delete();
 
         return response()->json(['message' => 'Member deleted successfully']);
+    }
+
+    /**
+     * Create a stable public statement link token if missing (explicit write — not called on GET show).
+     */
+    public function ensureStatementLink(Member $member)
+    {
+        try {
+            $member->getPublicShareToken();
+            $member->refresh();
+
+            return response()->json([
+                'message' => 'Statement link is ready',
+                'public_share_token' => $member->public_share_token,
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('ensureStatementLink failed', [
+                'member_id' => $member->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Could not create statement link',
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred',
+            ], 500);
+        }
     }
 
     /**
