@@ -454,6 +454,7 @@ class TransactionController extends Controller
         // Get all unarchived transactions for duplicate checking
         $allTransactions = Transaction::where('is_archived', false)
             ->where('credit', '>', 0)
+            ->whereNull('manual_contribution_id')
             ->with('bankStatement')
             ->get();
         

@@ -15,6 +15,7 @@ export default function ManualContributions() {
     member_id: '',
     amount: '',
     contribution_date: new Date().toISOString().split('T')[0],
+    reference_number: '',
     payment_method: 'cash',
     notes: '',
   })
@@ -67,6 +68,7 @@ export default function ManualContributions() {
       member_id: '',
       amount: '',
       contribution_date: new Date().toISOString().split('T')[0],
+      reference_number: '',
       payment_method: 'cash',
       notes: '',
     })
@@ -79,6 +81,7 @@ export default function ManualContributions() {
       member_id: contribution.member_id,
       amount: contribution.amount,
       contribution_date: contribution.contribution_date,
+      reference_number: contribution.reference_number || '',
       payment_method: contribution.payment_method,
       notes: contribution.notes || '',
     })
@@ -138,6 +141,7 @@ export default function ManualContributions() {
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Method</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -148,6 +152,7 @@ export default function ManualContributions() {
               <tr key={contribution.id}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{contribution.contribution_date}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{contribution.member?.name}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{contribution.reference_number || '—'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                   {new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES' }).format(contribution.amount)}
                 </td>
@@ -238,6 +243,19 @@ export default function ManualContributions() {
                       onChange={(e) => setFormData({ ...formData, contribution_date: e.target.value })}
                       className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Reference Number</label>
+                    <input
+                      type="text"
+                      value={formData.reference_number}
+                      onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
+                      placeholder="e.g. M-Pesa/Bank reference"
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      If a future statement upload contains this reference, it will be linked automatically.
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Payment Method *</label>

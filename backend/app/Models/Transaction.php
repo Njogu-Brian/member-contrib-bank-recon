@@ -11,6 +11,7 @@ class Transaction extends Model
 
     protected $fillable = [
         'bank_statement_id',
+        'manual_contribution_id',
         'tran_date',
         'value_date',
         'particulars',
@@ -90,6 +91,11 @@ class Transaction extends Model
     public function expense()
     {
         return $this->hasOne(Expense::class);
+    }
+
+    public function manualContribution()
+    {
+        return $this->belongsTo(ManualContribution::class, 'manual_contribution_id');
     }
 }
 

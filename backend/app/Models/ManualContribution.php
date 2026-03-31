@@ -13,6 +13,7 @@ class ManualContribution extends Model
         'member_id',
         'amount',
         'contribution_date',
+        'reference_number',
         'payment_method',
         'notes',
         'created_by',
@@ -31,6 +32,11 @@ class ManualContribution extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function matchedTransaction()
+    {
+        return $this->hasOne(Transaction::class, 'manual_contribution_id');
     }
 
     protected static function booted(): void

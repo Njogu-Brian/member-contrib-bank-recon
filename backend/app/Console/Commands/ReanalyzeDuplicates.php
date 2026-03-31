@@ -35,6 +35,7 @@ class ReanalyzeDuplicates extends Command
 
             // Cross-statement duplicates
             $crossStatementDuplicates = Transaction::where('bank_statement_id', $statement->id)
+                ->whereNull('manual_contribution_id')
                 ->whereExists(function ($query) {
                     $query->select(DB::raw(1))
                         ->from('transactions as prior')
@@ -78,6 +79,7 @@ class ReanalyzeDuplicates extends Command
             // Intra-statement duplicates
             $duplicateHashes = Transaction::select('row_hash')
                 ->where('bank_statement_id', $statement->id)
+                ->whereNull('manual_contribution_id')
                 ->groupBy('row_hash')
                 ->havingRaw('COUNT(*) > 1')
                 ->pluck('row_hash');

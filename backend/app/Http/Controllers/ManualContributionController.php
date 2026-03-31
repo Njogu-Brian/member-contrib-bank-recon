@@ -33,6 +33,7 @@ class ManualContributionController extends Controller
             'member_id' => 'required|exists:members,id',
             'amount' => 'required|numeric|min:0.01',
             'contribution_date' => 'required|date',
+            'reference_number' => 'nullable|string|max:100',
             'payment_method' => 'required|in:cash,mpesa,bank_transfer,other',
             'notes' => 'nullable|string',
         ]);
@@ -57,6 +58,7 @@ class ManualContributionController extends Controller
             'member_id' => 'sometimes|required|exists:members,id',
             'amount' => 'sometimes|required|numeric|min:0.01',
             'contribution_date' => 'sometimes|required|date',
+            'reference_number' => 'nullable|string|max:100',
             'payment_method' => 'sometimes|required|in:cash,mpesa,bank_transfer,other',
             'notes' => 'nullable|string',
         ]);
@@ -137,6 +139,7 @@ class ManualContributionController extends Controller
                     'member_id' => $member->id,
                     'amount' => $amount,
                     'contribution_date' => $date,
+                    'reference_number' => $data['reference_number'] ?? $data['reference'] ?? $data['ref'] ?? null,
                     'payment_method' => $data['payment_method'] ?? 'cash',
                     'notes' => $data['notes'] ?? 'Imported from Excel',
                     'created_by' => $user->id,

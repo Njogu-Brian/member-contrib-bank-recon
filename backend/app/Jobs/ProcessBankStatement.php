@@ -3,8 +3,10 @@
 namespace App\Jobs;
 
 use App\Models\BankStatement;
+use App\Models\ManualContribution;
 use App\Models\StatementDuplicate;
 use App\Models\Transaction;
+use App\Models\TransactionMatchLog;
 use App\Services\OcrParserService;
 use App\Services\TransactionParserService;
 use Illuminate\Bus\Queueable;
@@ -61,7 +63,7 @@ class ProcessBankStatement implements ShouldQueue
                 $assignmentStatus = 'unassigned';
                 
                 // Store transaction
-                Transaction::create([
+                $transaction = Transaction::create([
                     'bank_statement_id' => $this->bankStatement->id,
                     'tran_date' => $normalized['tran_date'],
                     'value_date' => $normalized['value_date'] ?? $normalized['tran_date'],
@@ -78,6 +80,7 @@ class ProcessBankStatement implements ShouldQueue
                     'assignment_status' => $assignmentStatus,
                 ]);
 
+                $this->reconcileManualContribution($transaction);
                 $savedCount++;
             }
 
@@ -161,6 +164,65 @@ class ProcessBankStatement implements ShouldQueue
             'transaction_code' => $parsed['transaction_code'] ?? $data['transaction_code'] ?? null,
             'phones' => $parsed['phones'],
         ];
+    }
+
+    protected function reconcileManualContribution(Transaction $transaction): void
+    {
+        $reference = trim((string) ($transaction->transaction_code ?? ''));
+        if ($reference === '') {
+            return;
+        }
+
+        $manual = ManualContribution::query()
+            ->whereNotNull('reference_number')
+            ->whereRaw('LOWER(reference_number) = ?', [mb_strtolower($reference)])
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$manual) {
+            return;
+        }
+
+        // Avoid linking multiple statement rows to the same manual contribution.
+        $alreadyLinked = Transaction::where('manual_contribution_id', $manual->id)->exists();
+        if ($alreadyLinked) {
+            return;
+        }
+
+        $statementAmount = (float) ($transaction->credit > 0 ? $transaction->credit : $transaction->debit);
+        $statementDate = $transaction->tran_date?->toDateString();
+
+        // Link transaction to the manual contribution and set member assignment.
+        $transaction->update([
+            'manual_contribution_id' => $manual->id,
+            'member_id' => $manual->member_id,
+            'assignment_status' => 'manual_assigned',
+            'match_confidence' => 1.0,
+            'draft_member_ids' => null,
+            'is_archived' => false,
+            'archived_at' => null,
+            'archive_reason' => null,
+        ]);
+
+        TransactionMatchLog::create([
+            'transaction_id' => $transaction->id,
+            'member_id' => $manual->member_id,
+            'confidence' => 1.0,
+            'match_reason' => "Linked to manual contribution via reference {$reference}",
+            'source' => 'manual_contribution_reference',
+        ]);
+
+        // Align manual contribution values to statement values when mismatched.
+        $updates = [];
+        if ($statementDate && optional($manual->contribution_date)->toDateString() !== $statementDate) {
+            $updates['contribution_date'] = $statementDate;
+        }
+        if ($statementAmount > 0 && abs(((float) $manual->amount) - $statementAmount) > 0.009) {
+            $updates['amount'] = $statementAmount;
+        }
+        if (!empty($updates)) {
+            $manual->update($updates);
+        }
     }
 
     protected function createRowHash(array $transaction): string
