@@ -332,7 +332,7 @@ export default function StatementViewer() {
     retry: 1,
   })
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+  const authToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
   const [pdfUrl, setPdfUrl] = useState(null)
   const [pdfFetchError, setPdfFetchError] = useState(null)
   const metrics = data?.metrics || {}
@@ -342,8 +342,31 @@ export default function StatementViewer() {
     let isActive = true
     let objectUrl = null
 
+    const resolveDocumentUrl = (rawUrl) => {
+      if (!rawUrl) return null
+
+      // If backend returns a relative /api/... path, keep it relative so dev proxy works.
+      if (rawUrl.startsWith('/')) {
+        return rawUrl
+      }
+
+      try {
+        const parsed = new URL(rawUrl)
+        // In dev it's easy to misconfigure APP_URL and lose the :8000 port.
+        // If it's clearly an API path, rewrite to current origin so Vite proxy can handle it.
+        if (parsed.pathname.startsWith('/api/') && parsed.host !== window.location.host) {
+          return `${window.location.origin}${parsed.pathname}${parsed.search}`
+        }
+        return rawUrl
+      } catch {
+        return rawUrl
+      }
+    }
+
     const loadPdf = async () => {
-      const documentUrl = data?.statement?.document_absolute_url ?? data?.statement?.document_url
+      const documentUrl = resolveDocumentUrl(
+        data?.statement?.document_url ?? data?.statement?.document_absolute_url
+      )
 
       if (!documentUrl) {
         setPdfUrl(null)
@@ -356,7 +379,7 @@ export default function StatementViewer() {
         setPdfUrl(null)
 
         const response = await fetch(documentUrl, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
           credentials: 'include',
         })
 
@@ -389,7 +412,7 @@ export default function StatementViewer() {
         URL.revokeObjectURL(objectUrl)
       }
     }
-  }, [data, token])
+  }, [data, authToken])
 
   useEffect(() => {
     const handleResize = () => {
