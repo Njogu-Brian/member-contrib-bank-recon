@@ -199,9 +199,14 @@ class SmsService
                 ? $this->generatePublicStatementLink($data['id'], $baseUrl)
                 : '',
             // Invoice placeholders
+            // total_invoices / expected_contributions = ALL invoices issued (matches statement "Total Invoices")
             '{total_invoices}' => isset($data['total_invoices']) 
                 ? number_format($data['total_invoices'], 2) 
                 : '0.00',
+            '{expected_contributions}' => isset($data['total_invoices']) 
+                ? number_format($data['total_invoices'], 2) 
+                : '0.00',
+            // pending_invoices = unpaid only (pending + overdue) — NOT total expected
             '{pending_invoices}' => isset($data['pending_invoices']) 
                 ? number_format($data['pending_invoices'], 2) 
                 : '0.00',

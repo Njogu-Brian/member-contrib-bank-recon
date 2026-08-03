@@ -426,6 +426,7 @@ class MemberController extends Controller
                 'closing_balance' => $runningBalance,
             ]),
             'invoice_summary' => $invoiceSummaryFormatted,
+            'mpesa_paybill' => \App\Models\Setting::get('mpesa_paybill', '4165387'),
             'pagination' => [
                 'current_page' => $paginatedStatement->currentPage(),
                 'per_page' => $paginatedStatement->perPage(),

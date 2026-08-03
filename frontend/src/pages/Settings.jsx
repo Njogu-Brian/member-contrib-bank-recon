@@ -17,6 +17,7 @@ export default function Settings() {
     contribution_start_date: '',
     weekly_contribution_amount: 1000,
     contact_phone: '',
+    mpesa_paybill: '4165387',
     logo: null,
     favicon: null,
   })
@@ -49,6 +50,7 @@ export default function Settings() {
         contribution_start_date: settings.contribution_start_date || '',
         weekly_contribution_amount: parseFloat(settings.weekly_contribution_amount) || 1000,
         contact_phone: settings.contact_phone || '',
+        mpesa_paybill: settings.mpesa_paybill || '4165387',
         logo: null,
         favicon: null,
         invoice_reminder_enabled: settings.invoice_reminder_enabled || 'true',
@@ -478,6 +480,22 @@ export default function Settings() {
                       />
                       <p className="mt-1 text-sm text-gray-500">
                         Contact number for member inquiries (appears on statements).
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        M-Pesa Paybill Number
+                      </label>
+                      <input
+                        type="text"
+                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                        placeholder="e.g., 4165387"
+                        value={formData.mpesa_paybill}
+                        onChange={(e) => setFormData({ ...formData, mpesa_paybill: e.target.value })}
+                      />
+                      <p className="mt-1 text-sm text-gray-500">
+                        Shown on member statements so members know where to contribute.
                       </p>
                     </div>
                   </div>

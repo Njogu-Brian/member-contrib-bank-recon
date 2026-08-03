@@ -96,8 +96,9 @@ class PublicMemberStatementController extends Controller
             ['path' => $request->url(), 'query' => $request->query()]
         );
 
-        // Get contact phone from settings
+        // Get contact phone and paybill from settings
         $contactPhone = \App\Models\Setting::get('contact_phone', null);
+        $mpesaPaybill = \App\Models\Setting::get('mpesa_paybill', '4165387');
 
         return response()->json([
             'member' => [
@@ -120,6 +121,7 @@ class PublicMemberStatementController extends Controller
             'monthly_totals' => $data['monthly_totals'],
             'print_date' => now()->toIso8601String(),
             'contact_phone' => $contactPhone,
+            'mpesa_paybill' => $mpesaPaybill,
         ]);
     }
 

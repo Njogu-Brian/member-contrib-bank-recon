@@ -359,6 +359,25 @@ export default function PublicStatement() {
 
       {/* Summary Cards */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {(data?.mpesa_paybill || '4165387') && (
+          <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            <p className="font-semibold">How to contribute (M-Pesa)</p>
+            <p className="mt-1">
+              Paybill: <span className="font-bold tracking-wide">{data?.mpesa_paybill || '4165387'}</span>
+              {member?.member_number || member?.member_code || member?.phone ? (
+                <>
+                  {' '}· Account / Till Account:{' '}
+                  <span className="font-bold">
+                    {member?.member_number || member?.member_code || member?.phone}
+                  </span>
+                </>
+              ) : null}
+            </p>
+            <p className="mt-1 text-emerald-800">
+              Use Lipa na M-Pesa → Paybill, enter the Paybill number above, then your account reference.
+            </p>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow p-4">
             <p className="text-sm text-gray-600">Total Contributions</p>

@@ -167,6 +167,7 @@ class SettingController extends Controller
             'contribution_start_date' => 'nullable|date',
             'weekly_contribution_amount' => 'nullable|numeric|min:0',
             'contact_phone' => 'nullable|string|max:20',
+            'mpesa_paybill' => 'nullable|string|max:20',
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
             'favicon' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg,ico|max:512',
         ]);
@@ -214,12 +215,18 @@ class SettingController extends Controller
             Setting::set('contact_phone', $validated['contact_phone']);
         }
 
+        if ($request->has('mpesa_paybill')) {
+            Setting::set('mpesa_paybill', $validated['mpesa_paybill']);
+        }
+
         // Return updated settings
         $settings = Setting::all()->pluck('value', 'key');
         $response = [
             'message' => 'Settings updated successfully',
             'contribution_start_date' => $settings->get('contribution_start_date'),
             'weekly_contribution_amount' => $settings->get('weekly_contribution_amount'),
+            'contact_phone' => $settings->get('contact_phone'),
+            'mpesa_paybill' => $settings->get('mpesa_paybill'),
         ];
         
         // Add URLs for logo and favicon if they exist

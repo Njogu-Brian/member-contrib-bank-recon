@@ -22,6 +22,12 @@ export const updateSettings = (data) => {
   if (data.weekly_contribution_amount !== undefined) {
     formData.append('weekly_contribution_amount', String(data.weekly_contribution_amount || ''))
   }
+  if (data.contact_phone !== undefined) {
+    formData.append('contact_phone', data.contact_phone || '')
+  }
+  if (data.mpesa_paybill !== undefined) {
+    formData.append('mpesa_paybill', data.mpesa_paybill || '')
+  }
   
   // Add file uploads - MUST come after other fields for proper FormData handling
   if (data.logo instanceof File) {

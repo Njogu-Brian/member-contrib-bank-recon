@@ -204,6 +204,7 @@ class EmailController extends Controller
             ),
             '{total_invoices}' => number_format($memberData['total_invoices'] ?? 0, 2),
             '{pending_invoices}' => number_format($memberData['pending_invoices'] ?? 0, 2),
+            '{expected_contributions}' => number_format($memberData['total_invoices'] ?? 0, 2),
             '{overdue_invoices}' => number_format($memberData['overdue_invoices'] ?? 0, 2),
             '{paid_invoices}' => number_format($memberData['paid_invoices'] ?? 0, 2),
             '{pending_invoice_count}' => $memberData['pending_invoice_count'] ?? 0,

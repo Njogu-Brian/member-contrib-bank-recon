@@ -292,9 +292,17 @@ export default function BulkSms() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => insertPlaceholder('{expected_contributions}')}
+                    className="px-2 py-1 text-xs bg-orange-100 hover:bg-orange-200 rounded border border-orange-300"
+                    title="Expected = total invoices issued (matches statement Total Invoices)"
+                  >
+                    {'{expected_contributions}'}
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => insertPlaceholder('{total_invoices}')}
                     className="px-2 py-1 text-xs bg-orange-100 hover:bg-orange-200 rounded border border-orange-300"
-                    title="Total invoices issued"
+                    title="Total invoices issued (same as expected_contributions)"
                   >
                     {'{total_invoices}'}
                   </button>
@@ -326,7 +334,7 @@ export default function BulkSms() {
                     type="button"
                     onClick={() => insertPlaceholder('{pending_invoices}')}
                     className="px-2 py-1 text-xs bg-orange-100 hover:bg-orange-200 rounded border border-orange-300"
-                    title="Total pending invoices amount"
+                    title="Unpaid only (pending + overdue) — not total expected"
                   >
                     {'{pending_invoices}'}
                   </button>

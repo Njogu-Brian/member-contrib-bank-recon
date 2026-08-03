@@ -786,6 +786,22 @@ export default function MemberProfile() {
             </div>
           )}
         </div>
+        {(statementData?.mpesa_paybill || '4165387') && (
+          <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            <p className="font-semibold">How to contribute (M-Pesa)</p>
+            <p className="mt-1">
+              Paybill: <span className="font-bold tracking-wide">{statementData?.mpesa_paybill || '4165387'}</span>
+              {(member?.member_number || member?.member_code || member?.phone) && (
+                <>
+                  {' '}· Account:{' '}
+                  <span className="font-bold">
+                    {member?.member_number || member?.member_code || member?.phone}
+                  </span>
+                </>
+              )}
+            </p>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
             <label className="text-sm font-medium text-gray-500">Total Contributions</label>
