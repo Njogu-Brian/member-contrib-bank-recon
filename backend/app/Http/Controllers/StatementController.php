@@ -263,8 +263,8 @@ class StatementController extends Controller
             'status' => 'uploaded',
         ]);
 
-        // Queue processing job
-        ProcessBankStatement::dispatch($statement);
+        // Parse after the HTTP response is sent — no queue worker required for uploads.
+        ProcessBankStatement::dispatchAfterResponse($statement);
 
         return response()->json($statement, 201);
     }
@@ -298,8 +298,8 @@ class StatementController extends Controller
         // Refresh the model
         $statement->refresh();
         
-        // Queue processing job
-        ProcessBankStatement::dispatch($statement);
+        // Parse after the HTTP response is sent — no queue worker required.
+        ProcessBankStatement::dispatchAfterResponse($statement);
         
         return response()->json([
             'message' => 'Statement queued for re-analysis',

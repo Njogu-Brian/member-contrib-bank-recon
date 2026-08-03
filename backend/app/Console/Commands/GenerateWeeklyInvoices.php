@@ -33,21 +33,26 @@ class GenerateWeeklyInvoices extends Command
             return 0;
         }
         
-        // Check if invoices already generated for this week
-        if (!$this->option('force')) {
-            $existing = Invoice::where('period', $currentWeek)->count();
-            if ($existing > 0) {
-                $this->info("Invoices already generated for week {$currentWeek}. Use --force to regenerate.");
-                return 0;
-            }
-        }
-        
         // Get active members
         $members = Member::where('is_active', true)->get();
+        $activeCount = $members->count();
         $generated = 0;
+        $skipped = 0;
         
         $dueDate = Carbon::now()->endOfWeek();
         $issueDate = Carbon::now()->startOfWeek();
+
+        // If every active member already has this week's invoice, nothing to do
+        if (!$this->option('force')) {
+            $existing = Invoice::where('period', $currentWeek)
+                ->where('invoice_type', Invoice::TYPE_WEEKLY)
+                ->whereIn('member_id', $members->pluck('id'))
+                ->count();
+            if ($existing >= $activeCount && $activeCount > 0) {
+                $this->info("Invoices already generated for week {$currentWeek} ({$existing}/{$activeCount} members). Use --force to regenerate.");
+                return 0;
+            }
+        }
         
         foreach ($members as $member) {
             // All active members get invoices from the global start date
@@ -55,8 +60,10 @@ class GenerateWeeklyInvoices extends Command
             if (!$this->option('force')) {
                 $exists = Invoice::where('member_id', $member->id)
                     ->where('period', $currentWeek)
+                    ->where('invoice_type', Invoice::TYPE_WEEKLY)
                     ->exists();
                 if ($exists) {
+                    $skipped++;
                     continue;
                 }
             }
@@ -76,7 +83,7 @@ class GenerateWeeklyInvoices extends Command
             $generated++;
         }
         
-        $this->info("Generated {$generated} invoices for week {$currentWeek}");
+        $this->info("Week {$currentWeek}: generated {$generated}, skipped {$skipped} (already had invoice)");
         
         return 0;
     }

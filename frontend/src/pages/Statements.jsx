@@ -24,6 +24,12 @@ export default function Statements() {
     queryKey: ['statements', page],
     queryFn: () => getStatements({ page }),
     retry: 1,
+    // Keep refreshing while any statement is still being parsed
+    refetchInterval: (query) => {
+      const rows = query.state.data?.data || []
+      const pending = rows.some((s) => s.status === 'uploaded' || s.status === 'processing')
+      return pending ? 3000 : false
+    },
   })
 
   const deleteMutation = useMutation({
@@ -68,7 +74,11 @@ export default function Statements() {
       try {
         await uploadStatement(file)
         queryClient.invalidateQueries(['statements'])
-        alert('Statement uploaded successfully!')
+        // Parsing continues after the upload response; refresh a few times so status updates
+        ;[2, 5, 10, 20].forEach((sec) => {
+          setTimeout(() => queryClient.invalidateQueries(['statements']), sec * 1000)
+        })
+        alert('Statement uploaded. Parsing will start automatically — status updates shortly.')
       } catch (error) {
         alert('Upload failed: ' + error.message)
       } finally {

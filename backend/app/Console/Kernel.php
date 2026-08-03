@@ -12,9 +12,10 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // Generate weekly invoices automatically every Monday at 00:00 (one invoice per active member for that week)
+        // Generate weekly invoices daily (command is idempotent: skips weeks/members that already have invoices).
+        // Daily catch-up avoids missing a week if Monday midnight cron fails or the server was down.
         $schedule->command('invoices:generate-weekly')
-            ->weeklyOn(1, '00:00')
+            ->dailyAt('00:05')
             ->withoutOverlapping(60)
             ->onSuccess(function () {
                 \Log::info('Weekly invoices generated successfully');
@@ -47,9 +48,10 @@ class Kernel extends ConsoleKernel
                 \Log::error('Failed to process invoice reminders');
             });
 
-        // Process queued statement parsing jobs every minute (for shared hosting without persistent queue worker)
+        // Drain queued jobs every minute (shared hosting / no persistent queue worker).
+        // Covers reanalyze-all and any jobs still sitting in the jobs table.
         if (config('queue.default') === 'database') {
-            $schedule->command('queue:work --once')
+            $schedule->command('queue:work --stop-when-empty --max-time=50 --tries=3')
                 ->everyMinute()
                 ->withoutOverlapping(5)
                 ->appendOutputTo(storage_path('logs/queue-cron.log'));

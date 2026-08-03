@@ -81,10 +81,17 @@ Weekly and scheduled invoices only run if the Laravel scheduler is triggered eve
 ```
 
 **What it runs:**
-- **Weekly invoices**: Every Monday at 00:00 (`invoices:generate-weekly`)
+- **Weekly invoices**: Daily at 00:05 (`invoices:generate-weekly`) — creates current-week invoices if missing (safe to run every day)
 - **Scheduled invoices** (yearly, monthly, etc.): Daily at 01:00 (`invoices:generate-scheduled`)
 - **Invoice reminders**: Daily at time set in Settings (`invoices:send-reminders`)
+- **Queue worker (statement parsing)**: Every minute when `QUEUE_CONNECTION=database`
 - **Scheduled reports**: Hourly check
+
+**Required crontab (must exist or nothing auto-runs):**
+```bash
+* * * * * cd ~/laravel-app/evimeria/backend && php artisan schedule:run >> /dev/null 2>&1
+```
+Without this line, weekly invoices will never auto-generate.
 
 **To add the cron on production:**
 ```bash
