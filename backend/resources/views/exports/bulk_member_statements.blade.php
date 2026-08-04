@@ -9,7 +9,7 @@
 @foreach ($items as $item)
     @php
         $member = $item['member'];
-        $entries = $item['data']['collection'];
+        $entries = $item['data']['collection_with_balance'] ?? $item['data']['collection'];
         $summary = $item['data']['summary'];
         $rangeLabel = $item['data']['range_label'];
     @endphp

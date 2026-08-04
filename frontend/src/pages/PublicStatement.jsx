@@ -404,7 +404,7 @@ export default function PublicStatement() {
           <div className="bg-white rounded-lg shadow p-4">
             <p className="text-sm text-gray-600">Status</p>
             <p className="text-2xl font-bold text-gray-900">
-              {summary?.contribution_status || 'Unknown'}
+              {summary?.contribution_status_label || summary?.contribution_status || 'Unknown'}
             </p>
           </div>
         </div>
@@ -425,16 +425,29 @@ export default function PublicStatement() {
                     Description
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider print:px-2 print:py-2 print:text-xs print:border print:border-gray-300">
-                    Reference
+                    Type
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider print:px-2 print:py-2 print:text-xs print:border print:border-gray-300">
-                    Amount (KES)
+                    Debit
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider print:px-2 print:py-2 print:text-xs print:border print:border-gray-300">
+                    Credit
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider print:px-2 print:py-2 print:text-xs print:border print:border-gray-300">
+                    Balance
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200 print:divide-gray-300">
                 {statement?.length > 0 ? (
-                  statement.map((entry, index) => (
+                  statement.map((entry, index) => {
+                    const debit = Number(entry.debit || 0)
+                    const credit = Number(entry.credit || 0)
+                    const amount = Number(entry.amount || 0)
+                    const displayDebit = debit > 0 ? debit : (amount < 0 ? Math.abs(amount) : 0)
+                    const displayCredit = credit > 0 ? credit : (amount > 0 ? amount : 0)
+                    const typeLabel = (entry.type || '').replace(/_/g, ' ')
+                    return (
                     <tr key={index} className="hover:bg-gray-50 print:hover:bg-transparent print:border-b print:border-gray-300">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 print:px-2 print:py-2 print:text-xs print:border-r print:border-gray-300">
                         {formatDate(entry.date)}
@@ -442,17 +455,24 @@ export default function PublicStatement() {
                       <td className="px-6 py-4 text-sm text-gray-900 print:px-2 print:py-2 print:text-xs print:border-r print:border-gray-300">
                         {entry.description}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 print:px-2 print:py-2 print:text-xs print:border-r print:border-gray-300">
-                        {entry.reference || 'N/A'}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize print:px-2 print:py-2 print:text-xs print:border-r print:border-gray-300">
+                        {typeLabel || 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right text-red-700 print:px-2 print:py-2 print:text-xs print:border-r print:border-gray-300">
+                        {displayDebit ? formatCurrency(displayDebit) : '—'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right text-green-700 print:px-2 print:py-2 print:text-xs print:border-r print:border-gray-300">
+                        {displayCredit ? formatCurrency(displayCredit) : '—'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right text-gray-900 print:px-2 print:py-2 print:text-xs">
-                        {formatCurrency(entry.amount)}
+                        {formatCurrency(entry.running_balance ?? 0)}
                       </td>
                     </tr>
-                  ))
+                    )
+                  })
                 ) : (
                   <tr>
-                    <td colSpan="4" className="px-6 py-8 text-center text-gray-500 print:px-2 print:py-4 print:text-xs">
+                    <td colSpan="6" className="px-6 py-8 text-center text-gray-500 print:px-2 print:py-4 print:text-xs">
                       No transactions found for this period.
                     </td>
                   </tr>
